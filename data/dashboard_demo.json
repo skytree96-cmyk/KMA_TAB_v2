@@ -1,0 +1,67 @@
+{
+  "company": {
+    "metrics": [
+      {"value": "3", "label": "운영 중 프로젝트", "note": "목업 데이터"},
+      {"value": "216명", "label": "초대 참여자", "note": "완료 181명"},
+      {"value": "83.8%", "label": "평균 완료율", "note": "전주 대비 +7.2%p"},
+      {"value": "8개", "label": "기본 측정역량", "note": "32문항 · 약 7~9분"}
+    ],
+    "projects": [
+      {
+        "name": "2026 하반기 공통역량 진단",
+        "scope": "본사 전 임직원 · 8개 역량",
+        "invited": 150,
+        "completed": 129,
+        "completion_pct": 86,
+        "status": "진행 중",
+        "due": "D-8"
+      },
+      {
+        "name": "신임팀장 리더십 진단",
+        "scope": "팀장 · 공통 8＋리더 4",
+        "invited": 40,
+        "completed": 26,
+        "completion_pct": 65,
+        "status": "진행 중",
+        "due": "D-3"
+      },
+      {
+        "name": "AX 실무자 교육 요구진단",
+        "scope": "기획·마케팅 · 공통 8＋AX 2",
+        "invited": 26,
+        "completed": 26,
+        "completion_pct": 100,
+        "status": "완료",
+        "due": "완료"
+      }
+    ]
+  },
+  "kma": {
+    "metrics": [
+      {"value": "27개사", "label": "베타 이용 회원사", "note": "목업 데이터"},
+      {"value": "9개", "label": "진행 프로젝트", "note": "발행 6 · 준비 3"},
+      {"value": "1,238명", "label": "누적 유효응답", "note": "규준 미적용"},
+      {"value": "3건", "label": "검수 대기 항목", "note": "문항 2 · 매핑 1"}
+    ],
+    "frameworks": [
+      {"name": "운영 문항은행", "scope": "31개 역량 · 활성 124문항", "progress": 78, "stage": "전문가 사전감수", "status": "검수"},
+      {"name": "직급 적용 기준", "scope": "5개 직급 · 비활성 20문항", "progress": 100, "stage": "배정조건 전환", "status": "완료"},
+      {"name": "과정 추천 규칙", "scope": "5요소 · 총 100점", "progress": 62, "stage": "과정 매핑 검수", "status": "검수"}
+    ],
+    "mapping": {
+      "mapped_courses": 46,
+      "review_courses": 12,
+      "principle": "과정명 키워드가 아니라 행동지표와 학습목표의 연결 근거를 검수합니다."
+    },
+    "organizations": [
+      {"name": "A회원사", "projects": 2, "invited": 238, "completion_pct": 86, "activity": "오늘 14:30"},
+      {"name": "B회원사", "projects": 1, "invited": 112, "completion_pct": 78, "activity": "오늘 13:12"},
+      {"name": "C회원사", "projects": 1, "invited": 64, "completion_pct": 61, "activity": "어제 17:40"}
+    ],
+    "audit_events": [
+      {"time": "08.10 14:30", "event": "프로젝트 발행", "target": "A회원사 · 하반기 공통역량", "result": "성공"},
+      {"time": "08.10 13:12", "event": "조직리포트 다운로드", "target": "B회원사 · HR 담당자", "result": "기록"},
+      {"time": "08.10 11:06", "event": "소수집단 필터 요청", "target": "C회원사 · N=4 부서", "result": "차단"}
+    ]
+  }
+}

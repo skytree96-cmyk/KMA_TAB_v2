@@ -1,0 +1,97 @@
+{
+  "meta": {
+    "logical_question_codes": 144,
+    "canonical_runtime_records": 144,
+    "unique_text_variants_in_source": 149,
+    "physical_question_occurrences_in_source": 400,
+    "source_conflict_codes": [
+      "SALES_Q1",
+      "SALES_Q2",
+      "SALES_Q3",
+      "SALES_Q4",
+      "MKT_Q1"
+    ],
+    "common_instruction": "최근 8주 동안 실제 업무에서 다음 행동을 얼마나 자주 했습니까?",
+    "response_scale": {
+      "1": "전혀 없었다",
+      "2": "드물게 있었다",
+      "3": "가끔 있었다",
+      "4": "자주 있었다",
+      "5": "거의 항상 있었다",
+      "NA": "수행기회 없음"
+    },
+    "scoring_direction": "전 문항 직접채점(역문항 없음)",
+    "judgment_scope": "내용전문가의 1차 문항검토이며, 통계적 타당화 결과가 아님"
+  },
+  "duplicate_groups": {
+    "DUP_CUSTOMER_NEEDS": [
+      "Q-CO-01",
+      "SALES_Q2",
+      "LOGI_Q4"
+    ],
+    "DUP_PLAN_EXECUTION": [
+      "Q-EX-01",
+      "PLAN_Q1",
+      "SALES_Q4",
+      "GRD2_Q1"
+    ],
+    "DUP_RISK_RESPONSE": [
+      "PM_Q2",
+      "FIN_Q3",
+      "PROC_Q3",
+      "LEGAL_Q2"
+    ],
+    "DUP_SELF_LEARNING": [
+      "Q-GM-01",
+      "GRD1_Q3",
+      "DX_Q2",
+      "DEV_Q3",
+      "RND_Q2"
+    ],
+    "DUP_FEEDBACK_COACHING": [
+      "Q-PD-02",
+      "GRD3_Q2",
+      "Q-GM-04",
+      "GRD1_Q2"
+    ],
+    "DUP_PROBLEM_DEFINITION": [
+      "Q-ST-01",
+      "Q-PS-01",
+      "GRD2_Q3",
+      "GRD3_Q3"
+    ],
+    "DUP_CROSS_FUNCTIONAL_COLLAB": [
+      "Q-CL-04",
+      "GRD2_Q4",
+      "DEV_Q4",
+      "RND_Q4"
+    ],
+    "DUP_STRATEGY_EXECUTION": [
+      "STRAT_Q2",
+      "GRD3_Q4",
+      "GRD4_Q1",
+      "GRD5_Q1"
+    ],
+    "DUP_STAKEHOLDER_RELATION": [
+      "Q-CI-04",
+      "PR_Q2",
+      "GRD5_Q3",
+      "SALES_Q1"
+    ],
+    "DUP_EVIDENCE_PERSUASION": [
+      "PLAN_Q4",
+      "COMM_Q3",
+      "Q-CI-03"
+    ],
+    "DUP_DATA_INSIGHT": [
+      "Q-ST-04",
+      "MKT_Q1",
+      "DATAJOB_Q2"
+    ],
+    "DUP_PEOPLE_DEVELOPMENT": [
+      "Q-PD-03",
+      "HR_Q2",
+      "GRD4_Q3"
+    ]
+  }
+}

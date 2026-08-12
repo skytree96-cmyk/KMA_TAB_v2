@@ -1,0 +1,31 @@
+{
+  "version": "1.0.0",
+  "response_scale": {
+    "0": "수행 기회 없음",
+    "1": "전혀 없었다",
+    "2": "드물게 있었다",
+    "3": "가끔 있었다",
+    "4": "자주 있었다",
+    "5": "거의 항상 있었다"
+  },
+  "item_index": "(응답값-1)*25; NA는 제외",
+  "factor_score": "유효문항 1~5 평균; 4문항 중 최소 3문항",
+  "missing_handling": "미응답은 수행 기회 없음(0)과 분리하여 missing_items로 집계",
+  "frequency_levels": "파일럿 전 임시 기술구간; 표준설정 근거 없음",
+  "factor_index": "(역량평균-1)*25",
+  "overall_score": "제공하지 않음",
+  "norm_scores": "규준 구축 전 T점수·백분위 미제공",
+  "group_suppression": "유효 N<5 비공개",
+  "recommendation": {
+    "gap": 40,
+    "content_fit": 30,
+    "organization_priority": 15,
+    "learner_interest": 10,
+    "level_delivery_fit": 5,
+    "training_cause_gate": {
+      "knowledge_skill": 1.0,
+      "mixed_or_unknown": 0.5,
+      "system_only": 0.0
+    }
+  }
+}

@@ -1,0 +1,33 @@
+﻿course_id,title,delivery,url,target_level,active,source_status
+C001,비즈니스 커뮤니케이션 스킬업,offline,https://www.kma.or.kr/edu/list.do,all,True,원본 코드 예시명; 운영 전 실제 과정코드·개설상태 검증 필요
+C002,직장인 소통·협업의 기술,online,https://studio.kma.or.kr/member/eLearning,all,True,원본 코드 예시명; 운영 전 실제 과정코드·개설상태 검증 필요
+C003,논리적 문제해결과 의사결정,offline,https://www.kma.or.kr/edu/list.do,all,True,원본 코드 예시명; 운영 전 실제 과정코드·개설상태 검증 필요
+C004,데이터 기반 문제해결 사고,online,https://studio.kma.or.kr/member/eLearning,all,True,원본 코드 예시명; 운영 전 실제 과정코드·개설상태 검증 필요
+C005,변화관리와 조직 혁신,offline,https://www.kma.or.kr/edu/list.do,manager,True,원본 코드 예시명; 운영 전 실제 과정코드·개설상태 검증 필요
+C006,애자일 마인드셋과 변화 적응력,online,https://studio.kma.or.kr/member/eLearning,all,True,원본 코드 예시명; 운영 전 실제 과정코드·개설상태 검증 필요
+C007,전략적 기획력 향상,offline,https://www.kma.or.kr/edu/list.do,all,True,원본 코드 예시명; 운영 전 실제 과정코드·개설상태 검증 필요
+C008,사업 기획의 기술,online,https://studio.kma.or.kr/member/eLearning,all,True,원본 코드 예시명; 운영 전 실제 과정코드·개설상태 검증 필요
+C009,성과중심 목표관리 실무,offline,https://www.kma.or.kr/edu/list.do,manager,True,원본 코드 예시명; 운영 전 실제 과정코드·개설상태 검증 필요
+C010,일 잘하는 사람의 실행력,online,https://studio.kma.or.kr/member/eLearning,all,True,원본 코드 예시명; 운영 전 실제 과정코드·개설상태 검증 필요
+C011,고객 중심 사고와 서비스 혁신,online,https://studio.kma.or.kr/member/eLearning,all,True,원본 코드 예시명; 운영 전 실제 과정코드·개설상태 검증 필요
+C012,팀장 리더십 핵심,offline,https://www.kma.or.kr/edu/list.do,manager,True,원본 코드 예시명; 운영 전 실제 과정코드·개설상태 검증 필요
+C013,코칭 리더십과 성장형 피드백,offline,https://www.kma.or.kr/edu/list.do,manager,True,원본 코드 예시명; 운영 전 실제 과정코드·개설상태 검증 필요
+C014,데이터 리터러시 실무,online,https://studio.kma.or.kr/member/eLearning,all,True,원본 코드 예시명; 운영 전 실제 과정코드·개설상태 검증 필요
+C015,AI 활용 업무 혁신,online,https://studio.kma.or.kr/member/eLearning,all,True,원본 코드 예시명; 운영 전 실제 과정코드·개설상태 검증 필요
+C016,디지털 전환 이해와 전략,offline,https://www.kma.or.kr/edu/list.do,all,True,원본 코드 예시명; 운영 전 실제 과정코드·개설상태 검증 필요
+C017,비재무 관리자를 위한 재무이해,offline,https://www.kma.or.kr/edu/list.do,manager,True,원본 코드 예시명; 운영 전 실제 과정코드·개설상태 검증 필요
+C018,재무제표 읽고 분석하기,online,https://studio.kma.or.kr/member/eLearning,all,True,원본 코드 예시명; 운영 전 실제 과정코드·개설상태 검증 필요
+C019,비즈니스 협상 실전 전략,offline,https://www.kma.or.kr/edu/list.do,all,True,원본 코드 예시명; 운영 전 실제 과정코드·개설상태 검증 필요
+C020,고성과 영업 스킬,offline,https://www.kma.or.kr/edu/list.do,all,True,원본 코드 예시명; 운영 전 실제 과정코드·개설상태 검증 필요
+C021,디지털 마케팅 실무,offline,https://www.kma.or.kr/edu/list.do,all,True,원본 코드 예시명; 운영 전 실제 과정코드·개설상태 검증 필요
+C022,HR 실무 핵심,offline,https://www.kma.or.kr/edu/list.do,all,True,원본 코드 예시명; 운영 전 실제 과정코드·개설상태 검증 필요
+C023,기업 홍보와 미디어 대응,offline,https://www.kma.or.kr/edu/list.do,all,True,원본 코드 예시명; 운영 전 실제 과정코드·개설상태 검증 필요
+C024,기업 법무와 컴플라이언스,offline,https://www.kma.or.kr/edu/list.do,all,True,원본 코드 예시명; 운영 전 실제 과정코드·개설상태 검증 필요
+C025,구매·조달 전략 실무,offline,https://www.kma.or.kr/edu/list.do,all,True,원본 코드 예시명; 운영 전 실제 과정코드·개설상태 검증 필요
+C026,생산·품질 개선 실무,offline,https://www.kma.or.kr/edu/list.do,all,True,원본 코드 예시명; 운영 전 실제 과정코드·개설상태 검증 필요
+C027,R&D 프로젝트 관리,offline,https://www.kma.or.kr/edu/list.do,all,True,원본 코드 예시명; 운영 전 실제 과정코드·개설상태 검증 필요
+C028,글로벌 비즈니스 커뮤니케이션,offline,https://www.kma.or.kr/edu/list.do,all,True,원본 코드 예시명; 운영 전 실제 과정코드·개설상태 검증 필요
+C029,ESG 실무와 지속가능경영,offline,https://www.kma.or.kr/edu/list.do,all,True,원본 코드 예시명; 운영 전 실제 과정코드·개설상태 검증 필요
+C030,프로젝트 관리 핵심,offline,https://www.kma.or.kr/edu/list.do,all,True,원본 코드 예시명; 운영 전 실제 과정코드·개설상태 검증 필요
+C031,물류·공급망 관리,offline,https://www.kma.or.kr/edu/list.do,all,True,원본 코드 예시명; 운영 전 실제 과정코드·개설상태 검증 필요
+C032,소프트웨어 품질과 협업 개발,online,https://studio.kma.or.kr/member/eLearning,all,True,원본 코드 예시명; 운영 전 실제 과정코드·개설상태 검증 필요

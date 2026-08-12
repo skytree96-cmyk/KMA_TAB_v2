@@ -1,0 +1,30 @@
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+venv/
+
+# Secrets and local configuration
+.env
+.env.*
+!.env.example
+.streamlit/secrets.toml
+*.pem
+*.key
+
+# Local/private data
+*.db
+*.sqlite
+*.sqlite3
+data/private/
+exports/
+reports/
+
+# Tooling / OS
+.DS_Store
+.idea/
+.vscode/
+coverage/
+.tmp/
+output/

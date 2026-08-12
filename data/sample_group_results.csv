@@ -1,0 +1,61 @@
+﻿participant_id,factor_code,factor_name_ko,score_1_to_5
+P001,CORE-CO,고객지향,2.9
+P001,CORE-CL,협업과 팀워크,3.1
+P001,CORE-GM,성장 마인드셋,3.3
+P001,JOB-ST,전략적 사고,3.5
+P001,JOB-PS,문제해결력,3.7
+P001,JOB-EX,실행력,3.9
+P001,LEAD-PD,사람 육성,4.1
+P001,LEAD-CI,소통과 영향력,2.7
+P002,CORE-CO,고객지향,3.2
+P002,CORE-CL,협업과 팀워크,3.4
+P002,CORE-GM,성장 마인드셋,3.6
+P002,JOB-ST,전략적 사고,3.8
+P002,JOB-PS,문제해결력,4.0
+P002,JOB-EX,실행력,2.6
+P002,LEAD-PD,사람 육성,2.8
+P002,LEAD-CI,소통과 영향력,3.0
+P003,CORE-CO,고객지향,3.5
+P003,CORE-CL,협업과 팀워크,3.7
+P003,CORE-GM,성장 마인드셋,3.9
+P003,JOB-ST,전략적 사고,4.1
+P003,JOB-PS,문제해결력,2.7
+P003,JOB-EX,실행력,2.9
+P003,LEAD-PD,사람 육성,3.1
+P003,LEAD-CI,소통과 영향력,3.3
+P004,CORE-CO,고객지향,3.8
+P004,CORE-CL,협업과 팀워크,4.0
+P004,CORE-GM,성장 마인드셋,2.6
+P004,JOB-ST,전략적 사고,2.8
+P004,JOB-PS,문제해결력,3.0
+P004,JOB-EX,실행력,3.2
+P004,LEAD-PD,사람 육성,3.4
+P004,LEAD-CI,소통과 영향력,3.6
+P005,CORE-CO,고객지향,4.1
+P005,CORE-CL,협업과 팀워크,2.7
+P005,CORE-GM,성장 마인드셋,2.9
+P005,JOB-ST,전략적 사고,3.1
+P005,JOB-PS,문제해결력,3.3
+P005,JOB-EX,실행력,3.5
+P005,LEAD-CI,소통과 영향력,3.9
+P006,CORE-CO,고객지향,2.8
+P006,CORE-CL,협업과 팀워크,3.0
+P006,CORE-GM,성장 마인드셋,3.2
+P006,JOB-ST,전략적 사고,3.4
+P006,JOB-PS,문제해결력,3.6
+P006,JOB-EX,실행력,3.8
+P006,LEAD-CI,소통과 영향력,2.6
+P007,CORE-CO,고객지향,3.1
+P007,CORE-CL,협업과 팀워크,3.3
+P007,CORE-GM,성장 마인드셋,3.5
+P007,JOB-ST,전략적 사고,3.7
+P007,JOB-PS,문제해결력,3.9
+P007,JOB-EX,실행력,4.1
+P007,LEAD-CI,소통과 영향력,2.9
+P008,CORE-CO,고객지향,3.4
+P008,CORE-CL,협업과 팀워크,3.6
+P008,CORE-GM,성장 마인드셋,3.8
+P008,JOB-ST,전략적 사고,4.0
+P008,JOB-PS,문제해결력,2.6
+P008,JOB-EX,실행력,2.8
+P008,LEAD-CI,소통과 영향력,3.2
