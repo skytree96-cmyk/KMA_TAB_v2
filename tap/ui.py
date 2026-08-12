@@ -1,17 +1,19 @@
 from __future__ import annotations
 
 from html import escape
+from pathlib import Path
 from typing import Iterable, Mapping, Sequence
 
 import streamlit as st
+from streamlit.errors import StreamlitAPIException, StreamlitPageNotFoundError
 
-from tap.config import APP_TITLE
+from tap.config import APP_TITLE, PROJECT_ROOT
 
 
 ROLE_LABELS = {
     "company": "교육담당자",
-    "participant": "임직원",
-    "kma": "KMA 운영자",
+    "participant": "참여자",
+    "kma": "KMA 관리자",
 }
 
 ROLE_LANDINGS = {
@@ -22,19 +24,19 @@ ROLE_LANDINGS = {
 
 ROLE_NAV = {
     "company": (
-        ("pages/7_user_guide.py", "처음 사용 안내"),
+        ("pages/0_user_guide.py", "처음 사용 안내"),
         ("streamlit_app.py", "관리자 대시보드"),
         ("pages/1_project_setup.py", "진단 프로젝트"),
         ("pages/4_organization_report.py", "조직 리포트"),
         ("pages/2_assessment.py", "참여자 미리보기"),
     ),
     "participant": (
-        ("pages/7_user_guide.py", "처음 사용 안내"),
+        ("pages/0_user_guide.py", "처음 사용 안내"),
         ("pages/2_assessment.py", "진단 참여"),
         ("pages/3_individual_report.py", "내 리포트"),
     ),
     "kma": (
-        ("pages/7_user_guide.py", "처음 사용 안내"),
+        ("pages/0_user_guide.py", "처음 사용 안내"),
         ("pages/6_kma_dashboard.py", "KMA 대시보드"),
         ("pages/5_question_bank.py", "문항은행·검수"),
         ("streamlit_app.py", "회원사 화면 미리보기"),
@@ -134,6 +136,14 @@ MOCKUP_CSS = """
   [data-testid="stSidebar"] div[role="radiogroup"] label:has(input:checked) {
     background:var(--tap-paper);
     box-shadow:0 2px 8px rgba(20,63,61,.10);
+  }
+  [data-testid="stSidebar"] .stDownloadButton > button {
+    min-height:38px;
+    margin-top:.4rem;
+    border-color:#bfe8e3;
+    background:var(--tap-mint-2);
+    color:var(--tap-teal-deep);
+    font-size:.78rem;
   }
 
   .tap-brand {
@@ -608,6 +618,43 @@ def setup_page(page_title: str, page_icon: str = "T") -> str:
     return _render_sidebar()
 
 
+def _safe_page_link(path: str, label: str, *, key: str) -> None:
+    """Keep the app usable when Streamlit Cloud has a stale page registry."""
+    try:
+        st.page_link(path, label=label, use_container_width=True)
+    except StreamlitPageNotFoundError:
+        _missing_page_button(label, key=key)
+    except KeyError as exc:
+        if exc.args != ("url_pathname",):
+            raise
+        _missing_page_button(label, key=key)
+
+
+def _missing_page_button(label: str, *, key: str) -> None:
+    st.button(
+        f"{label} · 준비 중",
+        key=key,
+        disabled=True,
+        help="배포 페이지 등록을 갱신하고 있습니다. 잠시 후 다시 시도해 주세요.",
+        width="stretch",
+    )
+
+
+def safe_switch_page(path: str) -> bool:
+    """Switch pages without turning a stale Cloud registry into an app crash."""
+    try:
+        st.switch_page(path)
+    except (StreamlitAPIException, StreamlitPageNotFoundError):
+        st.error("화면 연결을 갱신하고 있습니다. 잠시 후 다시 눌러 주세요.")
+        return False
+    except KeyError as exc:
+        if exc.args != ("url_pathname",):
+            raise
+        st.error("화면 연결을 갱신하고 있습니다. 잠시 후 다시 눌러 주세요.")
+        return False
+    return True
+
+
 def _render_sidebar() -> str:
     # CTA buttons run after the sidebar radio has already been instantiated.
     # Apply their requested role on the destination run, before creating it.
@@ -649,11 +696,26 @@ def _render_sidebar() -> str:
         selected_role = reverse_labels[selected_label]
         if selected_role != active_role:
             st.session_state.active_role = selected_role
-            st.switch_page(ROLE_LANDINGS[selected_role])
+            safe_switch_page(ROLE_LANDINGS[selected_role])
 
         st.markdown('<div class="tap-side-label">메뉴</div>', unsafe_allow_html=True)
-        for path, label in ROLE_NAV[selected_role]:
-            st.page_link(path, label=label, use_container_width=True)
+        for index, (path, label) in enumerate(ROLE_NAV[selected_role]):
+            _safe_page_link(
+                path,
+                label,
+                key=f"tap_missing_nav_{selected_role}_{index}",
+            )
+
+        guide_path = Path(PROJECT_ROOT) / "docs" / "TAP_빠른사용가이드_v3.pptx"
+        if guide_path.exists():
+            st.download_button(
+                "PPT 사용설명서 내려받기",
+                guide_path.read_bytes(),
+                guide_path.name,
+                "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+                key=f"tap_sidebar_guide_{selected_role}",
+                width="stretch",
+            )
 
         notes = {
             "company": (
@@ -661,11 +723,11 @@ def _render_sidebar() -> str:
                 "프로젝트와 참여율을 운영하고 N≥5 조직 집계 및 교육 추천을 확인합니다.",
             ),
             "participant": (
-                "임직원 참여 화면",
+                "참여자 진단 화면",
                 "본인의 진단과 개인 리포트만 확인합니다. 결과 공유 동의는 선택입니다.",
             ),
             "kma": (
-                "KMA 운영자 화면",
+                "KMA 관리자 화면",
                 "회원사 운영상태·문항 버전·과정 매핑·감사로그만 관리합니다.",
             ),
         }
@@ -683,7 +745,8 @@ def switch_role_page(role: str, path: str) -> None:
     if role not in ROLE_LABELS:
         raise ValueError(f"Unknown TAP role: {role}")
     st.session_state.tap_pending_role = role
-    st.switch_page(path)
+    if not safe_switch_page(path):
+        st.session_state.pop("tap_pending_role", None)
 
 
 def page_header(

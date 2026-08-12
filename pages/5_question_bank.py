@@ -15,7 +15,7 @@ page_header(
     "문항은행 검수",
     "전체 문항은행 및 예비 유효성 검수",
     "원본 144문항의 수정·유지·삭제 근거와 운영 여부를 추적합니다.",
-    badge="KMA 운영자 검수",
+    badge="KMA 관리자 검수",
     badge_tone="amber",
 )
 callout(

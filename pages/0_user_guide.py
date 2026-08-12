@@ -35,7 +35,7 @@ callout(
     tone="warn",
 )
 
-company_tab, participant_tab, kma_tab = st.tabs(["교육담당자", "임직원", "KMA 운영자"])
+company_tab, participant_tab, kma_tab = st.tabs(["교육담당자", "참여자", "KMA 관리자"])
 
 with company_tab:
     st.markdown("#### 교육담당자는 프로젝트에서 조직 리포트까지 봅니다")
@@ -55,10 +55,10 @@ with company_tab:
         switch_role_page("company", "pages/4_organization_report.py")
 
 with participant_tab:
-    st.markdown("#### 임직원은 최근 행동에 응답하고 본인 결과만 확인합니다")
+    st.markdown("#### 참여자는 최근 행동에 응답하고 본인 결과만 확인합니다")
     st.markdown(
         """
-        1. 사이드바 **역할 전환**에서 `임직원`을 선택합니다.
+        1. 사이드바 **역할 전환**에서 `참여자`를 선택합니다.
         2. 최근 8주에 해당 행동을 얼마나 자주 했는지 1~5점으로 답합니다.
         3. 그 행동을 할 기회가 없었다면 **수행 기회 없음**을 고릅니다. 미응답과는 다르게 처리됩니다.
         4. **저장하고 다음**을 누르고 마지막 문항에서 **결과 보기**를 선택합니다.
@@ -69,10 +69,10 @@ with participant_tab:
         switch_role_page("participant", "pages/2_assessment.py")
 
 with kma_tab:
-    st.markdown("#### KMA 운영자는 버전·검증상태·과정 매핑을 관리합니다")
+    st.markdown("#### KMA 관리자는 버전·검증상태·과정 매핑을 관리합니다")
     st.markdown(
         """
-        1. 사이드바 **역할 전환**에서 `KMA 운영자`를 선택합니다.
+        1. 사이드바 **역할 전환**에서 `KMA 관리자`를 선택합니다.
         2. **KMA 대시보드**에서 문항은행과 역량체계의 검증상태를 확인합니다.
         3. **문항은행·검수**에서 운영 문항과 비활성 문항의 근거를 추적합니다.
         4. 파일럿 후보 문항은 전문가 검토와 인지면접 전까지 프로젝트에 사용하지 않습니다.

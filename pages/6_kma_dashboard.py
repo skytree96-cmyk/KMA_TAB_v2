@@ -16,7 +16,7 @@ page_header(
     "KMA 운영 화면",
     "회원사 진단 운영 현황",
     "회원사 권한, 진단 버전, 교육과정 매핑과 데이터 접근 이력을 관리합니다.",
-    badge="KMA 운영자 화면",
+    badge="KMA 관리자 화면",
     badge_tone="amber",
 )
 
@@ -70,7 +70,7 @@ with right:
         st.caption("적합 과정이 없으면 억지로 추천하지 않고 ‘현재 매핑된 과정 없음’으로 표시합니다.")
 
 st.markdown("### 회원사 운영 현황")
-st.caption("KMA 운영자는 프로젝트 진행 상태만 확인하며 회원사의 조직점수·격차·개인결과는 열람하지 않습니다.")
+st.caption("KMA 관리자는 프로젝트 진행 상태만 확인하며 회원사의 조직점수·격차·개인결과는 열람하지 않습니다.")
 organizations = pd.DataFrame(dashboard["organizations"]).rename(
     columns={
         "name": "회원사",

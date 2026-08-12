@@ -10,6 +10,7 @@ from tap.ui import (
     metric_grid,
     page_header,
     project_rows,
+    safe_switch_page,
     setup_page,
 )
 
@@ -30,13 +31,13 @@ dashboard_hero()
 actions = st.columns(3)
 with actions[0]:
     if st.button("새 프로젝트 만들기", type="primary", width="stretch"):
-        st.switch_page("pages/1_project_setup.py")
+        safe_switch_page("pages/1_project_setup.py")
 with actions[1]:
     if st.button("조직 리포트 보기", width="stretch"):
-        st.switch_page("pages/4_organization_report.py")
+        safe_switch_page("pages/4_organization_report.py")
 with actions[2]:
     if st.button("처음 사용 안내", width="stretch"):
-        st.switch_page("pages/7_user_guide.py")
+        safe_switch_page("pages/0_user_guide.py")
 st.caption("아래 운영 수치는 화면 검토를 위한 목업 데이터이며 실제 회원사 실적이 아닙니다.")
 
 metric_grid(dashboard["metrics"])
@@ -85,16 +86,16 @@ with next_a:
         st.markdown("**① 진단 프로젝트 구성**")
         st.caption("대상 수준을 정하고 공통역량과 선택역량을 체크박스로 구성합니다.")
         if st.button("프로젝트 설정", key="home_project", width="stretch"):
-            st.switch_page("pages/1_project_setup.py")
+            safe_switch_page("pages/1_project_setup.py")
 with next_b:
     with st.container(border=True):
         st.markdown("**② 참여자 화면 확인**")
         st.caption("최근 8주 행동빈도 응답, 자동저장, 수행 기회 없음 처리를 확인합니다.")
         if st.button("참여자 미리보기", key="home_assessment", width="stretch"):
-            st.switch_page("pages/2_assessment.py")
+            safe_switch_page("pages/2_assessment.py")
 with next_c:
     with st.container(border=True):
         st.markdown("**③ 조직 교육수요 확인**")
         st.caption("N≥5 집계, 목표격차, 교육 외 원인과 과정추천을 함께 검토합니다.")
         if st.button("조직 리포트", key="home_org", width="stretch"):
-            st.switch_page("pages/4_organization_report.py")
+            safe_switch_page("pages/4_organization_report.py")

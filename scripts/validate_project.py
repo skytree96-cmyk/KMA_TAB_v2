@@ -16,6 +16,7 @@ from tap.data import (
     load_pilot_item_candidates,
     load_questions,
 )
+from tap.ui import ROLE_LANDINGS, ROLE_NAV
 
 
 def main() -> int:
@@ -54,12 +55,28 @@ def main() -> int:
 
     required_pages = [
         ROOT / "streamlit_app.py",
+        ROOT / "pages" / "0_user_guide.py",
         ROOT / "pages" / "1_project_setup.py",
         ROOT / "pages" / "6_kma_dashboard.py",
     ]
     for path in required_pages:
         if not path.exists():
             errors.append(f"required dashboard/page missing: {path.relative_to(ROOT)}")
+
+    navigation_paths = set(ROLE_LANDINGS.values())
+    navigation_paths.update(path for items in ROLE_NAV.values() for path, _ in items)
+    for relative_path in sorted(navigation_paths):
+        if not (ROOT / relative_path).is_file():
+            errors.append(f"navigation target missing: {relative_path}")
+
+    ui_source = (ROOT / "tap" / "ui.py").read_text(encoding="utf-8")
+    for legacy_reference in (
+        "pages/7_user_guide.py",
+        '"participant": "임직원"',
+        '"kma": "KMA 운영자"',
+    ):
+        if legacy_reference in ui_source:
+            errors.append(f"stale navigation reference remains in tap/ui.py: {legacy_reference}")
 
     project_source = (ROOT / "pages" / "1_project_setup.py").read_text(encoding="utf-8")
     if "st.multiselect" in project_source or "st.selectbox" in project_source:
