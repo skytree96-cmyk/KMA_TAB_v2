@@ -36,7 +36,7 @@ with actions[1]:
         st.switch_page("pages/4_organization_report.py")
 with actions[2]:
     if st.button("처음 사용 안내", width="stretch"):
-        st.switch_page("pages/0_user_guide.py")
+        st.switch_page("pages/7_user_guide.py")
 st.caption("아래 운영 수치는 화면 검토를 위한 목업 데이터이며 실제 회원사 실적이 아닙니다.")
 
 metric_grid(dashboard["metrics"])

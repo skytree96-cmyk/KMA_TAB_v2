@@ -14,7 +14,7 @@ from streamlit.testing.v1 import AppTest
 
 
 PAGES = [
-    "pages/0_user_guide.py",
+    "pages/7_user_guide.py",
     "pages/1_project_setup.py",
     "pages/2_assessment.py",
     "pages/3_individual_report.py",
