@@ -120,22 +120,21 @@ MOCKUP_CSS = """
     background:var(--tap-mint);
     color:var(--tap-teal-deep);
   }
-  [data-testid="stSidebar"] div[role="radiogroup"] {
-    display:grid;
-    gap:.34rem;
-    padding:.35rem;
-    background:var(--tap-mint-2);
-    border-radius:13px;
+  [data-testid="stSidebar"] [data-testid="stButton"] {
+    margin-bottom:.34rem;
   }
-  [data-testid="stSidebar"] div[role="radiogroup"] label {
-    margin:0;
-    padding:.45rem .55rem;
-    border-radius:9px;
-    background:transparent;
+  [data-testid="stSidebar"] [data-testid="stButton"] > button {
+    justify-content:flex-start;
+    padding:.45rem .7rem;
   }
-  [data-testid="stSidebar"] div[role="radiogroup"] label:has(input:checked) {
-    background:var(--tap-paper);
+  [data-testid="stSidebar"] [data-testid="stButton"] > button[kind="primary"] {
+    border-color:#9edbd5;
+    background:var(--tap-mint);
+    color:var(--tap-teal-deep);
     box-shadow:0 2px 8px rgba(20,63,61,.10);
+  }
+  [data-testid="stSidebar"] [data-testid="stButton"]:has(button[kind="primary"]) {
+    border-radius:11px;
   }
   [data-testid="stSidebar"] .stDownloadButton > button {
     min-height:38px;
@@ -656,12 +655,10 @@ def safe_switch_page(path: str) -> bool:
 
 
 def _render_sidebar() -> str:
-    # CTA buttons run after the sidebar radio has already been instantiated.
-    # Apply their requested role on the destination run, before creating it.
+    # Apply a role requested by a CTA before drawing the destination sidebar.
     pending_role = st.session_state.pop("tap_pending_role", None)
     if pending_role in ROLE_LABELS:
         st.session_state.active_role = pending_role
-        st.session_state.tap_role_selector = ROLE_LABELS[pending_role]
 
     if "active_role" not in st.session_state:
         st.session_state.active_role = "company"
@@ -669,11 +666,6 @@ def _render_sidebar() -> str:
     if active_role not in ROLE_LABELS:
         active_role = "company"
         st.session_state.active_role = active_role
-
-    reverse_labels = {label: code for code, label in ROLE_LABELS.items()}
-    expected_label = ROLE_LABELS[active_role]
-    if st.session_state.get("tap_role_selector") not in reverse_labels:
-        st.session_state.tap_role_selector = expected_label
 
     with st.sidebar:
         st.markdown(
@@ -687,16 +679,23 @@ def _render_sidebar() -> str:
             """,
             unsafe_allow_html=True,
         )
-        selected_label = st.radio(
-            "데모 역할 전환",
-            options=list(ROLE_LABELS.values()),
-            key="tap_role_selector",
-            label_visibility="collapsed",
-        )
-        selected_role = reverse_labels[selected_label]
-        if selected_role != active_role:
-            st.session_state.active_role = selected_role
-            safe_switch_page(ROLE_LANDINGS[selected_role])
+        requested_role: str | None = None
+        for role, label in ROLE_LABELS.items():
+            if st.button(
+                label,
+                key=f"tap_role_{role}",
+                type="primary" if role == active_role else "secondary",
+                width="stretch",
+            ):
+                requested_role = role
+
+        if requested_role is not None and requested_role != active_role:
+            previous_role = active_role
+            st.session_state.active_role = requested_role
+            if not safe_switch_page(ROLE_LANDINGS[requested_role]):
+                st.session_state.active_role = previous_role
+
+        selected_role = str(st.session_state.active_role)
 
         st.markdown('<div class="tap-side-label">메뉴</div>', unsafe_allow_html=True)
         for index, (path, label) in enumerate(ROLE_NAV[selected_role]):
@@ -741,7 +740,7 @@ def _render_sidebar() -> str:
 
 
 def switch_role_page(role: str, path: str) -> None:
-    """Switch pages and synchronize the role selector on the destination run."""
+    """Switch pages and synchronize the persistent role on the destination run."""
     if role not in ROLE_LABELS:
         raise ValueError(f"Unknown TAP role: {role}")
     st.session_state.tap_pending_role = role

@@ -50,20 +50,32 @@ def main() -> int:
         raise AssertionError("second job checkbox must be disabled")
 
     app = AppTest.from_file(str(ROOT / "streamlit_app.py"), default_timeout=20).run()
-    app.radio(key="tap_role_selector").set_value("참여자").run()
+    app.button(key="tap_role_participant").click().run()
     _assert_clean(app, "participant role switch")
     if not any(button.label == "프로젝트 설정으로 이동" for button in app.button):
         raise AssertionError("assessment landing is missing after participant role switch")
+    app.switch_page("pages/3_individual_report.py").run()
+    _assert_clean(app, "participant submenu navigation")
+    if app.session_state.active_role != "participant":
+        raise AssertionError("participant role was reset after opening a submenu")
+    if not any("참여자 진단 화면" in item.value for item in app.markdown):
+        raise AssertionError("participant sidebar was lost after opening a submenu")
 
     app = AppTest.from_file(str(ROOT / "streamlit_app.py"), default_timeout=20).run()
-    app.radio(key="tap_role_selector").set_value("KMA 관리자").run()
+    app.button(key="tap_role_kma").click().run()
     _assert_clean(app, "KMA role switch")
     if not any("회원사 진단 운영 현황" in item.value for item in app.markdown):
         raise AssertionError("KMA dashboard heading is missing after role switch")
+    app.switch_page("pages/5_question_bank.py").run()
+    _assert_clean(app, "KMA submenu navigation")
+    if app.session_state.active_role != "kma":
+        raise AssertionError("KMA role was reset after opening a submenu")
+    if not any("전체 문항은행 및 예비 유효성 검수" in item.value for item in app.markdown):
+        raise AssertionError("question bank is missing after KMA submenu navigation")
 
     print(
         f"STREAMLIT SMOKE PASSED: home + {len(PAGES)} pages + "
-        "checkbox limits + participant/KMA role switches"
+        "checkbox limits + persistent participant/KMA submenu navigation"
     )
     return 0
 

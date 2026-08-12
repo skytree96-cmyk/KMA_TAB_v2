@@ -23,6 +23,11 @@ class UiRegressionTests(unittest.TestCase):
         source = (ROOT / "tap" / "ui.py").read_text(encoding="utf-8")
         self.assertIn('[data-testid="stSidebarNav"] { display:none !important; }', source)
 
+    def test_role_switch_does_not_use_page_scoped_radio_state(self) -> None:
+        source = (ROOT / "tap" / "ui.py").read_text(encoding="utf-8")
+        self.assertNotIn('key="tap_role_selector"', source)
+        self.assertIn('key=f"tap_role_{role}"', source)
+
     def test_dark_theme_tokens_and_fixed_paper_report_exist(self) -> None:
         source = (ROOT / "tap" / "ui.py").read_text(encoding="utf-8")
         self.assertIn("@media (prefers-color-scheme:dark)", source)
