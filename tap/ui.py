@@ -26,14 +26,14 @@ ROLE_NAV = {
     "company": (
         ("pages/0_user_guide.py", "처음 사용 안내"),
         ("streamlit_app.py", "관리자 대시보드"),
-        ("pages/1_project_setup.py", "진단 프로젝트"),
-        ("pages/4_organization_report.py", "조직 리포트"),
-        ("pages/2_assessment.py", "참여자 미리보기"),
+        ("pages/1_project_setup.py", "교육평가 프로젝트"),
+        ("pages/4_organization_report.py", "교육 전후 리포트"),
+        ("pages/2_assessment.py", "검사 미리보기"),
     ),
     "participant": (
         ("pages/0_user_guide.py", "처음 사용 안내"),
-        ("pages/2_assessment.py", "진단 참여"),
-        ("pages/3_individual_report.py", "내 리포트"),
+        ("pages/2_assessment.py", "사전·사후 검사"),
+        ("pages/3_individual_report.py", "내 변화 리포트"),
     ),
     "kma": (
         ("pages/0_user_guide.py", "처음 사용 안내"),
@@ -719,11 +719,11 @@ def _render_sidebar() -> str:
         notes = {
             "company": (
                 "회원사 교육담당자 화면",
-                "프로젝트와 참여율을 운영하고 N≥5 조직 집계 및 교육 추천을 확인합니다.",
+                "교육 일정과 사전·사후 참여율을 운영하고 짝지어진 참여자 N≥5 조직 변화를 확인합니다.",
             ),
             "participant": (
-                "참여자 진단 화면",
-                "본인의 진단과 개인 리포트만 확인합니다. 결과 공유 동의는 선택입니다.",
+                "참여자 교육평가 화면",
+                "본인의 사전·사후 검사와 변화 리포트만 확인합니다. 결과 공유 동의는 선택입니다.",
             ),
             "kma": (
                 "KMA 관리자 화면",
@@ -779,18 +779,18 @@ def dashboard_hero() -> None:
         """
         <section class="tap-hero">
           <div class="tap-hero-copy">
-            <span class="tap-chip teal">교육 요구진단 · 회원사 제공</span>
-            <h2>KMA 회원사 임직원의<br>성장 우선순위를 찾습니다.</h2>
-            <p>최근 8주의 실제 업무행동을 진단하고, 개인에게는 개발 방향을, 교육담당자에게는 조직 교육수요와 추천과정을 제공합니다.</p>
+            <span class="tap-chip teal">교육 전후 역량평가 · 회원사 제공</span>
+            <h2>교육 전후의 변화를<br>같은 기준으로 확인합니다.</h2>
+            <p>교육 전 출발점을 기록하고, 교육 후 현업 적용 시점에 같은 행동문항으로 다시 측정해 개인·조직의 관찰된 변화와 현업 적용환경을 확인합니다.</p>
           </div>
           <div class="tap-loop-card">
-            <div class="tap-loop-step"><span>1</span>행동진단</div>
+            <div class="tap-loop-step"><span>1</span>사전검사</div>
             <div class="tap-loop-arrow"></div>
-            <div class="tap-loop-step"><span>2</span>개인·조직 리포트</div>
+            <div class="tap-loop-step"><span>2</span>교육·현업 적용</div>
             <div class="tap-loop-arrow"></div>
-            <div class="tap-loop-step"><span>3</span>KMA 교육 추천</div>
+            <div class="tap-loop-step"><span>3</span>사후검사</div>
             <div class="tap-loop-arrow"></div>
-            <div class="tap-loop-step"><span>+</span>stud.io 학습 연결</div>
+            <div class="tap-loop-step"><span>4</span>변화·전이 리포트</div>
           </div>
         </section>
         """,

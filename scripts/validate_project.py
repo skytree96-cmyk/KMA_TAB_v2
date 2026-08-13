@@ -59,10 +59,29 @@ def main() -> int:
         ROOT / "pages" / "1_project_setup.py",
         ROOT / "pages" / "6_kma_dashboard.py",
         ROOT / "docs" / "TAP_사용설명서_v3.pdf",
+        ROOT / "docs" / "TAP_빠른사용가이드_v3.pptx",
     ]
     for path in required_pages:
         if not path.exists():
             errors.append(f"required dashboard/page missing: {path.relative_to(ROOT)}")
+
+    guide_pdf = ROOT / "docs" / "TAP_사용설명서_v3.pdf"
+    if guide_pdf.is_file():
+        guide_bytes = guide_pdf.read_bytes()
+        if not guide_bytes.startswith(b"%PDF-") or len(guide_bytes) < 100_000:
+            errors.append("PDF user guide is empty or invalid")
+
+    prepost_contract = {
+        ROOT / "pages" / "1_project_setup.py": ("교육평가 프로젝트 만들기", "56 <= post_delay_days <= 70"),
+        ROOT / "pages" / "2_assessment.py": ("사전·사후 모두 동일하게 최근 8주", "익명 참여자 ID"),
+        ROOT / "pages" / "3_individual_report.py": ("교육 전·후 짝지어진 비교", "assessment_completed_by_phase"),
+        ROOT / "pages" / "4_organization_report.py": ("교육 전후 리포트", "session_type"),
+    }
+    for path, markers in prepost_contract.items():
+        source = path.read_text(encoding="utf-8")
+        for marker in markers:
+            if marker not in source:
+                errors.append(f"pre/post contract missing in {path.relative_to(ROOT)}: {marker}")
 
     navigation_paths = set(ROLE_LANDINGS.values())
     navigation_paths.update(path for items in ROLE_NAV.values() for path, _ in items)

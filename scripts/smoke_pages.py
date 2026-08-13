@@ -60,7 +60,7 @@ def main() -> int:
     _assert_clean(app, "participant submenu navigation")
     if app.session_state.active_role != "participant":
         raise AssertionError("participant role was reset after opening a submenu")
-    if not any("참여자 진단 화면" in item.value for item in app.markdown):
+    if not any("참여자 교육평가 화면" in item.value for item in app.markdown):
         raise AssertionError("participant sidebar was lost after opening a submenu")
 
     app = AppTest.from_file(str(ROOT / "streamlit_app.py"), default_timeout=20).run()

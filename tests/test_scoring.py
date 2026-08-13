@@ -6,6 +6,7 @@ from tap.scoring import (
     response_quality_flags,
     response_to_index,
     score_responses,
+    score_pre_post_responses,
 )
 
 
@@ -54,6 +55,40 @@ class ScoringTests(unittest.TestCase):
             [{"factor_code": "F1", "score_1_to_5": 3.5}],
         )
         self.assertEqual(rows[0]["self_reported_change"], 0.5)
+
+    def test_pre_post_responses_use_same_item_intersection(self):
+        rows = score_pre_post_responses(
+            QUESTIONS,
+            {"Q1": 1, "Q2": 4, "Q3": 4, "Q4": 0},
+            {"Q1": 3, "Q2": 5, "Q3": 5, "Q4": 5},
+        )
+        result = rows[0]
+        self.assertEqual(result["paired_valid_items"], 3)
+        self.assertEqual(result["pre_score"], 3.0)
+        self.assertEqual(result["post_score"], 4.33)
+        self.assertEqual(result["self_reported_change"], 1.33)
+        self.assertEqual(result["pre_na_items"], 1)
+        self.assertEqual(result["comparison_basis"], "동일 문항 교집합")
+
+    def test_pre_post_responses_do_not_treat_missing_or_na_as_scores(self):
+        result = score_pre_post_responses(
+            QUESTIONS,
+            {"Q1": 3, "Q2": 4, "Q3": 0},
+            {"Q1": 4, "Q2": 5, "Q3": 4, "Q4": 4},
+        )[0]
+        self.assertEqual(result["paired_valid_items"], 2)
+        self.assertEqual(result["pre_na_items"], 1)
+        self.assertEqual(result["pre_missing_items"], 1)
+        self.assertEqual(result["status"], "미산출")
+        self.assertIsNone(result["self_reported_change"])
+
+    def test_score_result_can_be_tagged_with_phase(self):
+        result = score_responses(
+            QUESTIONS,
+            {"Q1": 3, "Q2": 3, "Q3": 3, "Q4": 3},
+            assessment_phase="post",
+        )[0]
+        self.assertEqual(result["assessment_phase"], "post")
 
 
 if __name__ == "__main__":

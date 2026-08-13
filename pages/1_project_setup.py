@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections import Counter, defaultdict
 from datetime import date, timedelta
+import hashlib
 
 import streamlit as st
 
@@ -14,11 +15,11 @@ from tap.selection import (
     sanitize_selection,
     selection_errors,
 )
-from tap.state import ensure_state, reset_assessment
+from tap.state import activate_assessment_phase, ensure_state, reset_all_assessments
 from tap.ui import callout, domain_header, page_header, setup_page, summary_strip
 
 
-setup_page("프로젝트 설정", "T")
+setup_page("교육평가 프로젝트", "T")
 ensure_state(st.session_state)
 competencies = load_competencies()
 row_by_code = {row["factor_code"]: row for row in competencies}
@@ -109,22 +110,26 @@ def _render_limited_factor_checkboxes(
 
 
 page_header(
-    "프로젝트 만들기",
-    "새 진단 프로젝트",
-    "대상자에게 적용되는 기본역량을 확인하고 전문·미래역량 최대 3개와 직무역량 1개를 추가합니다.",
-    badge="체크박스형 모듈 구성",
+    "교육평가 프로젝트 만들기",
+    "교육 전·후 역량평가 설계",
+    "같은 참여자의 교육 전 기준선과 교육 후 변화를 비교할 수 있도록 일정과 측정역량을 고정합니다.",
+    badge="사전·사후 짝지은 비교",
 )
 
 with st.container(border=True):
-    st.markdown('<h3 class="tap-card-title">1. 프로젝트 기본정보</h3>', unsafe_allow_html=True)
+    st.markdown('<h3 class="tap-card-title">1. 교육과 검사 일정</h3>', unsafe_allow_html=True)
     st.markdown(
-        '<p class="tap-card-sub">교육 목적, 응답 대상과 기간을 먼저 설정합니다.</p>',
+        '<p class="tap-card-sub">교육과정·교육일·사전/사후 검사 기간을 먼저 고정합니다. 최근 8주 회상기간이 교육 전을 포함하지 않도록 사후검사는 교육 8~10주 후를 권장합니다.</p>',
         unsafe_allow_html=True,
     )
     _initialize_checkbox("project_name_input_initialized", True)
     if "project_name_input" not in st.session_state:
         st.session_state.project_name_input = st.session_state.project_name
     project_name = st.text_input("프로젝트명", key="project_name_input")
+
+    if "course_name_input" not in st.session_state:
+        st.session_state.course_name_input = st.session_state.get("course_name", "신임 리더 실행력 향상 과정")
+    course_name = st.text_input("교육과정명", key="course_name_input")
 
     level_codes = list(level_labels)
     target_level = st.radio(
@@ -136,13 +141,53 @@ with st.container(border=True):
         key="target_level_picker",
     )
 
-    default_start = _iso_date(st.session_state.project_start_date, date.today() + timedelta(days=7))
-    default_end = _iso_date(st.session_state.project_end_date, default_start + timedelta(days=11))
-    date_left, date_right = st.columns(2)
-    with date_left:
-        start_date = st.date_input("응답 시작일", value=default_start, key="project_start_picker")
-    with date_right:
-        end_date = st.date_input("응답 마감일", value=default_end, key="project_end_picker")
+    default_pre_start = _iso_date(
+        st.session_state.get("pre_start_date", st.session_state.project_start_date),
+        date.today() + timedelta(days=7),
+    )
+    default_pre_end = _iso_date(
+        st.session_state.get("pre_end_date", st.session_state.project_end_date),
+        default_pre_start + timedelta(days=11),
+    )
+    default_training_date = _iso_date(
+        st.session_state.get("training_date"),
+        default_pre_end + timedelta(days=3),
+    )
+    default_post_start = _iso_date(
+        st.session_state.get("post_start_date"),
+        default_training_date + timedelta(weeks=8),
+    )
+    default_post_end = _iso_date(
+        st.session_state.get("post_end_date"),
+        default_post_start + timedelta(days=11),
+    )
+
+    training_date = st.date_input("교육일", value=default_training_date, key="training_date_picker")
+    pre_left, pre_right = st.columns(2)
+    with pre_left:
+        pre_start_date = st.date_input("교육 전 검사 시작일", value=default_pre_start, key="pre_start_picker")
+    with pre_right:
+        pre_end_date = st.date_input("교육 전 검사 마감일", value=default_pre_end, key="pre_end_picker")
+    post_left, post_right = st.columns(2)
+    with post_left:
+        post_start_date = st.date_input("교육 후 검사 시작일", value=default_post_start, key="post_start_picker")
+    with post_right:
+        post_end_date = st.date_input("교육 후 검사 마감일", value=default_post_end, key="post_end_picker")
+
+    current_phase = st.radio(
+        "현재 참여자에게 열 검사",
+        options=["pre", "post"],
+        format_func={"pre": "교육 전 역량평가", "post": "교육 후 역량평가"}.get,
+        index=0 if st.session_state.get("assessment_phase", "pre") == "pre" else 1,
+        horizontal=True,
+        key="assessment_phase_picker",
+        help="사전검사 종료 후 사후검사로 바꾸면, 참여자는 사후 문항과 현업전이 문항에 응답합니다.",
+    )
+    allow_schedule_override = st.checkbox(
+        "공개 데모에서 검사기간 밖 미리보기 허용",
+        value=bool(st.session_state.get("allow_schedule_override", True)),
+        help="실제 운영에서는 해제하여 설정한 검사기간 안에서만 제출하도록 하세요.",
+    )
 
 base_rows = [
     row for row in competencies if row["active_for_scoring"] and row["library_type"] == "base"
@@ -330,19 +375,45 @@ if training_cause == "system_only":
         tone="warn",
     )
 
-date_error = end_date < start_date
-if date_error:
-    st.error("응답 마감일은 시작일보다 빠를 수 없습니다.")
+date_errors: list[str] = []
+if pre_end_date < pre_start_date:
+    date_errors.append("교육 전 검사 마감일은 시작일보다 빠를 수 없습니다.")
+if post_end_date < post_start_date:
+    date_errors.append("교육 후 검사 마감일은 시작일보다 빠를 수 없습니다.")
+if pre_end_date >= training_date:
+    date_errors.append("교육 전 검사는 교육일 전에 마감해야 합니다.")
+if post_start_date <= training_date:
+    date_errors.append("교육 후 검사는 교육일 다음 날 이후에 시작해야 합니다.")
+for message in date_errors:
+    st.error(message)
+
+post_delay_days = (post_start_date - training_date).days
+if not date_errors and not 56 <= post_delay_days <= 70:
+    st.warning(
+        f"현재 사후검사는 교육 {post_delay_days}일 후 시작합니다. "
+        "최근 8주 행동에 교육 전 기간이 섞이지 않도록 교육 8~10주(56~70일) 후를 권장합니다."
+    )
 
 if st.button(
     "설정 저장 후 참여자 화면 확인",
     type="primary",
-    disabled=item_count == 0 or bool(selection_issues) or date_error,
+    disabled=item_count == 0 or bool(selection_issues) or bool(date_errors),
     width="stretch",
 ):
-    st.session_state.project_name = project_name.strip() or "이름 없는 진단 프로젝트"
-    st.session_state.project_start_date = start_date.isoformat()
-    st.session_state.project_end_date = end_date.isoformat()
+    selection_changed = (
+        set(st.session_state.get("selected_factors", [])) != set(selected)
+        or st.session_state.get("target_level") != target_level
+    )
+    st.session_state.project_name = project_name.strip() or "이름 없는 교육평가 프로젝트"
+    st.session_state.course_name = course_name.strip() or "이름 없는 교육과정"
+    st.session_state.training_date = training_date.isoformat()
+    st.session_state.pre_start_date = pre_start_date.isoformat()
+    st.session_state.pre_end_date = pre_end_date.isoformat()
+    st.session_state.post_start_date = post_start_date.isoformat()
+    st.session_state.post_end_date = post_end_date.isoformat()
+    # 기존 화면과 내보내기 형식을 위해 프로젝트 기간은 사전검사 기간을 가리킨다.
+    st.session_state.project_start_date = pre_start_date.isoformat()
+    st.session_state.project_end_date = pre_end_date.isoformat()
     st.session_state.target_level = target_level
     st.session_state.selected_factors = selected
     st.session_state.target_means = {code: target_mean for code in selected}
@@ -350,5 +421,36 @@ if st.button(
     st.session_state.learner_interests = learner_interests
     st.session_state.training_cause = training_cause
     st.session_state.delivery_preference = delivery_preference
-    reset_assessment(st.session_state)
+    st.session_state.allow_schedule_override = allow_schedule_override
+
+    ordered_questions = sorted(
+        questions_for_factors(selected),
+        key=lambda row: hashlib.sha256(
+            f"{project_name.strip() or 'TAP'}|{row['question_code']}".encode("utf-8")
+        ).hexdigest(),
+    )
+    snapshot_rows = sorted(
+        (
+            str(row["question_code"]),
+            str(row["revised_text"]),
+            str(row.get("scoring_direction", "direct")),
+        )
+        for row in ordered_questions
+    )
+    snapshot_payload = "\n".join("|".join(parts) for parts in snapshot_rows)
+    new_snapshot_hash = hashlib.sha256(snapshot_payload.encode("utf-8")).hexdigest()
+    existing_snapshot_hash = str(st.session_state.get("question_snapshot_hash", ""))
+    if existing_snapshot_hash and existing_snapshot_hash != new_snapshot_hash:
+        selection_changed = True
+    if selection_changed or not existing_snapshot_hash:
+        st.session_state.question_snapshot_hash = new_snapshot_hash
+        st.session_state.question_snapshot_codes = [str(row["question_code"]) for row in ordered_questions]
+        st.session_state.assessment_version = f"TAP-1.0+{new_snapshot_hash[:12]}"
+
+    # 측정역량이 바뀌면 동일 문항 조건이 깨지므로 양 시점 응답을 함께 초기화한다.
+    # 검사 단계만 pre→post로 바꾸는 경우에는 사전응답을 유지한다.
+    if selection_changed:
+        reset_all_assessments(st.session_state)
+    activate_assessment_phase(st.session_state, current_phase)
+    st.session_state.current_assessment_phase = current_phase
     st.switch_page("pages/2_assessment.py")

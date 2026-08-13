@@ -35,6 +35,7 @@ def score_responses(
     questions: Iterable[Mapping[str, Any]],
     responses: Mapping[str, int],
     target_means: Mapping[str, float] | None = None,
+    assessment_phase: str | None = None,
 ) -> list[dict[str, Any]]:
     grouped: dict[str, list[Mapping[str, Any]]] = defaultdict(list)
     for question in questions:
@@ -65,8 +66,7 @@ def score_responses(
         raw_mean = round(mean(valid_values), 2) if valid else None
         index_100 = round((raw_mean - 1) * 25, 1) if raw_mean is not None else None
         gap = round(max(0.0, target - raw_mean), 2) if raw_mean is not None else None
-        results.append(
-            {
+        row: dict[str, Any] = {
                 "factor_code": factor_code,
                 "factor_name_ko": items[0]["factor_name_ko"],
                 "module_group": items[0]["module_group"],
@@ -81,7 +81,11 @@ def score_responses(
                 "target_mean": target,
                 "gap_to_target": gap,
             }
-        )
+        if assessment_phase is not None:
+            if assessment_phase not in {"pre", "post"}:
+                raise ValueError("assessment_phase must be 'pre' or 'post'")
+            row["assessment_phase"] = assessment_phase
+        results.append(row)
     return sorted(results, key=lambda x: (x["module_group"], x["factor_code"]))
 
 
@@ -126,3 +130,97 @@ def compare_pre_post(
             }
         )
     return rows
+
+
+def _paired_response_value(
+    responses: Mapping[str, Any], question_code: str
+) -> tuple[str, int | None]:
+    if question_code not in responses or responses[question_code] in (None, ""):
+        return "missing", None
+    value = responses[question_code]
+    if isinstance(value, bool) or value not in {0, 1, 2, 3, 4, 5}:
+        raise ValueError(f"invalid response for {question_code}: {value}")
+    if value == NA_VALUE:
+        return "na", None
+    return "valid", int(value)
+
+
+def score_pre_post_responses(
+    questions: Iterable[Mapping[str, Any]],
+    pre_responses: Mapping[str, Any],
+    post_responses: Mapping[str, Any],
+    target_means: Mapping[str, float] | None = None,
+) -> list[dict[str, Any]]:
+    """Score change using only items answered validly at both time points.
+
+    Missing and ``수행 기회 없음`` (0) responses stay distinct in the audit
+    counts. A factor is reported only when the paired intersection satisfies the
+    same completeness rule as a single assessment. The result describes an
+    observed self-reported change; it does not claim causal training impact.
+    """
+    grouped: dict[str, list[Mapping[str, Any]]] = defaultdict(list)
+    seen_question_codes: set[str] = set()
+    for question in questions:
+        question_code = str(question["question_code"])
+        if question_code in seen_question_codes:
+            raise ValueError(f"duplicate question_code: {question_code}")
+        seen_question_codes.add(question_code)
+        grouped[str(question["factor_code"])].append(question)
+
+    targets = target_means or {}
+    rows: list[dict[str, Any]] = []
+    for factor_code, items in grouped.items():
+        paired_pre: list[int] = []
+        paired_post: list[int] = []
+        pre_na = post_na = pre_missing = post_missing = 0
+        for item in items:
+            code = str(item["question_code"])
+            pre_status, pre_value = _paired_response_value(pre_responses, code)
+            post_status, post_value = _paired_response_value(post_responses, code)
+            pre_na += int(pre_status == "na")
+            post_na += int(post_status == "na")
+            pre_missing += int(pre_status == "missing")
+            post_missing += int(post_status == "missing")
+            if pre_status == "valid" and post_status == "valid":
+                paired_pre.append(int(pre_value))
+                paired_post.append(int(post_value))
+
+        total_items = len(items)
+        minimum = required_valid_items(total_items)
+        valid = len(paired_pre) >= minimum
+        pre_score = round(mean(paired_pre), 2) if valid else None
+        post_score = round(mean(paired_post), 2) if valid else None
+        change = round(post_score - pre_score, 2) if valid else None
+        target = float(targets.get(factor_code, 3.5))
+        rows.append(
+            {
+                "factor_code": factor_code,
+                "factor_name_ko": items[0]["factor_name_ko"],
+                "module_group": items[0]["module_group"],
+                "pre_score": pre_score,
+                "post_score": post_score,
+                "self_reported_change": change,
+                "pre_index_100": round((pre_score - 1) * 25, 1) if pre_score is not None else None,
+                "post_index_100": round((post_score - 1) * 25, 1) if post_score is not None else None,
+                "change_index_100": round(change * 25, 1) if change is not None else None,
+                "paired_valid_items": len(paired_pre),
+                "required_paired_items": minimum,
+                "total_items": total_items,
+                "dropped_unpaired_items": total_items - len(paired_pre),
+                "pre_na_items": pre_na,
+                "post_na_items": post_na,
+                "pre_missing_items": pre_missing,
+                "post_missing_items": post_missing,
+                "target_mean": target,
+                "pre_gap_to_target": (
+                    round(max(0.0, target - pre_score), 2) if pre_score is not None else None
+                ),
+                "post_gap_to_target": (
+                    round(max(0.0, target - post_score), 2) if post_score is not None else None
+                ),
+                "status": "산출" if valid else "미산출",
+                "comparison_basis": "동일 문항 교집합",
+                "interpretation": "교육 전후 관찰된 자기보고 변화",
+            }
+        )
+    return sorted(rows, key=lambda row: (row["module_group"], row["factor_code"]))

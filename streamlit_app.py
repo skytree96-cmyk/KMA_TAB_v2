@@ -20,9 +20,9 @@ ensure_state(st.session_state)
 dashboard = load_dashboard_demo()["company"]
 
 page_header(
-    "KMA 회원사 지원",
-    "진단 결과를 교육의 다음 행동으로",
-    "회원사 교육담당자가 프로젝트를 운영하고 KMA 교육과 stud.io로 연결합니다.",
+    "KMA 교육효과 평가",
+    "교육 전후의 변화를 다음 개선으로",
+    "교육담당자가 사전·사후 검사를 운영하고, 짝지은 변화와 현업 적용환경을 다음 교육 설계로 연결합니다.",
     badge="교육담당자 화면",
 )
 
@@ -30,10 +30,10 @@ dashboard_hero()
 
 actions = st.columns(3)
 with actions[0]:
-    if st.button("새 프로젝트 만들기", type="primary", width="stretch"):
+    if st.button("교육평가 프로젝트 만들기", type="primary", width="stretch"):
         safe_switch_page("pages/1_project_setup.py")
 with actions[1]:
-    if st.button("조직 리포트 보기", width="stretch"):
+    if st.button("교육 전후 리포트 보기", width="stretch"):
         safe_switch_page("pages/4_organization_report.py")
 with actions[2]:
     if st.button("처음 사용 안내", width="stretch"):
@@ -65,7 +65,7 @@ with right:
         )
         callout(
             "HR은 조직 집계가 기본",
-            "개인결과는 참여자가 별도로 동의한 범위만 열람합니다.",
+            "개인결과는 참여자가 별도로 동의한 범위만 열람하며, 조직 변화는 유효한 사전·사후 짝만 집계합니다.",
         )
         callout(
             "채용·승진·성과평가에 사용 금지",
@@ -78,24 +78,29 @@ with right:
             "유효응답자 5명 미만의 부서·직급 점수는 표시하지 않습니다.",
             icon="5+",
         )
+        callout(
+            "변화와 인과효과는 다릅니다",
+            "비교집단이 없는 사전·사후 자기보고 결과는 교육 전후 관찰된 변화로 표현합니다.",
+            icon="i",
+        )
 
 st.markdown("### 다음 운영 작업")
 next_a, next_b, next_c = st.columns(3)
 with next_a:
     with st.container(border=True):
-        st.markdown("**① 진단 프로젝트 구성**")
-        st.caption("대상 수준을 정하고 공통역량과 선택역량을 체크박스로 구성합니다.")
+        st.markdown("**① 교육·평가 일정 구성**")
+        st.caption("교육명과 교육일, 사전검사·사후검사 기간, 공통 측정역량을 함께 정합니다.")
         if st.button("프로젝트 설정", key="home_project", width="stretch"):
             safe_switch_page("pages/1_project_setup.py")
 with next_b:
     with st.container(border=True):
-        st.markdown("**② 참여자 화면 확인**")
-        st.caption("최근 8주 행동빈도 응답, 자동저장, 수행 기회 없음 처리를 확인합니다.")
+        st.markdown("**② 사전·사후 화면 확인**")
+        st.caption("두 시점 모두 같은 문항·척도와 최근 8주 회상기간을 사용하고, 익명 ID로 짝을 맞춥니다.")
         if st.button("참여자 미리보기", key="home_assessment", width="stretch"):
             safe_switch_page("pages/2_assessment.py")
 with next_c:
     with st.container(border=True):
-        st.markdown("**③ 조직 교육수요 확인**")
-        st.caption("N≥5 집계, 목표격차, 교육 외 원인과 과정추천을 함께 검토합니다.")
-        if st.button("조직 리포트", key="home_org", width="stretch"):
+        st.markdown("**③ 관찰된 변화 확인**")
+        st.caption("N≥5 짝지은 집계, 역량별 전후 변화, 수행기회와 전이 장애요인을 함께 검토합니다.")
+        if st.button("교육 전후 리포트", key="home_org", width="stretch"):
             safe_switch_page("pages/4_organization_report.py")
