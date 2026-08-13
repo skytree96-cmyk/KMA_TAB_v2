@@ -50,6 +50,13 @@ class UiRegressionTests(unittest.TestCase):
         self.assertIn("@media (prefers-color-scheme:dark)", source)
         self.assertIn("color-scheme:light", source)
 
+    def test_assessment_radio_and_progress_colors_follow_tap_theme(self) -> None:
+        source = (ROOT / "tap" / "ui.py").read_text(encoding="utf-8")
+        self.assertIn('[data-testid="stRadioOption"] p', source)
+        self.assertIn('[data-testid="stRadioOption"][data-selected] p', source)
+        self.assertIn('[data-testid="stProgressBarTrack"] > div', source)
+        self.assertNotIn('[data-testid="stProgress"] > div > div', source)
+
     @patch("tap.ui.st.error")
     @patch("tap.ui.st.switch_page", side_effect=StreamlitAPIException("missing page"))
     def test_safe_switch_keeps_current_page_on_registry_error(self, switch_page, error) -> None:

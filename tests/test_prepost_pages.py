@@ -53,6 +53,24 @@ class PrePostPageTests(unittest.TestCase):
         self.assertTrue(any(item.label == "적용을 방해한 요인(복수 선택)" for item in app.multiselect))
         self.assertTrue(any(item.label == "교육 후 검사 완료" for item in app.button))
 
+    def test_save_and_next_advances_to_the_following_question(self) -> None:
+        questions = questions_for_factors(["CORE-CO"])
+        self.assertGreater(len(questions), 1)
+        app = AppTest.from_file(str(ROOT / "pages" / "2_assessment.py"), default_timeout=30).run()
+        app.session_state["selected_factors"] = ["CORE-CO"]
+        app.session_state["participant_id"] = "TEST-P001"
+        app.run()
+
+        first_code = str(questions[0]["question_code"])
+        app.radio[0].set_value(3)
+        next(button for button in app.button if button.label == "저장하고 다음").click()
+        app.run()
+
+        self.assertEqual([], [str(item.value) for item in app.exception])
+        self.assertEqual(1, app.session_state["current_question"])
+        self.assertEqual(1, app.session_state["current_question_by_phase"]["pre"])
+        self.assertEqual(3, app.session_state["responses_by_phase"]["pre"][first_code])
+
 
 if __name__ == "__main__":
     unittest.main()

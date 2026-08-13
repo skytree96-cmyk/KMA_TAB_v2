@@ -46,6 +46,22 @@ class StateTests(unittest.TestCase):
         self.assertEqual(state["responses"], {"Q1": 5})
         self.assertEqual(state["current_question"], 1)
 
+    def test_sync_preserves_new_progress_after_timer_has_started(self):
+        state = {}
+        ensure_state(state)
+        state["assessment_started_at"] = 10.0
+        sync_assessment_phase(state)
+
+        # A populated phase map previously caused ensure_state() inside sync
+        # to restore question 0 before the new cursor could be saved.
+        state["responses"]["Q1"] = 3
+        state["current_question"] = 1
+        sync_assessment_phase(state)
+
+        self.assertEqual(state["current_question"], 1)
+        self.assertEqual(state["current_question_by_phase"]["pre"], 1)
+        self.assertEqual(state["responses_by_phase"]["pre"], {"Q1": 3})
+
     def test_reset_current_phase_does_not_clear_other_phase(self):
         state = {}
         ensure_state(state)

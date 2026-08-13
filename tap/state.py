@@ -168,7 +168,11 @@ def activate_assessment_phase(state: MutableMapping[str, Any], phase: str) -> No
 
 def sync_assessment_phase(state: MutableMapping[str, Any]) -> None:
     """Save flat compatibility keys into the currently active phase store."""
-    ensure_state(state)
+    # Do not call ``ensure_state`` here.  ``ensure_state`` intentionally loads
+    # the canonical phase map back into the flat compatibility aliases.  When
+    # a page has just changed an alias (for example ``current_question``), that
+    # reload would discard the new value before it can be persisted.  The save
+    # helper creates/repairs every phase mapping it needs on its own.
     _save_phase_aliases(state, _normalise_phase(state.get("assessment_phase")))
 
 

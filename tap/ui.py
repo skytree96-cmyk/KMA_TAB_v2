@@ -517,6 +517,14 @@ MOCKUP_CSS = """
   .stApp [data-testid="stExpander"] p {
     color:var(--tap-ink);
   }
+  .stApp [data-testid="stRadioOption"],
+  .stApp [data-testid="stRadioOption"] p {
+    color:var(--tap-ink) !important;
+  }
+  .stApp [data-testid="stRadioOption"][data-selected] p {
+    color:var(--tap-teal-deep) !important;
+    font-weight:800;
+  }
   .stApp [data-testid="stCaptionContainer"] p { color:var(--tap-muted) !important; }
   [data-testid="stFileUploaderDropzone"] {
     border-color:var(--tap-line) !important;
@@ -532,7 +540,17 @@ MOCKUP_CSS = """
   [data-baseweb="input"] input::placeholder,
   .stApp textarea::placeholder { color:var(--tap-muted) !important; opacity:.82; }
   [data-testid="stSlider"] [role="slider"] { background:var(--tap-teal); }
-  [data-testid="stProgress"] > div > div { background:linear-gradient(90deg,var(--tap-teal),#51d1c5); }
+  .stApp [data-testid="stProgress"] > div:first-child,
+  .stApp [data-testid="stProgress"] > div:first-child p {
+    color:var(--tap-ink) !important;
+    background:transparent !important;
+  }
+  .stApp [data-testid="stProgressBarTrack"] {
+    background:var(--tap-line) !important;
+  }
+  .stApp [data-testid="stProgressBarTrack"] > div {
+    background:linear-gradient(90deg,var(--tap-teal),#51d1c5) !important;
+  }
   [data-testid="stDataFrame"] { border:1px solid var(--tap-line); border-radius:15px; overflow:hidden; }
   [data-testid="stAlert"] { border-radius:14px; }
   [data-testid="stTabs"] [data-baseweb="tab-list"] { gap:.35rem; }
