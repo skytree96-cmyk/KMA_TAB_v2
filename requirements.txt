@@ -1,3 +1,3 @@
 streamlit==1.61.1
 pandas>=2.2,<4
-# Rebuild marker: restart Streamlit Cloud after the PDF user-guide rollout.
+# Rebuild marker: restart Streamlit Cloud for the pre/post evaluation rollout (2026-08-13).
