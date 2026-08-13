@@ -42,7 +42,7 @@ KMA 회원사의 교육 요구를 확인하고 교육과정을 연결하기 위�
 4. 개인은 본인 리포트를 보고, 교육담당자는 `조직 리포트`에서 익명 집계를 확인합니다.
 5. 조직 리포트의 `인쇄용 리포트 HTML`을 내려받아 브라우저의 `인쇄 → PDF 저장`을 사용합니다.
 
-화면 안의 상세 안내와 PPT 가이드는 `pages/0_user_guide.py`, `docs/TAP_빠른사용가이드_v3.pptx`에서 제공합니다.
+화면 안의 상세 안내와 PDF 사용설명서는 `pages/0_user_guide.py`, `docs/TAP_사용설명서_v3.pdf`에서 제공합니다.
 
 운영용 조직 리포트 CSV에는 `participant_id`, `factor_code`, `factor_name_ko`, `score_1_to_5`, `project_id`, `assessment_version`, `assessment_date` 7개 열이 모두 필요합니다. 화면의 `CSV 양식 내려받기`를 사용하면 올바른 형식으로 시작할 수 있습니다. 공개 데모에는 실제 개인정보나 기밀 응답을 업로드하지 마세요.
 

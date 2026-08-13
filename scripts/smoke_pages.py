@@ -33,6 +33,8 @@ def _assert_clean(app: AppTest, label: str) -> None:
 def main() -> int:
     app = AppTest.from_file(str(ROOT / "streamlit_app.py"), default_timeout=20).run()
     _assert_clean(app, "streamlit_app.py")
+    if not any(button.label == "사용설명서" for button in app.download_button):
+        raise AssertionError("sidebar PDF guide download is missing")
     for page in PAGES:
         app.switch_page(page).run()
         _assert_clean(app, page)

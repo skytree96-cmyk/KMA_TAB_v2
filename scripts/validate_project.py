@@ -58,6 +58,7 @@ def main() -> int:
         ROOT / "pages" / "0_user_guide.py",
         ROOT / "pages" / "1_project_setup.py",
         ROOT / "pages" / "6_kma_dashboard.py",
+        ROOT / "docs" / "TAP_사용설명서_v3.pdf",
     ]
     for path in required_pages:
         if not path.exists():

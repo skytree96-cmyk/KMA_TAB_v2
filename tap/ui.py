@@ -705,13 +705,13 @@ def _render_sidebar() -> str:
                 key=f"tap_missing_nav_{selected_role}_{index}",
             )
 
-        guide_path = Path(PROJECT_ROOT) / "docs" / "TAP_빠른사용가이드_v3.pptx"
+        guide_path = Path(PROJECT_ROOT) / "docs" / "TAP_사용설명서_v3.pdf"
         if guide_path.exists():
             st.download_button(
-                "PPT 사용설명서 내려받기",
+                "사용설명서",
                 guide_path.read_bytes(),
                 guide_path.name,
-                "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+                "application/pdf",
                 key=f"tap_sidebar_guide_{selected_role}",
                 width="stretch",
             )

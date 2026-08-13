@@ -82,13 +82,13 @@ with kma_tab:
     if st.button("문항은행 검수 열기", key="guide_question_bank", type="primary", width="stretch"):
         switch_role_page("kma", "pages/5_question_bank.py")
 
-guide_path = Path(PROJECT_ROOT) / "docs" / "TAP_빠른사용가이드_v3.pptx"
+guide_path = Path(PROJECT_ROOT) / "docs" / "TAP_사용설명서_v3.pdf"
 if guide_path.exists():
     st.divider()
     st.download_button(
-        "PPT 빠른 사용 가이드 내려받기",
+        "사용설명서 내려받기",
         guide_path.read_bytes(),
         guide_path.name,
-        "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+        "application/pdf",
         width="stretch",
     )
