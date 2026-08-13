@@ -117,15 +117,19 @@ callout(
     icon="i",
 )
 
+participant_id_missing = not str(st.session_state.get("participant_id", "")).strip()
 st.text_input(
-    "익명 참여자 ID",
+    "교육 참여자 ID",
     key="participant_id",
-    disabled=pre_complete,
+    disabled=pre_complete and not participant_id_missing,
     help="교육 전·후에 같은 ID를 사용해야 변화가 연결됩니다. 이름·사번 같은 직접 식별정보는 입력하지 마세요.",
 )
-if not str(st.session_state.get("participant_id", "")).strip():
-    st.error("교육 전·후를 연결할 익명 참여자 ID를 입력해 주세요.")
-    st.stop()
+participant_id_missing = not str(st.session_state.get("participant_id", "")).strip()
+if participant_id_missing:
+    st.warning(
+        "교육 전·후 결과를 연결할 교육 참여자 ID를 입력해 주세요. "
+        "문항은 미리 볼 수 있지만 ID 입력 전에는 응답을 저장할 수 없습니다."
+    )
 
 if phase == "post" and not pre_complete:
     callout(
@@ -193,6 +197,9 @@ def _render_transfer_environment() -> None:
         submitted = st.form_submit_button("교육 후 검사 완료", type="primary", width="stretch")
 
     if submitted:
+        if not str(st.session_state.get("participant_id", "")).strip():
+            st.error("교육 참여자 ID를 입력한 뒤 교육 후 검사 완료를 다시 눌러 주세요.")
+            return
         if any(value is None for value in values.values()):
             st.error("현업전이 항목 4개에 모두 응답해 주세요.")
             return
@@ -214,62 +221,86 @@ if st.session_state.assessment_completed:
         st.switch_page("pages/3_individual_report.py")
     st.stop()
 
-st.progress(answered / len(questions), text=f"{answered}/{len(questions)} 응답 · 현재 {idx + 1}번")
-st.markdown(
-    f"""
-    <div class="tap-question-card">
-      <div class="tap-question-meta">
-        <span>{phase_short_labels[phase]} 업무행동 문항 {idx + 1}</span>
-        <span>최근 8주</span>
-      </div>
-      <h2>{escape(question['revised_text'])}</h2>
-    </div>
-    """,
-    unsafe_allow_html=True,
-)
-
 options = list(LIKERT_OPTIONS)
 current_value = responses.get(question["question_code"])
-with st.form(f"question_form_{phase}_{question['question_code']}"):
-    choice = st.radio(
-        "응답",
-        options=options,
-        index=options.index(current_value) if current_value in options else None,
-        format_func=lambda value: f"{value}. {LIKERT_OPTIONS[value]}",
-        horizontal=True,
+with st.container(border=True):
+    st.markdown('<span class="tap-question-stage-anchor" aria-hidden="true"></span>', unsafe_allow_html=True)
+    st.markdown(
+        f"""
+        <div class="tap-assessment-progress-head">
+          <div class="tap-assessment-progress-count"><b>{idx + 1}</b><span>/ {len(questions)}</span></div>
+          <div class="tap-assessment-progress-status">{answered}개 응답 완료</div>
+        </div>
+        """,
+        unsafe_allow_html=True,
     )
-    if idx == len(questions) - 1:
-        submit_label = "저장하고 현업전이 문항" if phase == "post" else "교육 전 결과 보기"
-    else:
-        submit_label = "저장하고 다음"
-    submitted = st.form_submit_button(submit_label, type="primary", width="stretch")
+    st.progress((idx + 1) / len(questions))
+    st.markdown(
+        f"""
+        <section class="tap-question-panel">
+          <div class="tap-question-meta">
+            <span class="tap-factor-pill">{escape(str(question['factor_name_ko']))}</span>
+            <span class="tap-period-pill">최근 8주</span>
+          </div>
+          <p class="tap-question-number">{phase_short_labels[phase]} 업무행동 · 문항 {idx + 1}</p>
+          <h2>{escape(question['revised_text'])}</h2>
+        </section>
+        """,
+        unsafe_allow_html=True,
+    )
 
-if submitted:
-    if choice is None:
-        st.error("응답을 선택해 주세요. 수행 기회가 없었다면 '수행 기회 없음'을 선택하세요.")
-    else:
-        responses[question["question_code"]] = int(choice)
-        st.session_state.responses = responses
+    with st.form(f"question_form_{phase}_{question['question_code']}"):
+        st.markdown(
+            """
+            <div class="tap-response-head tap-response-anchor">
+              <b>얼마나 자주 했습니까?</b>
+              <span>해당 행동을 할 상황이 없었다면 0을 선택하세요.</span>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+        choice = st.radio(
+            "응답",
+            options=options,
+            index=options.index(current_value) if current_value in options else None,
+            format_func=lambda value: LIKERT_OPTIONS[value],
+            horizontal=True,
+            label_visibility="collapsed",
+        )
         if idx == len(questions) - 1:
-            sync_assessment_phase(st.session_state)
-            if phase == "post":
-                st.rerun()
-            else:
-                _finish_phase()
+            submit_label = "저장하고 현업전이 문항" if phase == "post" else "교육 전 결과 보기"
         else:
-            st.session_state.current_question = idx + 1
+            submit_label = "다음 문항 →"
+        submitted = st.form_submit_button(submit_label, type="primary", width="stretch")
+
+    if submitted:
+        if not str(st.session_state.get("participant_id", "")).strip():
+            st.error("교육 참여자 ID를 입력한 뒤 다음 문항을 다시 눌러 주세요. 선택한 응답은 그대로 유지됩니다.")
+        elif choice is None:
+            st.error("응답을 선택해 주세요. 수행 기회가 없었다면 '수행 기회 없음'을 선택하세요.")
+        else:
+            responses[question["question_code"]] = int(choice)
+            st.session_state.responses = responses
+            if idx == len(questions) - 1:
+                sync_assessment_phase(st.session_state)
+                if phase == "post":
+                    st.rerun()
+                else:
+                    _finish_phase()
+            else:
+                st.session_state.current_question = idx + 1
+                sync_assessment_phase(st.session_state)
+                st.rerun()
+
+    left, right = st.columns(2)
+    with left:
+        if st.button("← 이전 문항", disabled=idx == 0, width="stretch"):
+            st.session_state.current_question = idx - 1
             sync_assessment_phase(st.session_state)
             st.rerun()
-
-left, right = st.columns(2)
-with left:
-    if st.button("이전 문항", disabled=idx == 0, width="stretch"):
-        st.session_state.current_question = idx - 1
-        sync_assessment_phase(st.session_state)
-        st.rerun()
-with right:
-    with st.popover(f"{phase_short_labels[phase]} 검사 초기화", width="stretch"):
-        st.write(f"현재 {phase_short_labels[phase]} 응답만 모두 지웁니다. 다른 시점의 응답은 유지됩니다.")
-        if st.button("초기화 확인", type="secondary"):
-            reset_assessment(st.session_state, phase)
-            st.rerun()
+    with right:
+        with st.popover(f"{phase_short_labels[phase]} 검사 초기화", width="stretch"):
+            st.write(f"현재 {phase_short_labels[phase]} 응답만 모두 지웁니다. 다른 시점의 응답은 유지됩니다.")
+            if st.button("초기화 확인", type="secondary"):
+                reset_assessment(st.session_state, phase)
+                st.rerun()

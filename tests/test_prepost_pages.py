@@ -30,7 +30,7 @@ class PrePostPageTests(unittest.TestCase):
     def test_assessment_uses_same_eight_week_instruction_for_both_phases(self) -> None:
         source = (ROOT / "pages" / "2_assessment.py").read_text(encoding="utf-8")
         self.assertIn("사전·사후 모두 동일하게 최근 8주", source)
-        self.assertIn("<span>최근 8주</span>", source)
+        self.assertIn('class="tap-period-pill">최근 8주</span>', source)
         self.assertNotIn("최근 4주", source)
         self.assertIn("sync_assessment_phase", source)
 
@@ -63,13 +63,34 @@ class PrePostPageTests(unittest.TestCase):
 
         first_code = str(questions[0]["question_code"])
         app.radio[0].set_value(3)
-        next(button for button in app.button if button.label == "저장하고 다음").click()
+        next(button for button in app.button if button.label == "다음 문항 →").click()
         app.run()
 
         self.assertEqual([], [str(item.value) for item in app.exception])
         self.assertEqual(1, app.session_state["current_question"])
         self.assertEqual(1, app.session_state["current_question_by_phase"]["pre"])
         self.assertEqual(3, app.session_state["responses_by_phase"]["pre"][first_code])
+
+    def test_blank_participant_id_keeps_question_visible_and_blocks_save(self) -> None:
+        app = AppTest.from_file(str(ROOT / "pages" / "2_assessment.py"), default_timeout=30).run()
+        app.session_state["selected_factors"] = ["CORE-CO"]
+        app.session_state["participant_id"] = ""
+        app.run()
+
+        self.assertEqual([], [str(item.value) for item in app.exception])
+        self.assertTrue(any(item.label == "교육 참여자 ID" for item in app.text_input))
+        self.assertTrue(app.radio, "ID가 비어 있어도 질문과 응답 선택지는 보여야 합니다.")
+        self.assertTrue(any(item.label == "다음 문항 →" for item in app.button))
+        self.assertTrue(any("ID 입력 전에는 응답을 저장할 수 없습니다" in str(item.value) for item in app.warning))
+
+        app.radio[0].set_value(3)
+        next(button for button in app.button if button.label == "다음 문항 →").click()
+        app.run()
+
+        self.assertEqual(0, app.session_state["current_question"])
+        self.assertEqual({}, app.session_state["responses_by_phase"]["pre"])
+        self.assertEqual(3, app.radio[0].value)
+        self.assertTrue(any("교육 참여자 ID를 입력한 뒤" in str(item.value) for item in app.error))
 
 
 if __name__ == "__main__":

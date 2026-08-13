@@ -57,6 +57,20 @@ class UiRegressionTests(unittest.TestCase):
         self.assertIn('[data-testid="stProgressBarTrack"] > div', source)
         self.assertNotIn('[data-testid="stProgress"] > div > div', source)
 
+    def test_assessment_uses_focused_card_and_response_tile_grid(self) -> None:
+        ui_source = (ROOT / "tap" / "ui.py").read_text(encoding="utf-8")
+        page_source = (ROOT / "pages" / "2_assessment.py").read_text(encoding="utf-8")
+        self.assertIn(':has(.tap-question-stage-anchor)', ui_source)
+        self.assertIn('grid-template-columns:repeat(6,minmax(0,1fr))', ui_source)
+        self.assertIn('[data-testid="stRadioOption"]:has(input:checked)', ui_source)
+        self.assertIn('--tap-option-selected:#1b4743', ui_source)
+        self.assertIn('grid-template-columns:repeat(2,minmax(0,1fr))', ui_source)
+        self.assertIn('with st.container(border=True):', page_source)
+        self.assertIn("question['factor_name_ko']", page_source)
+        self.assertIn('class="tap-response-head tap-response-anchor"', page_source)
+        self.assertIn('format_func=lambda value: LIKERT_OPTIONS[value]', page_source)
+        self.assertIn('label_visibility="collapsed"', page_source)
+
     @patch("tap.ui.st.error")
     @patch("tap.ui.st.switch_page", side_effect=StreamlitAPIException("missing page"))
     def test_safe_switch_keeps_current_page_on_registry_error(self, switch_page, error) -> None:

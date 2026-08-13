@@ -95,7 +95,7 @@ with next_a:
 with next_b:
     with st.container(border=True):
         st.markdown("**② 사전·사후 화면 확인**")
-        st.caption("두 시점 모두 같은 문항·척도와 최근 8주 회상기간을 사용하고, 익명 ID로 짝을 맞춥니다.")
+        st.caption("두 시점 모두 같은 문항·척도와 최근 8주 회상기간을 사용하고, 교육 참여자 ID로 짝을 맞춥니다.")
         if st.button("참여자 미리보기", key="home_assessment", width="stretch"):
             safe_switch_page("pages/2_assessment.py")
 with next_c:

@@ -525,7 +525,7 @@ def _pre_post_report_body(model: Mapping[str, Any]) -> str:
         method_block = (
             f"""
             <div class="tap-report-method-grid">
-              <div><b>비교 규칙</b><span>동일 익명 ID·동일 역량·교육 전/후가 모두 있는 참여자만 변화 산출</span></div>
+              <div><b>비교 규칙</b><span>동일 교육 참여자 ID·동일 역량·교육 전/후가 모두 있는 참여자만 변화 산출</span></div>
               <div><b>집계 보호</b><span>짝지어진 참여자 N&lt;{pre_post.get('min_group_n', 5)} 비공개. 이 기준은 통계적 안정성을 보장하지 않음</span></div>
               <div><b>허용 표현</b><span>교육 전후 자기보고 행동빈도 변화</span></div>
               <div><b>금지 표현</b><span>비교집단 없는 결과를 교육의 인과효과로 확정</span></div>

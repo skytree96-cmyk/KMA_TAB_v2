@@ -38,14 +38,14 @@ KMA 회원사의 교육 전 출발점과 교육 후 현업 행동 변화를 같�
 
 1. 사이드바 `처음 사용 안내`에서 자신의 역할을 확인합니다.
 2. 교육담당자는 `교육평가 프로젝트`에서 교육명·교육일·사전/사후 검사기간·공통 측정역량을 설정합니다.
-3. 참여자는 교육 전에 `사전검사`, 교육 후 현업 적용 8~10주 뒤에 같은 문항·척도로 `사후검사`에 응답합니다. 최근 8주 회상기간에 교육 전이 섞이지 않도록 하며, 두 시점에는 같은 익명 ID를 사용합니다.
+3. 참여자는 교육 전에 `사전검사`, 교육 후 현업 적용 8~10주 뒤에 같은 문항·척도로 `사후검사`에 응답합니다. 최근 8주 회상기간에 교육 전이 섞이지 않도록 하며, 두 시점에는 같은 교육 참여자 ID를 사용합니다.
 4. 개인은 본인의 사전·사후 변화를 보고, 교육담당자는 `교육 전후 리포트`에서 유효하게 짝지어진 익명 조직 집계를 확인합니다.
 5. 사후검사의 적용기회·상사지원·도구·권한·장애요인과 역량 변화를 함께 해석한 뒤 교육 보완 또는 조직환경 개선을 결정합니다.
 6. 교육 전후 리포트의 `인쇄용 리포트 HTML`을 내려받아 브라우저의 `인쇄 → PDF 저장`을 사용합니다.
 
 화면 안의 상세 안내와 PDF 사용설명서는 `pages/0_user_guide.py`, `docs/TAP_사용설명서_v3.pdf`에서 제공합니다.
 
-운영용 교육 전후 리포트 CSV는 참여자별·역량별 장형 구조이며 `participant_id`, `factor_code`, `score_1_to_5`, `project_id`, `assessment_version`, `target_level`, `assessment_date`, `session_type`, `valid_items`, `na_items`, `missing_items`를 사용합니다. `session_type`은 `pre` 또는 `post`이며, 두 시점에는 같은 익명 `participant_id`와 같은 문항 버전을 유지해야 합니다. 화면의 `사전·사후 CSV 양식`을 사용하면 올바른 형식으로 시작할 수 있습니다. 공개 데모에는 실제 개인정보나 기밀 응답을 업로드하지 마세요.
+운영용 교육 전후 리포트 CSV는 참여자별·역량별 장형 구조이며 `participant_id`, `factor_code`, `score_1_to_5`, `project_id`, `assessment_version`, `target_level`, `assessment_date`, `session_type`, `valid_items`, `na_items`, `missing_items`를 사용합니다. `session_type`은 `pre` 또는 `post`이며, 두 시점에는 같은 교육 참여자 ID(`participant_id`)와 같은 문항 버전을 유지해야 합니다. 화면의 `사전·사후 CSV 양식`을 사용하면 올바른 형식으로 시작할 수 있습니다. 공개 데모에는 실제 개인정보나 기밀 응답을 업로드하지 마세요.
 
 원본 144문항은 모두 `data/question_bank.csv`에 보존돼 있습니다. 직급 20문항은 `active=false`, `original_decision=삭제`로 표시됩니다. 영업 4문항과 마케팅 1문항은 정적 SQL과 실행 API 문구가 달라 두 원문을 함께 기록했습니다.
 

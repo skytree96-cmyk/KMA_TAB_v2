@@ -73,7 +73,7 @@ def main() -> int:
 
     prepost_contract = {
         ROOT / "pages" / "1_project_setup.py": ("교육평가 프로젝트 만들기", "56 <= post_delay_days <= 70"),
-        ROOT / "pages" / "2_assessment.py": ("사전·사후 모두 동일하게 최근 8주", "익명 참여자 ID"),
+        ROOT / "pages" / "2_assessment.py": ("사전·사후 모두 동일하게 최근 8주", "교육 참여자 ID"),
         ROOT / "pages" / "3_individual_report.py": ("교육 전·후 짝지어진 비교", "assessment_completed_by_phase"),
         ROOT / "pages" / "4_organization_report.py": ("교육 전후 리포트", "session_type"),
     }
