@@ -57,6 +57,11 @@ class UiRegressionTests(unittest.TestCase):
         self.assertIn('[data-testid="stProgressBarTrack"] > div', source)
         self.assertNotIn('[data-testid="stProgress"] > div > div', source)
 
+    def test_locked_participant_id_remains_readable(self) -> None:
+        source = (ROOT / "tap" / "ui.py").read_text(encoding="utf-8")
+        self.assertIn('[data-testid="stTextInput"] input:disabled', source)
+        self.assertIn('-webkit-text-fill-color:var(--tap-ink) !important', source)
+
     def test_assessment_uses_focused_card_and_response_tile_grid(self) -> None:
         ui_source = (ROOT / "tap" / "ui.py").read_text(encoding="utf-8")
         page_source = (ROOT / "pages" / "2_assessment.py").read_text(encoding="utf-8")

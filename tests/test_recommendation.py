@@ -1,4 +1,5 @@
 import unittest
+from pathlib import Path
 
 from tap.recommendation import rank_courses, recommendation_score
 
@@ -24,6 +25,36 @@ class RecommendationTests(unittest.TestCase):
             training_cause="system_only",
         )
         self.assertEqual(rows, [])
+
+    def test_unknown_cause_is_a_neutral_default(self):
+        known = recommendation_score(
+            gap_to_target=2,
+            content_fit=0.8,
+            organization_priority=True,
+            learner_interest=False,
+            level_fit=True,
+            delivery_fit=True,
+            training_cause="knowledge_skill",
+        )
+        unknown = recommendation_score(
+            gap_to_target=2,
+            content_fit=0.8,
+            organization_priority=True,
+            learner_interest=False,
+            level_fit=True,
+            delivery_fit=True,
+            training_cause="mixed_or_unknown",
+        )
+        self.assertEqual(unknown["training_gate"], 1.0)
+        self.assertEqual(unknown["recommendation_score"], known["recommendation_score"])
+
+    def test_project_setup_defers_gap_cause_to_post_assessment(self):
+        source = (
+            Path(__file__).resolve().parents[1] / "pages" / "1_project_setup.py"
+        ).read_text(encoding="utf-8")
+        self.assertNotIn("현재 격차의 주된 원인", source)
+        self.assertIn('training_cause = "mixed_or_unknown"', source)
+        self.assertIn("격차 원인은 교육 후에 확인", source)
 
 
 if __name__ == "__main__":

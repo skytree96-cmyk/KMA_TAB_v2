@@ -626,6 +626,12 @@ MOCKUP_CSS = """
     color:var(--tap-ink) !important;
     caret-color:var(--tap-teal) !important;
   }
+  [data-testid="stTextInput"] input:disabled {
+    -webkit-text-fill-color:var(--tap-ink) !important;
+    color:var(--tap-ink) !important;
+    opacity:1 !important;
+    cursor:not-allowed;
+  }
   [data-baseweb="input"] input::placeholder,
   .stApp textarea::placeholder { color:var(--tap-muted) !important; opacity:.82; }
   [data-testid="stSlider"] [role="slider"] { background:var(--tap-teal); }

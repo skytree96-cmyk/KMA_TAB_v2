@@ -327,7 +327,9 @@ with st.container(border=True):
         "조직 기대 행동빈도(1~5)",
         1.0,
         5.0,
-        3.5,
+        float(
+            next(iter(dict(st.session_state.get("target_means") or {}).values()), 3.5)
+        ),
         0.1,
         help="파일럿 전 임시 운영값입니다. 실제 운영에서는 직무분석과 전문가 합의로 역량·대상별 목표를 정하세요.",
     )
@@ -350,29 +352,26 @@ with st.container(border=True):
         limit=min(3, len(selected_factor_rows)),
     )
 
-    training_cause = st.radio(
-        "현재 격차의 주된 원인",
-        options=["knowledge_skill", "mixed_or_unknown", "system_only"],
-        format_func={
-            "knowledge_skill": "지식·기술·연습 부족",
-            "mixed_or_unknown": "혼합 또는 아직 확인되지 않음",
-            "system_only": "권한·도구·프로세스 등 시스템 요인",
-        }.get,
-        horizontal=True,
+    # 격차 원인은 사전점수만으로 판정할 수 없으며 프로젝트 생성자가 미리
+    # 단정하면 추천과 사후해석에 확인편향이 생길 수 있다. 생성 단계에서는
+    # 중립값을 저장하고 교육 후 현업전이 응답과 함께 해석한다.
+    training_cause = "mixed_or_unknown"
+    callout(
+        "격차 원인은 교육 후에 확인",
+        "프로젝트 생성 시 원인을 미리 단정하지 않습니다. 교육 전·후 변화와 적용 기회, 상사 지원, 도구·권한, 시간·프로세스 응답을 함께 확인하세요.",
+        icon="i",
     )
     delivery_preference = st.radio(
         "선호 교육방식",
         options=["all", "offline", "online"],
+        index=["all", "offline", "online"].index(
+            str(st.session_state.get("delivery_preference", "all"))
+            if str(st.session_state.get("delivery_preference", "all"))
+            in {"all", "offline", "online"}
+            else "all"
+        ),
         format_func={"all": "무관", "offline": "집합", "online": "온라인"}.get,
         horizontal=True,
-    )
-
-if training_cause == "system_only":
-    callout(
-        "교육 추천 중단",
-        "시스템 요인이 주된 원인이므로 비교육적 개선을 우선 제안합니다.",
-        icon="!",
-        tone="warn",
     )
 
 date_errors: list[str] = []
@@ -400,12 +399,54 @@ if st.button(
     disabled=item_count == 0 or bool(selection_issues) or bool(date_errors),
     width="stretch",
 ):
+    next_project_name = project_name.strip() or "이름 없는 교육평가 프로젝트"
+    next_course_name = course_name.strip() or "이름 없는 교육과정"
+    next_schedule = (
+        training_date.isoformat(),
+        pre_start_date.isoformat(),
+        pre_end_date.isoformat(),
+        post_start_date.isoformat(),
+        post_end_date.isoformat(),
+    )
+    stored_schedule = (
+        str(st.session_state.get("training_date", "")),
+        str(st.session_state.get("pre_start_date", "")),
+        str(st.session_state.get("pre_end_date", "")),
+        str(st.session_state.get("post_start_date", "")),
+        str(st.session_state.get("post_end_date", "")),
+    )
+    has_saved_assessment = any(
+        bool(value)
+        for value in dict(st.session_state.get("responses_by_phase") or {}).values()
+    )
     selection_changed = (
         set(st.session_state.get("selected_factors", [])) != set(selected)
         or st.session_state.get("target_level") != target_level
+        or (
+            has_saved_assessment
+            and (
+                str(st.session_state.get("project_name", "")) != next_project_name
+                or str(st.session_state.get("course_name", "")) != next_course_name
+                or stored_schedule != next_schedule
+            )
+        )
     )
-    st.session_state.project_name = project_name.strip() or "이름 없는 교육평가 프로젝트"
-    st.session_state.course_name = course_name.strip() or "이름 없는 교육과정"
+    project_identity_changed = (
+        set(st.session_state.get("selected_factors", [])) != set(selected)
+        or st.session_state.get("target_level") != target_level
+        or str(st.session_state.get("project_name", "")) != next_project_name
+        or str(st.session_state.get("course_name", "")) != next_course_name
+        or stored_schedule != next_schedule
+    )
+    st.session_state.project_name = next_project_name
+    if project_identity_changed or not str(st.session_state.get("project_id", "")).strip():
+        identity_material = "|".join(
+            (next_project_name, next_course_name, target_level, *sorted(selected), *next_schedule)
+        )
+        st.session_state.project_id = "TAP-" + hashlib.sha256(
+            identity_material.encode("utf-8")
+        ).hexdigest()[:16].upper()
+    st.session_state.course_name = next_course_name
     st.session_state.training_date = training_date.isoformat()
     st.session_state.pre_start_date = pre_start_date.isoformat()
     st.session_state.pre_end_date = pre_end_date.isoformat()

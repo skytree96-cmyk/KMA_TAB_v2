@@ -5,15 +5,17 @@ from typing import Any, MutableMapping, cast
 
 
 ASSESSMENT_PHASES = ("pre", "post")
+PARTICIPANT_ID_WIDGET_KEY = "_participant_id_input"
 
 
 DEFAULTS: dict[str, Any] = {
     "active_role": "company",
     "project_name": "2026 하반기 공통역량 진단",
+    "project_id": "",
     "project_start_date": "2026-08-17",
     "project_end_date": "2026-08-28",
     "course_name": "공통역량 교육",
-    "participant_id": "DEMO-P001",
+    "participant_id": "",
     "assessment_version": "TAP-1.0",
     "question_snapshot_hash": "",
     "question_snapshot_codes": [],
@@ -30,6 +32,7 @@ DEFAULTS: dict[str, Any] = {
     "current_question_by_phase": {"pre": 0, "post": 0},
     "assessment_started_at_by_phase": {"pre": None, "post": None},
     "assessment_completed_by_phase": {"pre": False, "post": False},
+    "assessment_completed_at_by_phase": {"pre": None, "post": None},
     "duration_seconds_by_phase": {"pre": None, "post": None},
     "post_transfer_responses": {},
     # The flat keys remain as aliases for the active phase so existing pages and
@@ -54,6 +57,25 @@ def _normalise_phase(phase: Any) -> str:
     return value
 
 
+def load_participant_id_widget(state: MutableMapping[str, Any]) -> str:
+    """Restore the durable participant ID into a temporary widget key.
+
+    Streamlit removes widget-owned keys when the user leaves their page. The
+    canonical ``participant_id`` therefore remains application state while the
+    text input uses a disposable key recreated for the post assessment.
+    """
+    participant_id = str(state.get("participant_id", ""))
+    state[PARTICIPANT_ID_WIDGET_KEY] = participant_id
+    return participant_id
+
+
+def save_participant_id_widget(state: MutableMapping[str, Any]) -> str:
+    """Persist the temporary participant-ID widget value across pages."""
+    participant_id = str(state.get(PARTICIPANT_ID_WIDGET_KEY, "")).strip()
+    state["participant_id"] = participant_id
+    return participant_id
+
+
 def _ensure_phase_mapping(
     state: MutableMapping[str, Any], key: str, default_value: Any
 ) -> MutableMapping[str, Any]:
@@ -73,6 +95,7 @@ def _load_phase_aliases(state: MutableMapping[str, Any], phase: str) -> None:
     started_at = _ensure_phase_mapping(state, "assessment_started_at_by_phase", None)
     completed = _ensure_phase_mapping(state, "assessment_completed_by_phase", False)
     durations = _ensure_phase_mapping(state, "duration_seconds_by_phase", None)
+    completed_at = _ensure_phase_mapping(state, "assessment_completed_at_by_phase", None)
 
     # Keep the response object shared, not merely copied. Existing code mutates
     # ``state.responses`` in-place; the phase store must see those writes.
@@ -114,6 +137,11 @@ def ensure_state(state: MutableMapping[str, Any]) -> None:
     for key, value in DEFAULTS.items():
         if key not in state:
             state[key] = deepcopy(value)
+
+    # 프로젝트 생성 단계의 원인 사전판정은 제거됐다. 이전 세션의 숨은 값이
+    # 새 추천 결과를 계속 차단하지 않도록 중립 상태로 마이그레이션한다.
+    if state.get("training_cause") != "mixed_or_unknown":
+        state["training_cause"] = "mixed_or_unknown"
 
     phase = _normalise_phase(state.get("assessment_phase"))
     state["assessment_phase"] = phase
@@ -195,12 +223,14 @@ def reset_assessment(state: MutableMapping[str, Any], phase: str | None = None) 
     started_at = _ensure_phase_mapping(state, "assessment_started_at_by_phase", None)
     completed = _ensure_phase_mapping(state, "assessment_completed_by_phase", False)
     durations = _ensure_phase_mapping(state, "duration_seconds_by_phase", None)
+    completed_at = _ensure_phase_mapping(state, "assessment_completed_at_by_phase", None)
 
     responses[selected_phase] = {}
     current_questions[selected_phase] = 0
     started_at[selected_phase] = None
     completed[selected_phase] = False
     durations[selected_phase] = None
+    completed_at[selected_phase] = None
     if selected_phase == "post":
         state["post_transfer_responses"] = {}
     if selected_phase == state.get("assessment_phase"):

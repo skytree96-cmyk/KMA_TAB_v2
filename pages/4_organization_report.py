@@ -7,10 +7,11 @@ import streamlit as st
 
 from tap.aggregation import aggregate_factor_results
 from tap.config import DATA_DIR, MIN_GROUP_N
-from tap.data import load_competencies
+from tap.data import load_competencies, questions_for_factors
 from tap.reporting import (
     build_organization_report_model,
     build_pre_post_group_summary,
+    completed_session_factor_rows,
     organization_report_fragment,
     prepare_group_results,
     printable_organization_report_html,
@@ -33,12 +34,32 @@ callout(
     icon="5+",
 )
 
-template_csv = """participant_id,factor_code,score_1_to_5,project_id,assessment_version,target_level,assessment_date,session_type,valid_items,na_items,missing_items,opportunity_1_to_5,manager_support_1_to_5,resource_support_1_to_5
-P001,CORE-CO,3.0,PROJECT-001,TAP-1.0,manager,2026-08-01,pre,4,0,0,,,
-P001,CORE-CO,3.8,PROJECT-001,TAP-1.0,manager,2026-10-01,post,4,0,0,4,4,3
-P002,CORE-CO,3.2,PROJECT-001,TAP-1.0,manager,2026-08-01,pre,3,1,0,,,
-P002,CORE-CO,3.7,PROJECT-001,TAP-1.0,manager,2026-10-01,post,4,0,0,3,4,4
+template_csv = """participant_id,factor_code,score_1_to_5,project_id,assessment_version,target_level,assessment_date,session_type,valid_items,na_items,missing_items,opportunity_1_to_5,manager_support_1_to_5,resource_support_1_to_5,time_process_support_1_to_5
+P001,CORE-CO,3.0,PROJECT-001,TAP-1.0,manager,2026-08-01,pre,4,0,0,,,,
+P001,CORE-CO,3.8,PROJECT-001,TAP-1.0,manager,2026-10-01,post,4,0,0,4,4,3,4
+P002,CORE-CO,3.2,PROJECT-001,TAP-1.0,manager,2026-08-01,pre,3,1,0,,,,
+P002,CORE-CO,3.7,PROJECT-001,TAP-1.0,manager,2026-10-01,post,4,0,0,3,4,4,3
 """
+
+completed_dates = dict(st.session_state.get("assessment_completed_at_by_phase") or {})
+session_rows = completed_session_factor_rows(
+    questions_for_factors(list(st.session_state.get("selected_factors", []))),
+    dict(st.session_state.get("responses_by_phase") or {}),
+    dict(st.session_state.get("assessment_completed_by_phase") or {}),
+    participant_id=str(st.session_state.get("participant_id", "")),
+    project_id=str(
+        st.session_state.get("project_id")
+        or st.session_state.get("project_name", "TAP-PROJECT")
+    ),
+    assessment_version=str(st.session_state.get("assessment_version", "TAP-1.0")),
+    target_level=str(st.session_state.get("target_level", "staff")),
+    assessment_dates={
+        "pre": completed_dates.get("pre") or st.session_state.get("pre_end_date", ""),
+        "post": completed_dates.get("post") or st.session_state.get("post_end_date", ""),
+    },
+    target_means=dict(st.session_state.get("target_means") or {}),
+    post_transfer_responses=dict(st.session_state.get("post_transfer_responses") or {}),
+)
 
 with st.expander("데이터 준비와 업로드", expanded=True):
     st.caption(
@@ -56,16 +77,47 @@ with st.expander("데이터 준비와 업로드", expanded=True):
         )
     with upload_col:
         uploaded = st.file_uploader(
-            "익명 조직결과 CSV",
+            "교육 참여자 조직결과 CSV",
             type=["csv"],
             help=(
                 "필수: participant_id, factor_code, score_1_to_5, project_id, "
                 "assessment_version, target_level, assessment_date. 전후 비교 시 session_type도 필요합니다."
             ),
         )
+    show_sample = st.checkbox(
+        "예시 리포트 보기",
+        value=False,
+        help="실제 완료 결과나 업로드 파일이 없을 때만 화면 확인용 합성 예시를 표시합니다.",
+    )
 
-is_sample = uploaded is None
-if is_sample:
+if uploaded is not None:
+    source_kind = "upload"
+    is_sample = False
+    raw = uploaded.getvalue()
+    try:
+        source = pd.read_csv(io.BytesIO(raw), encoding="utf-8-sig")
+    except UnicodeDecodeError:
+        try:
+            source = pd.read_csv(io.BytesIO(raw), encoding="cp949")
+        except (UnicodeDecodeError, pd.errors.ParserError, pd.errors.EmptyDataError) as exc:
+            st.error(f"CSV 인코딩 또는 구조를 읽을 수 없습니다: {exc}")
+            st.stop()
+    except (pd.errors.ParserError, pd.errors.EmptyDataError) as exc:
+        st.error(f"CSV 구조를 읽을 수 없습니다: {exc}")
+        st.stop()
+    st.success("업로드한 실제 조직결과를 사용하고 있습니다.")
+elif session_rows:
+    source_kind = "session"
+    is_sample = False
+    source = pd.DataFrame(session_rows)
+    completed_phases = sorted(set(source["session_type"]))
+    phase_text = "교육 전·후" if completed_phases == ["post", "pre"] else (
+        "교육 전" if completed_phases == ["pre"] else "교육 후"
+    )
+    st.success(f"현재 브라우저에서 완료한 실제 {phase_text} 결과를 자동으로 사용하고 있습니다.")
+elif show_sample:
+    source_kind = "sample"
+    is_sample = True
     base_sample = pd.read_csv(DATA_DIR / "sample_group_results.csv")
     # 기존 단일시점 예시를 화면 확인용 전후 예시로 확장한다. 모든 값은 예시임을 명시한다.
     pre_sample = base_sample.copy()
@@ -83,26 +135,22 @@ if is_sample:
     post_sample["opportunity_1_to_5"] = 3.8
     post_sample["manager_support_1_to_5"] = 3.6
     post_sample["resource_support_1_to_5"] = 3.4
+    post_sample["time_process_support_1_to_5"] = 3.3
     source = pd.concat([pre_sample, post_sample], ignore_index=True)
-    st.info("업로드 파일이 없어 교육 전·후 예시 데이터를 표시합니다. 모든 수치와 변화량은 실제 결과가 아닙니다.")
+    st.warning("예시 리포트 보기 옵션이 켜져 있습니다. 모든 수치와 변화량은 합성 예시이며 실제 결과가 아닙니다.")
 else:
-    raw = uploaded.getvalue()
-    try:
-        source = pd.read_csv(io.BytesIO(raw), encoding="utf-8-sig")
-    except UnicodeDecodeError:
-        try:
-            source = pd.read_csv(io.BytesIO(raw), encoding="cp949")
-        except (UnicodeDecodeError, pd.errors.ParserError, pd.errors.EmptyDataError) as exc:
-            st.error(f"CSV 인코딩 또는 구조를 읽을 수 없습니다: {exc}")
-            st.stop()
-    except (pd.errors.ParserError, pd.errors.EmptyDataError) as exc:
-        st.error(f"CSV 구조를 읽을 수 없습니다: {exc}")
-        st.stop()
+    st.info(
+        "표시할 실제 결과가 없습니다. 이 브라우저에서 검사를 완료하거나 조직결과 CSV를 업로드해 주세요. "
+        "화면 구성만 확인하려면 ‘예시 리포트 보기’를 선택할 수 있습니다."
+    )
+    if st.button("검사 진행하기", type="primary"):
+        st.switch_page("pages/2_assessment.py")
+    st.stop()
 
 clean, validation_errors, validation_warnings = prepare_group_results(
     source,
     load_competencies(),
-    require_metadata=not is_sample,
+    require_metadata=source_kind in {"session", "upload"},
 )
 for warning in validation_warnings:
     st.warning(warning)
@@ -115,6 +163,16 @@ session_values = set(clean["session_type"].dropna()) if "session_type" in clean.
 is_pre_post = {"pre", "post"}.issubset(session_values)
 pre_post_summary = build_pre_post_group_summary(clean, min_group_n=MIN_GROUP_N) if is_pre_post else None
 
+if source_kind == "session" and int(clean["participant_id"].nunique()) < MIN_GROUP_N:
+    st.warning(
+        f"실제 완료 결과 {int(clean['participant_id'].nunique())}명의 데이터를 읽었습니다. "
+        f"조직 리포트는 개인정보 보호를 위해 N≥{MIN_GROUP_N}일 때만 평균과 변화량을 공개합니다. "
+        "본인의 실제 교육 전·후 수치는 개인 리포트에서 바로 확인할 수 있습니다."
+    )
+    if st.button("내 실제 교육 전·후 비교 보기", type="primary"):
+        st.switch_page("pages/3_individual_report.py")
+    st.stop()
+
 if is_pre_post:
     profile_source = clean[clean["session_type"].eq("post")]
 else:
@@ -126,23 +184,20 @@ if not rows:
 
 source_codes = set(clean["factor_code"])
 project_was_configured = bool(st.session_state.get("selected_factors"))
-if is_sample:
+if source_kind == "session":
     configured_targets = {
         str(code): float(value)
         for code, value in st.session_state.get("target_means", {}).items()
         if code in source_codes
     }
     organization_priorities = set(st.session_state.get("organization_priorities", []))
-    project_name = (
-        str(st.session_state.get("project_name", "조직 진단"))
-        if project_was_configured
-        else "TAP 교육 전·후 변화 예시"
-    )
-    report_period = (
-        f"{st.session_state.get('project_start_date')} ~ {st.session_state.get('project_end_date')}"
-        if project_was_configured
-        else "예시 교육 전·후 기간"
-    )
+    project_name = str(st.session_state.get("project_name", "조직 교육평가"))
+    report_period = f"{st.session_state.get('pre_end_date')} ~ {st.session_state.get('post_end_date')}"
+elif is_sample:
+    configured_targets = {}
+    organization_priorities = set()
+    project_name = "TAP 교육 전·후 변화 예시"
+    report_period = "예시 교육 전·후 기간"
 else:
     # 업로드 결과는 현재 브라우저 세션의 다른 프로젝트 설정과 절대 섞지 않는다.
     configured_targets = {}

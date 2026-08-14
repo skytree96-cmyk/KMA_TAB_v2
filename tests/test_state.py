@@ -1,15 +1,24 @@
 import unittest
 
 from tap.state import (
+    PARTICIPANT_ID_WIDGET_KEY,
     activate_assessment_phase,
     ensure_state,
+    load_participant_id_widget,
     reset_all_assessments,
     reset_assessment,
+    save_participant_id_widget,
     sync_assessment_phase,
 )
 
 
 class StateTests(unittest.TestCase):
+    def test_fresh_state_requires_participant_id_and_neutralizes_legacy_cause(self):
+        state = {"training_cause": "system_only"}
+        ensure_state(state)
+        self.assertEqual("", state["participant_id"])
+        self.assertEqual("mixed_or_unknown", state["training_cause"])
+
     def test_legacy_flat_responses_migrate_to_pre(self):
         state = {
             "responses": {"Q1": 4},
@@ -104,6 +113,22 @@ class StateTests(unittest.TestCase):
         reset_all_assessments(state)
         self.assertIsNone(state["assessment_started_at_by_phase"]["pre"])
         self.assertIsNone(state["assessment_started_at_by_phase"]["post"])
+
+    def test_participant_id_survives_widget_cleanup_between_phases(self):
+        state = {}
+        ensure_state(state)
+        load_participant_id_widget(state)
+        state[PARTICIPANT_ID_WIDGET_KEY] = "  EDU-P001  "
+        save_participant_id_widget(state)
+
+        # Streamlit removes widget-owned state on page navigation. The durable
+        # value must still be available when the post assessment is opened.
+        del state[PARTICIPANT_ID_WIDGET_KEY]
+        activate_assessment_phase(state, "post")
+
+        self.assertEqual("EDU-P001", state["participant_id"])
+        self.assertEqual("EDU-P001", load_participant_id_widget(state))
+        self.assertEqual("EDU-P001", state[PARTICIPANT_ID_WIDGET_KEY])
 
 
 if __name__ == "__main__":

@@ -5,7 +5,9 @@ from typing import Any, Iterable, Mapping
 
 TRAINING_GATE = {
     "knowledge_skill": 1.0,
-    "mixed_or_unknown": 0.5,
+    # 원인 미확인은 정보의 부재이지 교육효과가 절반이라는 근거가 아니다.
+    # 프로젝트 생성 단계의 중립 기본값이 점수를 왜곡하지 않도록 1.0을 적용한다.
+    "mixed_or_unknown": 1.0,
     "system_only": 0.0,
 }
 

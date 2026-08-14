@@ -27,6 +27,25 @@ class PrePostPageTests(unittest.TestCase):
         self.assertIn("56 <= post_delay_days <= 70", source)
         self.assertIn("activate_assessment_phase", source)
 
+    def test_project_identity_change_invalidates_saved_assessments(self) -> None:
+        source = (ROOT / "pages" / "1_project_setup.py").read_text(encoding="utf-8")
+        self.assertIn("has_saved_assessment", source)
+        self.assertIn('str(st.session_state.get("project_name", "")) != next_project_name', source)
+        self.assertIn("stored_schedule != next_schedule", source)
+        self.assertIn('st.session_state.project_id = "TAP-"', source)
+
+    def test_project_setup_preserves_custom_target_and_delivery_on_reentry(self) -> None:
+        app = AppTest.from_file(str(ROOT / "pages" / "1_project_setup.py"), default_timeout=30)
+        app.session_state["target_means"] = {"CORE-CO": 4.2}
+        app.session_state["delivery_preference"] = "online"
+        app.run()
+
+        self.assertEqual([], [str(item.value) for item in app.exception])
+        target = next(item for item in app.slider if item.label == "조직 기대 행동빈도(1~5)")
+        delivery = next(item for item in app.radio if item.label == "선호 교육방식")
+        self.assertEqual(4.2, target.value)
+        self.assertEqual("online", delivery.value)
+
     def test_assessment_uses_same_eight_week_instruction_for_both_phases(self) -> None:
         source = (ROOT / "pages" / "2_assessment.py").read_text(encoding="utf-8")
         self.assertIn("사전·사후 모두 동일하게 최근 8주", source)
@@ -91,6 +110,36 @@ class PrePostPageTests(unittest.TestCase):
         self.assertEqual({}, app.session_state["responses_by_phase"]["pre"])
         self.assertEqual(3, app.radio[0].value)
         self.assertTrue(any("교육 참여자 ID를 입력한 뒤" in str(item.value) for item in app.error))
+
+    def test_completed_pre_phase_restores_locked_participant_id_for_post(self) -> None:
+        app = AppTest.from_file(str(ROOT / "pages" / "2_assessment.py"), default_timeout=30).run()
+        app.session_state["selected_factors"] = ["CORE-CO"]
+        app.session_state["participant_id"] = "EDU-P001"
+        app.session_state["assessment_phase"] = "post"
+        app.session_state["assessment_completed_by_phase"] = {"pre": True, "post": False}
+        # Match Streamlit's cleanup after leaving the pre-assessment page.
+        if "_participant_id_input" in app.session_state:
+            del app.session_state["_participant_id_input"]
+        app.run()
+
+        self.assertEqual([], [str(item.value) for item in app.exception])
+        participant_id_input = next(item for item in app.text_input if item.label == "교육 참여자 ID")
+        self.assertEqual("EDU-P001", participant_id_input.value)
+        self.assertTrue(participant_id_input.disabled)
+        self.assertEqual("EDU-P001", app.session_state["participant_id"])
+
+    def test_post_without_pre_offers_baseline_json_upload(self) -> None:
+        app = AppTest.from_file(str(ROOT / "pages" / "2_assessment.py"), default_timeout=30).run()
+        app.session_state["selected_factors"] = ["CORE-CO"]
+        app.session_state["assessment_phase"] = "post"
+        app.session_state["assessment_completed_by_phase"] = {"pre": False, "post": False}
+        app.run()
+
+        self.assertEqual([], [str(item.value) for item in app.exception])
+        self.assertTrue(
+            any(item.label == "사전검사 기준파일(JSON)" for item in app.get("file_uploader"))
+        )
+        self.assertTrue(any("본인만 안전하게 보관" in str(item.value) for item in app.caption))
 
 
 if __name__ == "__main__":

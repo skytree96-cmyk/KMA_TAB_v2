@@ -1,3 +1,3 @@
 streamlit==1.61.1
 pandas>=2.2,<4
-# Rebuild marker: restart Streamlit Cloud for the questionnaire UI rollout (2026-08-13).
+# Rebuild marker: restart Streamlit Cloud for pre/post continuity and real-report rollout (2026-08-14).

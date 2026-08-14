@@ -9,8 +9,10 @@ from statistics import mean
 import pandas as pd
 import streamlit as st
 
+from tap.baseline_transfer import BaselineValidationError, pre_baseline_json_bytes
 from tap.data import load_course_map, load_courses, questions_for_factors
 from tap.recommendation import rank_courses
+from tap.reporting import completed_session_factor_rows
 from tap.scoring import response_quality_flags, score_pre_post_responses, score_responses
 from tap.state import ensure_state
 from tap.ui import callout, page_header, setup_page
@@ -32,6 +34,33 @@ completed_by_phase = dict(st.session_state.get("assessment_completed_by_phase") 
 pre_complete = bool(completed_by_phase.get("pre", False))
 post_complete = bool(completed_by_phase.get("post", False))
 
+
+def _render_pre_baseline_download(*, key: str) -> None:
+    """Offer the completed pre item responses for a later browser session."""
+    if not pre_complete:
+        return
+    try:
+        baseline_bytes = pre_baseline_json_bytes(st.session_state)
+    except BaselineValidationError as exc:
+        st.warning(f"교육 전 검사 기준파일을 만들지 못했습니다: {exc}")
+        return
+
+    with st.container(border=True):
+        st.markdown("#### 교육 후 검사를 위한 기준파일")
+        st.caption(
+            "교육 후 검사 때 이 JSON을 불러오면 동일 문항의 사전 응답과 교육 참여자 ID가 연결됩니다. "
+            "파일에는 가명 ID와 문항별 응답이 있으므로 타인에게 전달하지 말고 본인만 안전하게 보관하세요. "
+            "SHA-256 검사는 우발적 파일 변경을 확인할 뿐, 전자서명이나 보안 인증은 아닙니다."
+        )
+        st.download_button(
+            "교육 전 검사 기준파일 저장",
+            baseline_bytes,
+            "tap_pre_assessment_baseline.json",
+            "application/json",
+            key=key,
+            width="stretch",
+        )
+
 if not (pre_responses or post_responses or legacy_responses):
     st.warning("아직 저장된 응답이 없습니다.")
     if st.button("사전·사후 검사로 이동", type="primary"):
@@ -44,6 +73,7 @@ if pre_responses and post_responses and not has_pre_post:
     c_pre, c_post = st.columns(2)
     c_pre.metric("교육 전", "완료" if pre_complete else "진행 중")
     c_post.metric("교육 후", "완료" if post_complete else "진행 중")
+    _render_pre_baseline_download(key="pre_baseline_download_incomplete")
     if st.button("검사로 돌아가기", type="primary"):
         st.switch_page("pages/2_assessment.py")
     st.stop()
@@ -71,7 +101,10 @@ page_header(
     badge="본인만 기본 열람",
 )
 
+_render_pre_baseline_download(key="pre_baseline_download")
+
 if has_pre_post:
+    st.success("현재 브라우저에 저장된 실제 교육 전·후 완료 응답을 비교하고 있습니다.")
     pre_results = score_responses(questions, pre_responses, st.session_state.target_means)
     post_results = score_responses(questions, post_responses, st.session_state.target_means)
     scored_changes = score_pre_post_responses(
@@ -91,9 +124,15 @@ if has_pre_post:
     pre_na_count = sum(int(row["pre_na_items"]) for row in change_rows)
     post_na_count = sum(int(row["post_na_items"]) for row in change_rows)
     average_change = mean(float(row["change"]) for row in comparable) if comparable else None
-    largest = max(comparable, key=lambda row: float(row["change"])) if comparable else None
+    largest = max(comparable, key=lambda row: abs(float(row["change"]))) if comparable else None
+    change_direction = (
+        "증가" if largest and float(largest["change"]) > 0
+        else "감소" if largest and float(largest["change"]) < 0
+        else "변화 없음"
+    )
     headline = (
-        f"{escape(str(largest['factor_name_ko']))}에서 가장 큰 관찰 변화 {float(largest['change']):+.2f}점이 나타났습니다."
+        f"{escape(str(largest['factor_name_ko']))}에서 가장 큰 관찰 변화가 "
+        f"{change_direction} {float(largest['change']):+.2f}점으로 나타났습니다."
         if largest
         else "공통 유효문항이 부족해 교육 전·후 변화를 산출하지 못했습니다."
     )
@@ -181,8 +220,9 @@ if has_pre_post:
         ("application_opportunity", "업무 적용기회"),
         ("supervisor_support", "상사·동료 지원"),
         ("resources_authority", "도구·권한 지원"),
+        ("time_process_support", "시간·프로세스 지원"),
     )
-    transfer_columns = st.columns(3)
+    transfer_columns = st.columns(4)
     for column, (key, label) in zip(transfer_columns, transfer_labels, strict=False):
         value = transfer_values.get(key)
         with column:
@@ -314,37 +354,29 @@ st.caption("동의하지 않아도 조직의 익명 집계에는 포함될 수 �
 
 if has_pre_post:
     export_payload = {"pre": pre_results, "post": post_results, "comparison": change_rows}
-    participant_id = str(st.session_state.get("participant_id", "DEMO-P001"))
-    project_id = str(st.session_state.get("project_name", "TAP-PROJECT"))
+    participant_id = str(st.session_state.get("participant_id", "")).strip()
+    project_id = str(
+        st.session_state.get("project_id")
+        or st.session_state.get("project_name", "TAP-PROJECT")
+    )
     assessment_version = str(st.session_state.get("assessment_version", "TAP-1.0"))
+    completed_dates = dict(st.session_state.get("assessment_completed_at_by_phase") or {})
     phase_dates = {
-        "pre": str(st.session_state.get("pre_end_date", "")),
-        "post": str(st.session_state.get("post_end_date", "")),
+        "pre": str(completed_dates.get("pre") or st.session_state.get("pre_end_date", "")),
+        "post": str(completed_dates.get("post") or st.session_state.get("post_end_date", "")),
     }
-    transfer = dict(st.session_state.get("post_transfer_responses") or {})
-    csv_rows = []
-    for phase_name, phase_results in (("pre", pre_results), ("post", post_results)):
-        for row in phase_results:
-            if row.get("score_1_to_5") is None:
-                continue
-            csv_rows.append(
-                {
-                    "participant_id": participant_id,
-                    "factor_code": row["factor_code"],
-                    "score_1_to_5": row["score_1_to_5"],
-                    "project_id": project_id,
-                    "assessment_version": assessment_version,
-                    "target_level": st.session_state.target_level,
-                    "assessment_date": phase_dates[phase_name],
-                    "session_type": phase_name,
-                    "valid_items": row["valid_items"],
-                    "na_items": row["na_items"],
-                    "missing_items": row["missing_items"],
-                    "opportunity_1_to_5": transfer.get("application_opportunity") if phase_name == "post" else None,
-                    "manager_support_1_to_5": transfer.get("supervisor_support") if phase_name == "post" else None,
-                    "resource_support_1_to_5": transfer.get("resources_authority") if phase_name == "post" else None,
-                }
-            )
+    csv_rows = completed_session_factor_rows(
+        questions,
+        phase_store,
+        completed_by_phase,
+        participant_id=participant_id,
+        project_id=project_id,
+        assessment_version=assessment_version,
+        target_level=str(st.session_state.target_level),
+        assessment_dates=phase_dates,
+        target_means=dict(st.session_state.get("target_means") or {}),
+        post_transfer_responses=dict(st.session_state.get("post_transfer_responses") or {}),
+    )
     export_name = "tap_individual_pre_post_result"
 else:
     export_payload = results

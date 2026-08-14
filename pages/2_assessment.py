@@ -7,9 +7,17 @@ from time import time
 
 import streamlit as st
 
+from tap.baseline_transfer import BaselineValidationError, restore_pre_baseline
 from tap.config import LIKERT_OPTIONS
 from tap.data import questions_for_factors
-from tap.state import ensure_state, reset_assessment, sync_assessment_phase
+from tap.state import (
+    PARTICIPANT_ID_WIDGET_KEY,
+    ensure_state,
+    load_participant_id_widget,
+    reset_assessment,
+    save_participant_id_widget,
+    sync_assessment_phase,
+)
 from tap.ui import callout, page_header, setup_page
 
 
@@ -118,12 +126,17 @@ callout(
 )
 
 participant_id_missing = not str(st.session_state.get("participant_id", "")).strip()
+load_participant_id_widget(st.session_state)
 st.text_input(
     "교육 참여자 ID",
-    key="participant_id",
+    key=PARTICIPANT_ID_WIDGET_KEY,
+    on_change=save_participant_id_widget,
+    args=(st.session_state,),
     disabled=pre_complete and not participant_id_missing,
     help="교육 전·후에 같은 ID를 사용해야 변화가 연결됩니다. 이름·사번 같은 직접 식별정보는 입력하지 마세요.",
 )
+if pre_complete and not participant_id_missing:
+    st.caption("교육 전 검사에 사용한 ID로 자동 연결되어 변경할 수 없습니다.")
 participant_id_missing = not str(st.session_state.get("participant_id", "")).strip()
 if participant_id_missing:
     st.warning(
@@ -134,15 +147,37 @@ if participant_id_missing:
 if phase == "post" and not pre_complete:
     callout(
         "교육 전 검사가 아직 완료되지 않았습니다",
-        "교육 후 응답은 저장할 수 있지만, 사전검사가 완료되어야 짝지은 변화 리포트를 산출할 수 있습니다.",
+        "이 브라우저에 사전검사가 없으면 교육 전 완료 후 내려받은 기준파일을 불러오세요. 기준파일이 없어도 교육 후 응답은 저장할 수 있지만 짝지은 변화 리포트는 산출할 수 없습니다.",
         icon="!",
         tone="warn",
     )
+    st.markdown("#### 교육 전 검사 기준파일 불러오기")
+    st.caption(
+        "교육 전 검사 완료 후 저장한 TAP JSON만 사용할 수 있습니다. "
+        "파일은 참여자 ID와 문항별 응답을 포함하므로 타인에게 전달하지 말고 본인만 안전하게 보관하세요."
+    )
+    uploaded_baseline = st.file_uploader(
+        "사전검사 기준파일(JSON)",
+        type=["json"],
+        help="현재 검사와 역량·문항 스냅샷·검사 버전이 모두 일치할 때만 복원됩니다.",
+        key="pre_baseline_uploader",
+    )
+    if uploaded_baseline is not None:
+        try:
+            restored = restore_pre_baseline(st.session_state, uploaded_baseline.getvalue())
+        except BaselineValidationError as exc:
+            st.error(f"기준파일을 불러오지 못했습니다: {exc}")
+        else:
+            st.success(
+                f"교육 전 검사 {len(restored['responses'])}개 문항과 교육 참여자 ID를 복원했습니다."
+            )
+            st.rerun()
 
 
 def _finish_phase() -> None:
     """Complete and persist the active phase before opening its report."""
     st.session_state.assessment_completed = True
+    st.session_state.assessment_completed_at_by_phase[phase] = date.today().isoformat()
     started = st.session_state.assessment_started_at or time()
     st.session_state.duration_seconds = max(0, time() - started)
     sync_assessment_phase(st.session_state)

@@ -9,6 +9,8 @@ from typing import Any, Iterable, Mapping
 
 import pandas as pd
 
+from tap.scoring import score_pre_post_responses, score_responses
+
 
 GROUP_REQUIRED_COLUMNS = ("participant_id", "factor_code", "score_1_to_5")
 GROUP_METADATA_COLUMNS = ("project_id", "assessment_version", "target_level", "assessment_date")
@@ -18,8 +20,97 @@ GROUP_TRANSFER_COLUMNS = (
     "opportunity_1_to_5",
     "manager_support_1_to_5",
     "resource_support_1_to_5",
+    "time_process_support_1_to_5",
 )
 SESSION_TYPES = {"pre", "post"}
+
+
+def completed_session_factor_rows(
+    question_rows: Iterable[Mapping[str, Any]],
+    responses_by_phase: Mapping[str, Mapping[str, int]],
+    completed_by_phase: Mapping[str, Any],
+    *,
+    participant_id: str,
+    project_id: str,
+    assessment_version: str,
+    target_level: str,
+    assessment_dates: Mapping[str, Any],
+    target_means: Mapping[str, float] | None = None,
+    post_transfer_responses: Mapping[str, Any] | None = None,
+) -> list[dict[str, Any]]:
+    """Convert completed in-browser assessments to the canonical group CSV rows.
+
+    Incomplete waves are deliberately omitted. This prevents a partially answered
+    post-test from being presented as a real pre/post comparison and gives the
+    organization report the exact same factor scores as the individual report.
+    """
+    clean_participant_id = str(participant_id or "").strip()
+    if not clean_participant_id:
+        return []
+
+    questions = list(question_rows)
+    transfer = dict(post_transfer_responses or {})
+    transfer_columns = {
+        "opportunity_1_to_5": transfer.get("application_opportunity"),
+        "manager_support_1_to_5": transfer.get("supervisor_support"),
+        "resource_support_1_to_5": transfer.get("resources_authority"),
+        "time_process_support_1_to_5": transfer.get("time_process_support"),
+    }
+    paired_scores: dict[str, dict[str, Any]] = {}
+    if bool(completed_by_phase.get("pre")) and bool(completed_by_phase.get("post")):
+        paired_scores = {
+            str(row["factor_code"]): row
+            for row in score_pre_post_responses(
+                questions,
+                dict(responses_by_phase.get("pre") or {}),
+                dict(responses_by_phase.get("post") or {}),
+                target_means,
+            )
+        }
+    output: list[dict[str, Any]] = []
+    for phase in ("pre", "post"):
+        if not bool(completed_by_phase.get(phase, False)):
+            continue
+        responses = dict(responses_by_phase.get(phase) or {})
+        if not responses:
+            continue
+        for score in score_responses(
+            questions,
+            responses,
+            target_means,
+            assessment_phase=phase,
+        ):
+            paired = paired_scores.get(str(score["factor_code"]))
+            if paired:
+                paired_score = paired.get("pre_score" if phase == "pre" else "post_score")
+                if paired_score is None:
+                    continue
+                score = dict(score)
+                score["score_1_to_5"] = paired_score
+            if score.get("score_1_to_5") is None:
+                continue
+            row = {
+                "participant_id": clean_participant_id,
+                "factor_code": score["factor_code"],
+                "factor_name_ko": score["factor_name_ko"],
+                "score_1_to_5": score["score_1_to_5"],
+                "project_id": str(project_id or "TAP-PROJECT").strip() or "TAP-PROJECT",
+                "assessment_version": str(assessment_version or "TAP-1.0").strip() or "TAP-1.0",
+                "target_level": str(target_level or "staff").strip() or "staff",
+                "assessment_date": str(assessment_dates.get(phase, "") or ""),
+                "session_type": phase,
+                "valid_items": score["valid_items"],
+                "na_items": score["na_items"],
+                "missing_items": score["missing_items"],
+                "opportunity_1_to_5": None,
+                "manager_support_1_to_5": None,
+                "resource_support_1_to_5": None,
+                "time_process_support_1_to_5": None,
+            }
+            if phase == "post":
+                row.update(transfer_columns)
+            output.append(row)
+    return output
 
 
 def prepare_group_results(
@@ -264,6 +355,7 @@ def build_pre_post_group_summary(
         "opportunity_1_to_5": "업무 적용기회",
         "manager_support_1_to_5": "상사·동료 지원",
         "resource_support_1_to_5": "도구·권한 지원",
+        "time_process_support_1_to_5": "시간·프로세스 지원",
     }
     transfer_factors: dict[str, dict[str, Any]] = {}
     post = work[work[GROUP_SESSION_COLUMN].eq("post")]
@@ -451,7 +543,7 @@ def _pre_post_report_body(model: Mapping[str, Any]) -> str:
 
     transfer_factors = dict(pre_post.get("transfer_factors", {}))
     transfer_cards = []
-    for label in ("업무 적용기회", "상사·동료 지원", "도구·권한 지원"):
+    for label in ("업무 적용기회", "상사·동료 지원", "도구·권한 지원", "시간·프로세스 지원"):
         detail = transfer_factors.get(label)
         if isinstance(detail, Mapping):
             value = detail.get("mean")

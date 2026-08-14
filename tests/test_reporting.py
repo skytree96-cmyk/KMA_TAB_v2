@@ -7,10 +7,11 @@ from pathlib import Path
 import pandas as pd
 from streamlit.testing.v1 import AppTest
 
-from tap.data import questions_for_factors
+from tap.data import load_competencies, questions_for_factors
 from tap.reporting import (
     build_organization_report_model,
     build_pre_post_group_summary,
+    completed_session_factor_rows,
     organization_report_fragment,
     prepare_group_results,
     printable_organization_report_html,
@@ -28,6 +29,50 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class ReportingTests(unittest.TestCase):
+    def test_individual_report_uses_canonical_common_item_export_and_direction(self) -> None:
+        source = (ROOT / "pages" / "3_individual_report.py").read_text(encoding="utf-8")
+        self.assertIn("csv_rows = completed_session_factor_rows(", source)
+        self.assertIn('key=lambda row: abs(float(row["change"]))', source)
+        self.assertIn('("time_process_support", "시간·프로세스 지원")', source)
+
+    def test_completed_session_rows_are_real_canonical_pre_post_export(self) -> None:
+        questions = questions_for_factors(["CORE-CO"])
+        pre = {str(row["question_code"]): 2 for row in questions}
+        post = {str(row["question_code"]): 4 for row in questions}
+        rows = completed_session_factor_rows(
+            questions,
+            {"pre": pre, "post": post},
+            {"pre": True, "post": True},
+            participant_id=" REAL-P001 ",
+            project_id="실제 교육",
+            assessment_version="TAP-1.0",
+            target_level="manager",
+            assessment_dates={"pre": "2026-08-01", "post": "2026-10-01"},
+            post_transfer_responses={
+                "application_opportunity": 4,
+                "supervisor_support": 3,
+                "resources_authority": 5,
+            },
+        )
+
+        self.assertEqual(["pre", "post"], [row["session_type"] for row in rows])
+        self.assertEqual([2, 4], [row["score_1_to_5"] for row in rows])
+        self.assertTrue(all(row["participant_id"] == "REAL-P001" for row in rows))
+        self.assertIsNone(rows[0]["opportunity_1_to_5"])
+        self.assertEqual(4, rows[1]["opportunity_1_to_5"])
+
+        incomplete = completed_session_factor_rows(
+            questions,
+            {"pre": pre, "post": post},
+            {"pre": True, "post": False},
+            participant_id="REAL-P001",
+            project_id="실제 교육",
+            assessment_version="TAP-1.0",
+            target_level="manager",
+            assessment_dates={"pre": "2026-08-01", "post": "2026-10-01"},
+        )
+        self.assertEqual(["pre"], [row["session_type"] for row in incomplete])
+
     def test_upload_validation_applies_canonical_name(self) -> None:
         frame = pd.DataFrame(
             [{"participant_id": "P1", "factor_code": "F1", "factor_name_ko": "임의명", "score_1_to_5": 3.5}]
@@ -259,6 +304,60 @@ class ReportingTests(unittest.TestCase):
             any("교육 전·후 짝지어진 비교" in str(item.value) for item in app.markdown)
         )
         self.assertTrue(any(item.label == "관찰 변화 평균" for item in app.metric))
+        self.assertTrue(any("실제 교육 전·후 완료 응답" in str(item.value) for item in app.success))
+
+    def test_completed_pre_report_offers_private_baseline_download(self) -> None:
+        questions = questions_for_factors(["CORE-CO"])
+        pre = {str(row["question_code"]): 3 for row in questions}
+        app = AppTest.from_file(str(ROOT / "pages" / "3_individual_report.py"), default_timeout=30).run()
+        app.session_state["selected_factors"] = ["CORE-CO"]
+        app.session_state["participant_id"] = "EDU-P001"
+        app.session_state["responses_by_phase"] = {"pre": pre, "post": {}}
+        app.session_state["assessment_completed_by_phase"] = {"pre": True, "post": False}
+        app.session_state["question_snapshot_codes"] = [
+            str(row["question_code"]) for row in questions
+        ]
+        app.session_state["question_snapshot_hash"] = "a" * 64
+        app.session_state["assessment_version"] = "TAP-1.0+aaaaaaaaaaaa"
+        app.run()
+
+        self.assertEqual([], [str(item.value) for item in app.exception])
+        button = next(
+            item for item in app.get("download_button")
+            if item.label == "교육 전 검사 기준파일 저장"
+        )
+        self.assertEqual("교육 전 검사 기준파일 저장", button.label)
+        source = (ROOT / "pages" / "3_individual_report.py").read_text(encoding="utf-8")
+        self.assertIn('"tap_pre_assessment_baseline.json"', source)
+        self.assertTrue(any("본인만 안전하게 보관" in str(item.value) for item in app.caption))
+
+    def test_organization_report_uses_completed_session_before_sample(self) -> None:
+        questions = questions_for_factors(["CORE-CO"])
+        pre = {str(row["question_code"]): 2 for row in questions}
+        post = {str(row["question_code"]): 4 for row in questions}
+        app = AppTest.from_file(str(ROOT / "pages" / "4_organization_report.py"), default_timeout=30).run()
+        app.session_state["selected_factors"] = ["CORE-CO"]
+        app.session_state["participant_id"] = "REAL-P001"
+        app.session_state["responses_by_phase"] = {"pre": pre, "post": post}
+        app.session_state["assessment_completed_by_phase"] = {"pre": True, "post": True}
+        app.session_state["pre_end_date"] = "2026-08-01"
+        app.session_state["post_end_date"] = "2026-10-01"
+        app.run()
+
+        self.assertEqual([], [str(item.value) for item in app.exception])
+        self.assertTrue(any("실제 교육 전·후 결과" in str(item.value) for item in app.success))
+        self.assertTrue(any("실제 완료 결과 1명" in str(item.value) for item in app.warning))
+        self.assertTrue(any(item.label == "내 실제 교육 전·후 비교 보기" for item in app.button))
+        self.assertFalse(any("합성 예시" in str(item.value) for item in app.warning))
+        self.assertFalse(app.metric, "N<5 실제 세션은 조직 지표를 렌더링하면 안 됩니다.")
+
+    def test_organization_report_does_not_auto_show_sample(self) -> None:
+        app = AppTest.from_file(str(ROOT / "pages" / "4_organization_report.py"), default_timeout=30).run()
+
+        self.assertEqual([], [str(item.value) for item in app.exception])
+        self.assertTrue(any(item.label == "예시 리포트 보기" and not item.value for item in app.checkbox))
+        self.assertTrue(any("표시할 실제 결과가 없습니다" in str(item.value) for item in app.info))
+        self.assertFalse(any("예시 데이터를 표시" in str(item.value) for item in app.info))
 
     def test_incomplete_post_does_not_render_change_report(self) -> None:
         questions = questions_for_factors(["CORE-CO"])
@@ -296,6 +395,40 @@ class ReportingTests(unittest.TestCase):
         )
         summary = build_pre_post_group_summary(frame, min_group_n=1)
         self.assertEqual(summary["paired_participant_count"], 0)
+
+    def test_completed_session_rows_match_personal_common_item_change(self) -> None:
+        questions = questions_for_factors(["CORE-CO"])
+        self.assertEqual(4, len(questions))
+        codes = [str(row["question_code"]) for row in questions]
+        rows = completed_session_factor_rows(
+            questions,
+            {
+                "pre": dict(zip(codes, [1, 1, 1, 5], strict=True)),
+                "post": dict(zip(codes, [5, 5, 5, 0], strict=True)),
+            },
+            {"pre": True, "post": True},
+            participant_id="P1",
+            project_id="PROJECT-1",
+            assessment_version="TAP-1",
+            target_level="staff",
+            assessment_dates={"pre": "2026-08-01", "post": "2026-10-01"},
+            post_transfer_responses={"time_process_support": 4},
+        )
+        by_phase = {row["session_type"]: row for row in rows}
+
+        self.assertEqual(1.0, by_phase["pre"]["score_1_to_5"])
+        self.assertEqual(5.0, by_phase["post"]["score_1_to_5"])
+        self.assertEqual(4, by_phase["pre"]["valid_items"])
+        self.assertEqual(3, by_phase["post"]["valid_items"])
+        self.assertEqual(1, by_phase["post"]["na_items"])
+        self.assertEqual(4, by_phase["post"]["time_process_support_1_to_5"])
+
+        clean, errors, _ = prepare_group_results(
+            pd.DataFrame(rows), load_competencies(), require_metadata=True
+        )
+        self.assertEqual([], errors)
+        summary = build_pre_post_group_summary(clean, min_group_n=1)
+        self.assertEqual(4.0, summary["comparison_rows"][0]["change"])
 
 
 if __name__ == "__main__":
