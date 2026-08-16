@@ -46,16 +46,30 @@ def _render_pre_baseline_download(*, key: str) -> None:
         return
 
     with st.container(border=True):
-        st.markdown("#### 교육 후 검사를 위한 기준파일")
+        st.markdown("#### 교육 후 검사를 이어가기 위한 필수 파일")
+        st.markdown(
+            "**1. 아래 기준파일 저장 → 2. 교육 후 검사일까지 안전 보관 → "
+            "3. 참여자 화면의 `교육 후 검사 이어하기`에서 파일 선택**"
+        )
         st.caption(
-            "교육 후 검사 때 이 JSON을 불러오면 동일 문항의 사전 응답과 교육 참여자 ID가 연결됩니다. "
+            "이 기준파일은 일반 결과 JSON과 다른 사후검사 연결용 파일입니다. "
+            "교육 후 검사 때 불러오면 동일 문항의 사전 응답과 교육 참여자 ID가 연결됩니다. "
             "파일에는 가명 ID와 문항별 응답이 있으므로 타인에게 전달하지 말고 본인만 안전하게 보관하세요. "
             "SHA-256 검사는 우발적 파일 변경을 확인할 뿐, 전자서명이나 보안 인증은 아닙니다."
         )
+        project_token = "".join(
+            character
+            for character in str(st.session_state.get("project_id", "TAP-PROJECT"))
+            if character.isalnum() or character in "-_"
+        )[:48] or "TAP-PROJECT"
+        completed_at = str(
+            dict(st.session_state.get("assessment_completed_at_by_phase") or {}).get("pre")
+            or st.session_state.get("pre_end_date", "")
+        ).replace("-", "")
         st.download_button(
-            "교육 전 검사 기준파일 저장",
+            "1. 교육 전 검사 기준파일 저장",
             baseline_bytes,
-            "tap_pre_assessment_baseline.json",
+            f"tap_pre_baseline_{project_token}_{completed_at}.json",
             "application/json",
             key=key,
             width="stretch",

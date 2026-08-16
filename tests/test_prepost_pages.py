@@ -59,8 +59,8 @@ class PrePostPageTests(unittest.TestCase):
         app = AppTest.from_file(str(ROOT / "pages" / "2_assessment.py"), default_timeout=30).run()
         app.session_state["selected_factors"] = ["CORE-CO"]
         app.session_state["assessment_phase"] = "post"
-        app.session_state["responses_by_phase"] = {"pre": {}, "post": responses}
-        app.session_state["assessment_completed_by_phase"] = {"pre": False, "post": False}
+        app.session_state["responses_by_phase"] = {"pre": responses, "post": responses}
+        app.session_state["assessment_completed_by_phase"] = {"pre": True, "post": False}
         app.run()
 
         self.assertEqual([], [str(item.value) for item in app.exception])
@@ -137,9 +137,22 @@ class PrePostPageTests(unittest.TestCase):
 
         self.assertEqual([], [str(item.value) for item in app.exception])
         self.assertTrue(
-            any(item.label == "사전검사 기준파일(JSON)" for item in app.get("file_uploader"))
+            any(item.label == "교육 전 검사 기준파일(JSON)" for item in app.get("file_uploader"))
         )
-        self.assertTrue(any("본인만 안전하게 보관" in str(item.value) for item in app.caption))
+        self.assertFalse(app.radio, "기준파일 복원 전에는 사후 문항을 시작하면 안 됩니다.")
+        self.assertTrue(any("분실한 경우" in str(item.value) for item in app.caption))
+
+    def test_fresh_participant_can_import_baseline_before_project_setup(self) -> None:
+        app = AppTest.from_file(str(ROOT / "pages" / "2_assessment.py"), default_timeout=30).run()
+
+        self.assertEqual([], [str(item.value) for item in app.exception])
+        self.assertTrue(any("교육 후 검사 이어하기" in str(item.value) for item in app.markdown))
+        self.assertTrue(
+            any(item.label == "교육 전 검사 기준파일(JSON)" for item in app.get("file_uploader"))
+        )
+        self.assertTrue(
+            any(item.label == "교육평가 프로젝트 설정으로 이동" for item in app.button)
+        )
 
 
 if __name__ == "__main__":

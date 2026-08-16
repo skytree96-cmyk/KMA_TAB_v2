@@ -35,6 +35,26 @@ callout(
     tone="warn",
 )
 
+st.markdown("### 브라우저가 바뀌면 기준파일로 교육 후 검사를 이어갑니다")
+st.markdown(
+    """
+    <div class="tap-guide-grid">
+      <div class="tap-guide-step"><span>1</span><b>사전검사 완료</b><small>사전검사를 끝내고 개인 리포트로 이동합니다.</small></div>
+      <div class="tap-guide-step"><span>2</span><b>기준파일 저장</b><small>개인 리포트에서 ‘교육 전 검사 기준파일 저장’을 누릅니다.</small></div>
+      <div class="tap-guide-step"><span>3</span><b>8~10주 개인 보관</b><small>교육 후 검사 전까지 본인만 접근할 수 있는 위치에 안전하게 보관합니다.</small></div>
+      <div class="tap-guide-step"><span>4</span><b>교육 후 검사 이어하기</b><small>참여자 화면에서 ‘교육 전 검사 기준파일(JSON)’을 선택하면 프로젝트·ID·사전응답이 자동 복원됩니다. 사후검사를 완료한 뒤 비교 리포트를 확인합니다.</small></div>
+    </div>
+    """,
+    unsafe_allow_html=True,
+)
+
+callout(
+    "기준파일과 결과 JSON은 서로 다른 파일",
+    "기준파일(tap_pre_baseline_…json)은 교육 후 검사를 잇기 위한 파일이며 서버 원본이나 전체 백업이 아닙니다. 이름·사번 대신 가명 교육 참여자 ID를 사용하고, 문항별 응답이 포함되므로 본인만 보관하세요.",
+    icon="!",
+    tone="warn",
+)
+
 callout(
     "비교가 성립하는 세 가지 조건",
     "사전·사후에 동일한 교육 참여자 ID, 동일한 문항·척도·버전, 동일한 최근 8주 회상기간을 사용하세요. 한 시점의 ‘수행 기회 없음’은 0점이 아니라 비교 제외입니다.",
@@ -77,7 +97,8 @@ with participant_tab:
         3. 두 검사 모두 최근 8주에 해당 행동을 얼마나 자주 했는지 1~5점으로 답합니다.
         4. 그 행동을 할 기회가 없었다면 **수행 기회 없음**을 고릅니다. 미응답·0점과는 다릅니다.
         5. 사후검사에서는 교육내용을 적용할 기회, 상사지원, 도구·권한, 장애요인도 함께 답합니다.
-        6. 결과는 규준·백분위·개인순위가 아니라 본인의 사전·사후 관찰 변화입니다.
+        6. 브라우저 세션이 달라지면 사전검사 후 저장한 **교육 전 검사 기준파일**을 `교육 전 검사 기준파일(JSON)`에서 선택해 자동 복원합니다.
+        7. 결과는 규준·백분위·개인순위가 아니라 본인의 사전·사후 관찰 변화입니다.
         """
     )
     if st.button("사전·사후 검사 화면 열기", key="guide_assessment", type="primary", width="stretch"):

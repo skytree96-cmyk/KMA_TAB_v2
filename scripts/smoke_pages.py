@@ -54,8 +54,13 @@ def main() -> int:
     app = AppTest.from_file(str(ROOT / "streamlit_app.py"), default_timeout=20).run()
     app.button(key="tap_role_participant").click().run()
     _assert_clean(app, "participant role switch")
-    if not any(button.label == "프로젝트 설정으로 이동" for button in app.button):
+    if not any(button.label == "교육평가 프로젝트 설정으로 이동" for button in app.button):
         raise AssertionError("assessment landing is missing after participant role switch")
+    if not any(
+        uploader.label == "교육 전 검사 기준파일(JSON)"
+        for uploader in app.get("file_uploader")
+    ):
+        raise AssertionError("post-assessment baseline entry is missing")
     app.switch_page("pages/3_individual_report.py").run()
     _assert_clean(app, "participant submenu navigation")
     if app.session_state.active_role != "participant":

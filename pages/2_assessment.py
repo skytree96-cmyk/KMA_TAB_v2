@@ -7,7 +7,7 @@ from time import time
 
 import streamlit as st
 
-from tap.baseline_transfer import BaselineValidationError, restore_pre_baseline
+from tap.baseline_transfer import BaselineValidationError, bootstrap_post_from_pre_baseline
 from tap.config import LIKERT_OPTIONS
 from tap.data import questions_for_factors
 from tap.state import (
@@ -24,9 +24,58 @@ from tap.ui import callout, page_header, setup_page
 setup_page("검사 참여", "2")
 ensure_state(st.session_state)
 
+
+def _render_post_baseline_entry(*, key: str) -> None:
+    """Restore a completed pre assessment before the post questionnaire starts."""
+    with st.container(border=True):
+        st.markdown("### 교육 후 검사 이어하기")
+        st.markdown(
+            "**1. 기준파일 선택 → 2. 교육 전 결과·참여자 ID 자동 복원 → "
+            "3. 교육 후 검사 시작**"
+        )
+        st.caption(
+            "교육 전 검사 완료 직후 개인 리포트에서 저장한 "
+            "`tap_pre_baseline_…json` 파일을 선택하세요. "
+            "일반 결과 JSON은 사용할 수 없습니다."
+        )
+        uploaded_baseline = st.file_uploader(
+            "교육 전 검사 기준파일(JSON)",
+            type=["json"],
+            help=(
+                "파일 안의 프로젝트·교육일·선택 역량·검사 버전·문항 스냅샷을 "
+                "현재 문항은행과 확인한 뒤 교육 후 검사 상태를 자동으로 구성합니다."
+            ),
+            key=key,
+        )
+        if uploaded_baseline is None:
+            return
+        try:
+            restored = bootstrap_post_from_pre_baseline(
+                st.session_state,
+                uploaded_baseline.getvalue(),
+            )
+        except BaselineValidationError as exc:
+            st.error(f"기준파일을 불러오지 못했습니다: {exc}")
+            return
+
+        st.session_state["baseline_restore_notice"] = (
+            f"교육 전 검사 {len(restored['responses'])}개 문항과 교육 참여자 ID를 "
+            "복원했습니다. 이제 교육 후 검사에 응답해 주세요."
+        )
+        st.rerun()
+
+
 if not st.session_state.selected_factors:
-    st.warning("먼저 교육평가 프로젝트를 설정해 주세요.")
-    if st.button("프로젝트 설정으로 이동", type="primary"):
+    page_header(
+        "검사 참여",
+        "교육 전·후 검사 시작",
+        "교육 전 검사는 설정된 프로젝트로 시작하고, 교육 후 검사는 저장해 둔 기준파일로 바로 이어갑니다.",
+        badge="참여자",
+    )
+    _render_post_baseline_entry(key="pre_baseline_bootstrap_uploader")
+    st.markdown("#### 교육 전 검사를 시작하시나요?")
+    st.caption("교육담당자가 먼저 교육과정·일정·측정역량을 설정해야 합니다.")
+    if st.button("교육평가 프로젝트 설정으로 이동", type="primary"):
         st.switch_page("pages/1_project_setup.py")
     st.stop()
 
@@ -86,6 +135,26 @@ completed_by_phase = st.session_state.get("assessment_completed_by_phase", {})
 pre_complete = bool(completed_by_phase.get("pre", False))
 post_complete = bool(completed_by_phase.get("post", False))
 
+if phase == "post" and not pre_complete:
+    page_header(
+        "검사 참여",
+        f"교육 후 검사 이어하기 · {st.session_state.get('course_name', '교육과정')}",
+        "교육 전 검사 기준파일을 먼저 복원해야 동일 참여자·동일 문항의 변화를 비교할 수 있습니다.",
+        badge="교육 후",
+    )
+    callout(
+        "교육 전 검사 기준파일 필요",
+        "교육 전 검사 완료 직후 저장한 기준파일을 선택하면 프로젝트와 참여자 ID가 자동으로 복원됩니다.",
+        icon="!",
+        tone="warn",
+    )
+    _render_post_baseline_entry(key="pre_baseline_post_uploader")
+    st.caption(
+        "기준파일을 분실한 경우 현재 공개 데모에서는 교육 전·후 비교를 복원할 수 없습니다. "
+        "교육담당자에게 문의해 주세요."
+    )
+    st.stop()
+
 try:
     window_start = date.fromisoformat(str(period_start))
     window_end = date.fromisoformat(str(period_end))
@@ -109,6 +178,12 @@ page_header(
     "사전·사후 모두 동일하게 최근 8주 동안 실제 업무에서 나타난 행동을 기준으로 응답해 주세요.",
     badge=phase_short_labels[phase],
 )
+
+restore_notice = st.session_state.pop("baseline_restore_notice", "")
+if restore_notice:
+    st.success(restore_notice)
+    for warning in st.session_state.get("baseline_restore_warnings", []):
+        st.warning(warning)
 
 status_parts = [
     f"교육 전 {'완료' if pre_complete else '미완료'}",
@@ -143,36 +218,6 @@ if participant_id_missing:
         "교육 전·후 결과를 연결할 교육 참여자 ID를 입력해 주세요. "
         "문항은 미리 볼 수 있지만 ID 입력 전에는 응답을 저장할 수 없습니다."
     )
-
-if phase == "post" and not pre_complete:
-    callout(
-        "교육 전 검사가 아직 완료되지 않았습니다",
-        "이 브라우저에 사전검사가 없으면 교육 전 완료 후 내려받은 기준파일을 불러오세요. 기준파일이 없어도 교육 후 응답은 저장할 수 있지만 짝지은 변화 리포트는 산출할 수 없습니다.",
-        icon="!",
-        tone="warn",
-    )
-    st.markdown("#### 교육 전 검사 기준파일 불러오기")
-    st.caption(
-        "교육 전 검사 완료 후 저장한 TAP JSON만 사용할 수 있습니다. "
-        "파일은 참여자 ID와 문항별 응답을 포함하므로 타인에게 전달하지 말고 본인만 안전하게 보관하세요."
-    )
-    uploaded_baseline = st.file_uploader(
-        "사전검사 기준파일(JSON)",
-        type=["json"],
-        help="현재 검사와 역량·문항 스냅샷·검사 버전이 모두 일치할 때만 복원됩니다.",
-        key="pre_baseline_uploader",
-    )
-    if uploaded_baseline is not None:
-        try:
-            restored = restore_pre_baseline(st.session_state, uploaded_baseline.getvalue())
-        except BaselineValidationError as exc:
-            st.error(f"기준파일을 불러오지 못했습니다: {exc}")
-        else:
-            st.success(
-                f"교육 전 검사 {len(restored['responses'])}개 문항과 교육 참여자 ID를 복원했습니다."
-            )
-            st.rerun()
-
 
 def _finish_phase() -> None:
     """Complete and persist the active phase before opening its report."""

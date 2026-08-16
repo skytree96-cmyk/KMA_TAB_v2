@@ -324,11 +324,12 @@ class ReportingTests(unittest.TestCase):
         self.assertEqual([], [str(item.value) for item in app.exception])
         button = next(
             item for item in app.get("download_button")
-            if item.label == "교육 전 검사 기준파일 저장"
+            if item.label == "1. 교육 전 검사 기준파일 저장"
         )
-        self.assertEqual("교육 전 검사 기준파일 저장", button.label)
+        self.assertEqual("1. 교육 전 검사 기준파일 저장", button.label)
         source = (ROOT / "pages" / "3_individual_report.py").read_text(encoding="utf-8")
-        self.assertIn('"tap_pre_assessment_baseline.json"', source)
+        self.assertIn('f"tap_pre_baseline_{project_token}_{completed_at}.json"', source)
+        self.assertTrue(any("일반 결과 JSON과 다른" in str(item.value) for item in app.caption))
         self.assertTrue(any("본인만 안전하게 보관" in str(item.value) for item in app.caption))
 
     def test_organization_report_uses_completed_session_before_sample(self) -> None:
