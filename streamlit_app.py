@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import streamlit as st
 
-from tap.dashboard import completion_rate, load_dashboard_demo
+from tap.dashboard import build_session_dashboard
 from tap.state import ensure_state
 from tap.ui import (
     callout,
@@ -17,7 +17,7 @@ from tap.ui import (
 
 setup_page("관리자 대시보드", "T")
 ensure_state(st.session_state)
-dashboard = load_dashboard_demo()["company"]
+dashboard = build_session_dashboard(st.session_state)
 
 page_header(
     "KMA 교육효과 평가",
@@ -38,23 +38,29 @@ with actions[1]:
 with actions[2]:
     if st.button("처음 사용 안내", width="stretch"):
         safe_switch_page("pages/0_user_guide.py")
-st.caption("아래 운영 수치는 화면 검토를 위한 목업 데이터이며 실제 회원사 실적이 아닙니다.")
+st.info(
+    "현재 화면은 이 브라우저 세션에 저장된 실제 프로젝트와 검사 상태만 보여줍니다. "
+    "서버 DB가 연결되지 않은 공개 MVP이므로 다른 참여자·브라우저·회원사의 데이터는 합산되지 않습니다."
+)
 
 metric_grid(dashboard["metrics"])
 
 left, right = st.columns([1.35, 1], gap="large")
 with left:
     with st.container(border=True):
-        st.markdown('<h3 class="tap-card-title">진행 프로젝트</h3>', unsafe_allow_html=True)
+        st.markdown('<h3 class="tap-card-title">현재 세션 프로젝트</h3>', unsafe_allow_html=True)
         st.markdown(
-            '<p class="tap-card-sub">참여율과 마감 상태를 확인하고 리마인드를 운영합니다.</p>',
+            '<p class="tap-card-sub">현재 브라우저에서 만든 프로젝트와 한 참여자의 교육 전·후 완료 상태입니다.</p>',
             unsafe_allow_html=True,
         )
-        project_rows(dashboard["projects"])
-        st.caption(
-            f"전체 초대 기준 가중 완료율 {completion_rate(dashboard['projects']):.1f}% · "
-            "실제 운영에서는 프로젝트·참여자 DB에서 계산합니다."
-        )
+        if dashboard["projects"]:
+            project_rows(dashboard["projects"])
+            st.caption(
+                f"검사 단계 진행률 {dashboard['phase_completion_pct']:.0f}% · "
+                f"교육 전·후 모두 완료한 현재 세션 참여자 {dashboard['paired_count']}명"
+            )
+        else:
+            st.info("현재 세션에 저장된 프로젝트가 없습니다. 먼저 교육평가 프로젝트를 만들어 주세요.")
 
 with right:
     with st.container(border=True):
@@ -96,7 +102,7 @@ with next_b:
     with st.container(border=True):
         st.markdown("**② 사전·사후 화면 확인**")
         st.caption("두 시점 모두 같은 문항·척도와 최근 8주 회상기간을 사용하고, 교육 참여자 ID로 짝을 맞춥니다.")
-        if st.button("참여자 미리보기", key="home_assessment", width="stretch"):
+        if st.button("실제 검사 시작", key="home_assessment", width="stretch"):
             safe_switch_page("pages/2_assessment.py")
 with next_c:
     with st.container(border=True):

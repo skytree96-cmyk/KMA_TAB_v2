@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 from streamlit.testing.v1 import AppTest
 
@@ -34,6 +35,52 @@ class PrePostPageTests(unittest.TestCase):
         self.assertIn("stored_schedule != next_schedule", source)
         self.assertIn('st.session_state.project_id = "TAP-"', source)
 
+    def test_project_identity_change_clears_previous_participant_pairing(self) -> None:
+        app = AppTest.from_file(str(ROOT / "pages" / "1_project_setup.py"), default_timeout=30)
+        app.session_state["project_id"] = "TAP-OLD"
+        app.session_state["project_name"] = "기존 프로젝트"
+        app.session_state["project_name_input"] = "새 프로젝트"
+        app.session_state["participant_id"] = "OLD-P001"
+        app.session_state["_participant_id_input"] = "OLD-P001"
+        app.run()
+
+        save = next(
+            item for item in app.button if item.label == "설정 저장 후 실제 검사 시작"
+        )
+        with patch("streamlit.switch_page"):
+            save.click()
+            app.run()
+
+        self.assertEqual([], [str(item.value) for item in app.exception])
+        self.assertEqual("", app.session_state["participant_id"])
+        self.assertNotIn("_participant_id_input", app.session_state)
+
+    def test_phase_only_switch_keeps_participant_pairing(self) -> None:
+        app = AppTest.from_file(str(ROOT / "pages" / "1_project_setup.py"), default_timeout=30).run()
+        with patch("streamlit.switch_page"):
+            next(
+                item for item in app.button if item.label == "설정 저장 후 실제 검사 시작"
+            ).click()
+            app.run()
+
+        project_id = app.session_state["project_id"]
+        app.session_state["participant_id"] = "KEEP-P001"
+        app.session_state["_participant_id_input"] = "KEEP-P001"
+        next(
+            item for item in app.radio if item.label == "현재 참여자에게 열 검사"
+        ).set_value("post")
+        with patch("streamlit.switch_page"):
+            next(
+                item for item in app.button if item.label == "설정 저장 후 실제 검사 시작"
+            ).click()
+            app.run()
+
+        self.assertEqual([], [str(item.value) for item in app.exception])
+        self.assertEqual(project_id, app.session_state["project_id"])
+        self.assertEqual("KEEP-P001", app.session_state["participant_id"])
+        self.assertEqual("KEEP-P001", app.session_state["_participant_id_input"])
+        self.assertEqual("post", app.session_state["assessment_phase"])
+
     def test_project_setup_preserves_custom_target_and_delivery_on_reentry(self) -> None:
         app = AppTest.from_file(str(ROOT / "pages" / "1_project_setup.py"), default_timeout=30)
         app.session_state["target_means"] = {"CORE-CO": 4.2}
@@ -52,6 +99,14 @@ class PrePostPageTests(unittest.TestCase):
         self.assertIn('class="tap-period-pill">최근 8주</span>', source)
         self.assertNotIn("최근 4주", source)
         self.assertIn("sync_assessment_phase", source)
+
+    def test_public_schedule_override_is_presented_as_real_submission(self) -> None:
+        setup_source = (ROOT / "pages" / "1_project_setup.py").read_text(encoding="utf-8")
+        assessment_source = (ROOT / "pages" / "2_assessment.py").read_text(encoding="utf-8")
+        self.assertIn("공개 시연에서 검사기간 예외 허용", setup_source)
+        self.assertIn("실제 검사 제출이 가능합니다", assessment_source)
+        self.assertNotIn("검사기간 밖 미리보기", setup_source)
+        self.assertNotIn("미리보기 모드", assessment_source)
 
     def test_completed_post_items_open_transfer_environment_form(self) -> None:
         questions = questions_for_factors(["CORE-CO"])

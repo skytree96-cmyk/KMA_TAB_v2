@@ -28,7 +28,7 @@ ROLE_NAV = {
         ("streamlit_app.py", "관리자 대시보드"),
         ("pages/1_project_setup.py", "교육평가 프로젝트"),
         ("pages/4_organization_report.py", "교육 전후 리포트"),
-        ("pages/2_assessment.py", "검사 미리보기"),
+        ("pages/2_assessment.py", "사전·사후 검사"),
     ),
     "participant": (
         ("pages/0_user_guide.py", "처음 사용 안내"),
@@ -39,7 +39,7 @@ ROLE_NAV = {
         ("pages/0_user_guide.py", "처음 사용 안내"),
         ("pages/6_kma_dashboard.py", "KMA 대시보드"),
         ("pages/5_question_bank.py", "문항은행·검수"),
-        ("streamlit_app.py", "회원사 화면 미리보기"),
+        ("streamlit_app.py", "회원사 운영 화면"),
     ),
 }
 

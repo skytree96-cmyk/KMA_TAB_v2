@@ -97,8 +97,16 @@ def as_v1(raw: bytes) -> bytes:
         "organization_priorities",
         "learner_interests",
         "delivery_preference",
+        "allow_schedule_override",
     ):
         payload["project"].pop(field)
+    return encode_with_checksum(payload)
+
+
+def as_v2(raw: bytes) -> bytes:
+    payload = json.loads(raw)
+    payload["schema_version"] = 2
+    payload["project"].pop("allow_schedule_override")
     return encode_with_checksum(payload)
 
 
@@ -210,7 +218,7 @@ class BaselineTransferTests(unittest.TestCase):
         with self.assertRaisesRegex(BaselineValidationError, "다른 참여자 ID"):
             restore_pre_baseline(target, pre_baseline_json_bytes(source))
 
-    def test_new_files_use_v2_project_identity_and_schedule(self) -> None:
+    def test_new_files_use_v3_project_identity_schedule_and_override(self) -> None:
         payload = json.loads(pre_baseline_json_bytes(baseline_state()))
 
         self.assertEqual(BASELINE_FORMAT, payload["format"])
@@ -222,6 +230,7 @@ class BaselineTransferTests(unittest.TestCase):
         self.assertEqual(["CORE-CO"], payload["project"]["organization_priorities"])
         self.assertEqual(["CORE-CO"], payload["project"]["learner_interests"])
         self.assertEqual("offline", payload["project"]["delivery_preference"])
+        self.assertFalse(payload["project"]["allow_schedule_override"])
 
     def test_bootstrap_configures_fresh_post_session_from_current_bank(self) -> None:
         source = current_bank_baseline_state()
@@ -238,7 +247,7 @@ class BaselineTransferTests(unittest.TestCase):
 
         restored = bootstrap_post_from_pre_baseline(fresh, raw)
 
-        self.assertEqual(2, restored["schema_version"])
+        self.assertEqual(BASELINE_SCHEMA_VERSION, restored["schema_version"])
         self.assertEqual("post", fresh["assessment_phase"])
         self.assertEqual("post", fresh["current_assessment_phase"])
         self.assertEqual(source["project_id"], fresh["project_id"])
@@ -258,6 +267,79 @@ class BaselineTransferTests(unittest.TestCase):
         self.assertFalse(fresh["assessment_completed_by_phase"]["post"])
         self.assertEqual({}, fresh["responses"])
         self.assertEqual(0, fresh["current_question"])
+
+    def test_schedule_override_allows_out_of_window_pre_completion_round_trip(self) -> None:
+        source = current_bank_baseline_state()
+        source["allow_schedule_override"] = True
+        source["assessment_completed_at_by_phase"] = {
+            "pre": "2026-08-16",
+            "post": None,
+        }
+
+        raw = pre_baseline_json_bytes(source)
+        payload = json.loads(raw)
+        self.assertEqual(3, payload["schema_version"])
+        self.assertTrue(payload["project"]["allow_schedule_override"])
+        self.assertEqual("2026-08-16", payload["project"]["pre_completed_at"])
+
+        fresh = {
+            "assessment_phase": "pre",
+            "allow_schedule_override": False,
+            "selected_factors": [],
+            "question_snapshot_hash": "",
+            "question_snapshot_codes": [],
+            "responses_by_phase": {"pre": {}, "post": {}},
+            "assessment_completed_by_phase": {"pre": False, "post": False},
+        }
+        restored = bootstrap_post_from_pre_baseline(fresh, raw)
+
+        self.assertEqual(3, restored["schema_version"])
+        self.assertTrue(fresh["allow_schedule_override"])
+        self.assertEqual("2026-08-16", fresh["assessment_completed_at_by_phase"]["pre"])
+        self.assertTrue(fresh["assessment_completed_by_phase"]["pre"])
+
+        configured_post = deepcopy(source)
+        configured_post.update(
+            {
+                "assessment_phase": "post",
+                "responses_by_phase": {"pre": {}, "post": {}},
+                "assessment_completed_by_phase": {"pre": False, "post": False},
+                "current_question_by_phase": {"pre": 0, "post": 0},
+            }
+        )
+        restore_pre_baseline(configured_post, raw)
+        self.assertTrue(configured_post["assessment_completed_by_phase"]["pre"])
+        self.assertEqual(
+            source["responses_by_phase"]["pre"],
+            configured_post["responses_by_phase"]["pre"],
+        )
+
+        mismatched_post = deepcopy(configured_post)
+        mismatched_post["allow_schedule_override"] = False
+        with self.assertRaisesRegex(BaselineValidationError, "예외 허용 설정"):
+            validate_pre_baseline(raw, mismatched_post)
+
+        strict = deepcopy(source)
+        strict["allow_schedule_override"] = False
+        with self.assertRaisesRegex(BaselineValidationError, "사전 완료일"):
+            pre_baseline_json_bytes(strict)
+
+    def test_bootstrap_still_accepts_v2_baseline(self) -> None:
+        source = current_bank_baseline_state()
+        raw = as_v2(pre_baseline_json_bytes(source))
+        fresh = {
+            "assessment_phase": "pre",
+            "selected_factors": [],
+            "question_snapshot_hash": "",
+            "question_snapshot_codes": [],
+            "responses_by_phase": {"pre": {}, "post": {}},
+        }
+
+        restored = bootstrap_post_from_pre_baseline(fresh, raw)
+
+        self.assertEqual(2, restored["schema_version"])
+        self.assertEqual(source["participant_id"], fresh["participant_id"])
+        self.assertEqual(source["responses_by_phase"]["pre"], fresh["responses_by_phase"]["pre"])
 
     def test_bootstrap_accepts_v1_without_requiring_new_schedule_fields(self) -> None:
         source = current_bank_baseline_state()
@@ -349,7 +431,7 @@ class BaselineTransferTests(unittest.TestCase):
             bootstrap_post_from_pre_baseline(existing, pre_baseline_json_bytes(source))
         self.assertEqual(before_existing, existing)
 
-    def test_v2_rejects_blank_identity_bad_dates_and_bad_recommendation_context(self) -> None:
+    def test_v3_rejects_blank_identity_bad_dates_and_bad_recommendation_context(self) -> None:
         source = current_bank_baseline_state()
         raw_payload = json.loads(pre_baseline_json_bytes(source))
         invalid_cases = (
@@ -363,6 +445,7 @@ class BaselineTransferTests(unittest.TestCase):
             ("organization_priorities", "CORE-CO", "조직 우선역량"),
             ("learner_interests", [""], "학습 희망역량"),
             ("delivery_preference", "blended", "교육방식 선호"),
+            ("allow_schedule_override", "true", "allow_schedule_override"),
         )
         for field, value, message in invalid_cases:
             with self.subTest(field=field, value=value):
@@ -381,7 +464,7 @@ class BaselineTransferTests(unittest.TestCase):
                     bootstrap_post_from_pre_baseline(fresh, invalid_raw)
                 self.assertEqual(before, fresh)
 
-    def test_v2_generator_derives_nonempty_project_id_before_validation(self) -> None:
+    def test_v3_generator_derives_nonempty_project_id_before_validation(self) -> None:
         source = baseline_state()
         source["project_id"] = ""
 

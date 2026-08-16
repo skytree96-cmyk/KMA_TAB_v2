@@ -15,7 +15,12 @@ from tap.selection import (
     sanitize_selection,
     selection_errors,
 )
-from tap.state import activate_assessment_phase, ensure_state, reset_all_assessments
+from tap.state import (
+    PARTICIPANT_ID_WIDGET_KEY,
+    activate_assessment_phase,
+    ensure_state,
+    reset_all_assessments,
+)
 from tap.ui import callout, domain_header, page_header, setup_page, summary_strip
 
 
@@ -184,9 +189,9 @@ with st.container(border=True):
         help="사전검사 종료 후 사후검사로 바꾸면, 참여자는 사후 문항과 현업전이 문항에 응답합니다.",
     )
     allow_schedule_override = st.checkbox(
-        "공개 데모에서 검사기간 밖 미리보기 허용",
+        "공개 시연에서 검사기간 예외 허용",
         value=bool(st.session_state.get("allow_schedule_override", True)),
-        help="실제 운영에서는 해제하여 설정한 검사기간 안에서만 제출하도록 하세요.",
+        help="시연 중에는 설정 기간 밖에서도 실제 검사를 제출할 수 있습니다. 운영 전환 시에는 해제하세요.",
     )
 
 base_rows = [
@@ -394,7 +399,7 @@ if not date_errors and not 56 <= post_delay_days <= 70:
     )
 
 if st.button(
-    "설정 저장 후 참여자 화면 확인",
+    "설정 저장 후 실제 검사 시작",
     type="primary",
     disabled=item_count == 0 or bool(selection_issues) or bool(date_errors),
     width="stretch",
@@ -492,6 +497,13 @@ if st.button(
     # 검사 단계만 pre→post로 바꾸는 경우에는 사전응답을 유지한다.
     if selection_changed:
         reset_all_assessments(st.session_state)
+    if project_identity_changed:
+        # A pseudonymous participant ID belongs to one project pairing only.
+        # Clear both the durable value and its disposable widget key whenever
+        # the project identity changes; a pre→post phase switch alone does not
+        # enter this branch and therefore keeps the pairing ID.
+        st.session_state.participant_id = ""
+        st.session_state.pop(PARTICIPANT_ID_WIDGET_KEY, None)
     activate_assessment_phase(st.session_state, current_phase)
     st.session_state.current_assessment_phase = current_phase
     st.switch_page("pages/2_assessment.py")

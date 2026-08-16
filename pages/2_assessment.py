@@ -166,7 +166,10 @@ if outside_window and not st.session_state.get("allow_schedule_override", True):
     st.warning(f"{phase_labels[phase]} 기간({period_start} ~ {period_end})이 아닙니다. 교육담당자에게 문의해 주세요.")
     st.stop()
 if outside_window:
-    st.caption("공개 데모 미리보기 모드 · 실제 운영에서는 설정된 검사기간 안에서만 제출할 수 있습니다.")
+    st.caption(
+        "공개 시연 환경 · 검사기간 예외가 허용되어 현재도 실제 검사 제출이 가능합니다. "
+        "운영 전환 시 교육평가 프로젝트에서 예외 허용을 해제하세요."
+    )
 
 if st.session_state.assessment_started_at is None:
     st.session_state.assessment_started_at = time()

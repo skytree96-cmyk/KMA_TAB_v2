@@ -13,8 +13,8 @@ from tap.state import PARTICIPANT_ID_WIDGET_KEY
 
 
 BASELINE_FORMAT = "tap-pre-assessment-baseline"
-BASELINE_SCHEMA_VERSION = 2
-SUPPORTED_BASELINE_SCHEMA_VERSIONS = frozenset({1, 2})
+BASELINE_SCHEMA_VERSION = 3
+SUPPORTED_BASELINE_SCHEMA_VERSIONS = frozenset({1, 2, 3})
 MAX_BASELINE_BYTES = 1_000_000
 _SHA256_PATTERN = re.compile(r"^[0-9a-f]{64}$")
 _TOP_LEVEL_FIELDS = {
@@ -47,9 +47,11 @@ _PROJECT_FIELDS_V2 = _PROJECT_FIELDS_V1 | {
     "learner_interests",
     "delivery_preference",
 }
+_PROJECT_FIELDS_V3 = _PROJECT_FIELDS_V2 | {"allow_schedule_override"}
 _PROJECT_FIELDS_BY_VERSION = {
     1: _PROJECT_FIELDS_V1,
     2: _PROJECT_FIELDS_V2,
+    3: _PROJECT_FIELDS_V3,
 }
 _INSTRUMENT_FIELDS = {
     "assessment_version",
@@ -127,11 +129,15 @@ def _deterministic_project_id(prefix: str, material: Mapping[str, Any]) -> str:
     return prefix + hashlib.sha256(canonical).hexdigest()[:16].upper()
 
 
-def _validate_v2_project(project: Mapping[str, Any]) -> dict[str, Any]:
+def _validate_project_schedule(
+    project: Mapping[str, Any],
+    *,
+    allow_schedule_override: bool,
+) -> dict[str, Any]:
     required_strings = _PROJECT_FIELDS_V2 - {"target_means"} - _V2_LIST_FIELDS
     for field in required_strings:
         if not isinstance(project.get(field), str) or not str(project[field]).strip():
-            raise BaselineValidationError(f"v2 기준파일의 {field} 값이 비어 있거나 올바르지 않습니다.")
+            raise BaselineValidationError(f"기준파일의 {field} 값이 비어 있거나 올바르지 않습니다.")
 
     priorities = _clean_optional_string_list(
         project.get("organization_priorities"), "조직 우선역량"
@@ -147,15 +153,37 @@ def _validate_v2_project(project: Mapping[str, Any]) -> dict[str, Any]:
     training = _parse_iso_date(project.get("training_date"), "교육일")
     post_start = _parse_iso_date(project.get("post_start_date"), "사후검사 시작일")
     post_end = _parse_iso_date(project.get("post_end_date"), "사후검사 종료일")
-    if not (pre_start <= pre_completed <= pre_end < training < post_start <= post_end):
+    if not (pre_start <= pre_end < training < post_start <= post_end):
         raise BaselineValidationError(
-            "검사 일정은 사전 시작≤사전 완료≤사전 종료<교육일<사후 시작≤사후 종료 순서여야 합니다."
+            "검사 일정은 사전 시작≤사전 종료<교육일<사후 시작≤사후 종료 순서여야 합니다."
+        )
+    if not allow_schedule_override and not (pre_start <= pre_completed <= pre_end):
+        raise BaselineValidationError(
+            "검사 일정상 사전 완료일은 설정된 사전검사 기간 안이어야 합니다."
         )
 
     normalized = dict(project)
     normalized["organization_priorities"] = priorities
     normalized["learner_interests"] = interests
     normalized["delivery_preference"] = delivery
+    return normalized
+
+
+def _validate_v2_project(project: Mapping[str, Any]) -> dict[str, Any]:
+    return _validate_project_schedule(project, allow_schedule_override=False)
+
+
+def _validate_v3_project(project: Mapping[str, Any]) -> dict[str, Any]:
+    allow_schedule_override = project.get("allow_schedule_override")
+    if not isinstance(allow_schedule_override, bool):
+        raise BaselineValidationError(
+            "v3 기준파일의 allow_schedule_override 값은 true 또는 false여야 합니다."
+        )
+    normalized = _validate_project_schedule(
+        project,
+        allow_schedule_override=allow_schedule_override,
+    )
+    normalized["allow_schedule_override"] = allow_schedule_override
     return normalized
 
 
@@ -225,6 +253,9 @@ def build_pre_baseline_payload(state: Mapping[str, Any]) -> dict[str, Any]:
     responses = _validated_responses(responses_by_phase.get("pre"), snapshot_codes)
 
     target_means = state.get("target_means", {})
+    allow_schedule_override = state.get("allow_schedule_override", False)
+    if not isinstance(allow_schedule_override, bool):
+        raise BaselineValidationError("검사기간 예외 허용 설정이 올바르지 않습니다.")
     project = {
         "project_id": str(state.get("project_id", "")).strip(),
         "project_name": str(state.get("project_name", "")).strip(),
@@ -243,6 +274,7 @@ def build_pre_baseline_payload(state: Mapping[str, Any]) -> dict[str, Any]:
         "organization_priorities": deepcopy(state.get("organization_priorities") or []),
         "learner_interests": deepcopy(state.get("learner_interests") or []),
         "delivery_preference": str(state.get("delivery_preference", "all")).strip(),
+        "allow_schedule_override": allow_schedule_override,
     }
     if not project["project_id"]:
         project["project_id"] = _deterministic_project_id(
@@ -260,7 +292,7 @@ def build_pre_baseline_payload(state: Mapping[str, Any]) -> dict[str, Any]:
                 "question_snapshot_hash": snapshot_hash,
             },
         )
-    project = _validate_v2_project(project)
+    project = _validate_v3_project(project)
     payload = {
         "format": BASELINE_FORMAT,
         "schema_version": BASELINE_SCHEMA_VERSION,
@@ -360,14 +392,20 @@ def validate_pre_baseline(
     expected_project_fields = _PROJECT_FIELDS_BY_VERSION[int(schema_version)]
     if not isinstance(project, dict) or set(project) != expected_project_fields:
         raise BaselineValidationError("프로젝트 메타데이터 구성이 올바르지 않습니다.")
-    string_fields = expected_project_fields - {"target_means"} - _V2_LIST_FIELDS
+    string_fields = (
+        expected_project_fields
+        - {"target_means", "allow_schedule_override"}
+        - _V2_LIST_FIELDS
+    )
     if any(
         not isinstance(project[field], str)
         for field in string_fields
     ) or not isinstance(project.get("target_means"), dict):
         raise BaselineValidationError("프로젝트 메타데이터 값의 형식이 올바르지 않습니다.")
-    if int(schema_version) >= 2:
+    if int(schema_version) == 2:
         project = _validate_v2_project(project)
+    elif int(schema_version) >= 3:
+        project = _validate_v3_project(project)
 
     try:
         baseline_targets = {
@@ -426,6 +464,17 @@ def validate_pre_baseline(
             raise BaselineValidationError("기준파일의 학습 희망역량이 현재 프로젝트와 일치하지 않습니다.")
         if project["delivery_preference"] != current_delivery:
             raise BaselineValidationError("기준파일의 교육방식 선호가 현재 프로젝트와 일치하지 않습니다.")
+    if int(schema_version) >= 3:
+        current_override = current_state.get(
+            "allow_schedule_override",
+            project["allow_schedule_override"],
+        )
+        if not isinstance(current_override, bool):
+            raise BaselineValidationError("현재 프로젝트의 검사기간 예외 허용 설정이 올바르지 않습니다.")
+        if project["allow_schedule_override"] != current_override:
+            raise BaselineValidationError(
+                "기준파일의 검사기간 예외 허용 설정이 현재 프로젝트와 일치하지 않습니다."
+            )
     instrument = payload.get("instrument")
     if not isinstance(instrument, dict) or set(instrument) != _INSTRUMENT_FIELDS:
         raise BaselineValidationError("검사 도구 정보가 올바르지 않습니다.")
@@ -616,7 +665,7 @@ def bootstrap_post_from_pre_baseline(
             "question_snapshot_codes": preview_instrument.get("question_snapshot_codes", []),
         }
     )
-    for field in _PROJECT_FIELDS_V2 - {"target_means", "pre_completed_at"}:
+    for field in _PROJECT_FIELDS_V3 - {"target_means", "pre_completed_at"}:
         if field in preview_project:
             candidate[field] = preview_project[field]
 
@@ -675,6 +724,12 @@ def bootstrap_post_from_pre_baseline(
         "organization_priorities": list(project["organization_priorities"]),
         "learner_interests": list(project["learner_interests"]),
         "delivery_preference": project["delivery_preference"],
+        "allow_schedule_override": bool(
+            project.get(
+                "allow_schedule_override",
+                state.get("allow_schedule_override", True),
+            )
+        ),
         "baseline_restore_warnings": restore_warnings,
         "assessment_version": instrument["assessment_version"],
         "question_snapshot_hash": payload_hash,

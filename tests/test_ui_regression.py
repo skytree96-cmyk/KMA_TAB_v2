@@ -28,6 +28,17 @@ class UiRegressionTests(unittest.TestCase):
         self.assertNotIn('key="tap_role_selector"', source)
         self.assertIn('key=f"tap_role_{role}"', source)
 
+    def test_company_navigation_opens_real_assessment(self) -> None:
+        source = (ROOT / "tap" / "ui.py").read_text(encoding="utf-8")
+        self.assertIn('("pages/2_assessment.py", "사전·사후 검사")', source)
+        self.assertNotIn('("pages/2_assessment.py", "검사 미리보기")', source)
+        self.assertIn('("streamlit_app.py", "회원사 운영 화면")', source)
+        self.assertNotIn('("streamlit_app.py", "회원사 화면 미리보기")', source)
+
+        setup_source = (ROOT / "pages" / "1_project_setup.py").read_text(encoding="utf-8")
+        self.assertIn('"설정 저장 후 실제 검사 시작"', setup_source)
+        self.assertNotIn('"설정 저장 후 참여자 화면 확인"', setup_source)
+
     def test_user_guide_download_is_pdf_with_simple_label(self) -> None:
         expected_path = '"docs" / "TAP_사용설명서_v3.pdf"'
         sidebar_source = (ROOT / "tap" / "ui.py").read_text(encoding="utf-8")
@@ -44,6 +55,13 @@ class UiRegressionTests(unittest.TestCase):
         guide_bytes = (ROOT / "docs" / "TAP_사용설명서_v3.pdf").read_bytes()
         self.assertTrue(guide_bytes.startswith(b"%PDF-"))
         self.assertGreater(len(guide_bytes), 100_000)
+
+    def test_user_guide_discloses_cross_browser_mvp_limit(self) -> None:
+        source = (ROOT / "pages" / "0_user_guide.py").read_text(encoding="utf-8")
+        self.assertIn("프로젝트를 만든 동일 브라우저 세션에서만 시작", source)
+        self.assertIn("다른 브라우저로 프로젝트를 전달하는 링크·코드", source)
+        self.assertIn("교육 후 검사는 사전검사 뒤 저장한 기준파일(JSON)", source)
+        self.assertIn("사전·사후 검사를 모두 완료한 뒤", source)
 
     def test_dark_theme_tokens_and_fixed_paper_report_exist(self) -> None:
         source = (ROOT / "tap" / "ui.py").read_text(encoding="utf-8")
