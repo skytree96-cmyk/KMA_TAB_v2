@@ -172,9 +172,12 @@ def main() -> int:
 
     required_pages = [
         ROOT / "streamlit_app.py",
+        ROOT / ".streamlit" / "secrets.toml.example",
         ROOT / "pages" / "0_user_guide.py",
         ROOT / "pages" / "1_project_setup.py",
         ROOT / "pages" / "6_kma_dashboard.py",
+        ROOT / "tap" / "github_demo_store.py",
+        ROOT / "docs" / "GITHUB_DEMO_STORE_SETUP.md",
         ROOT / "docs" / "TAP_사용설명서_v3.pdf",
         ROOT / "docs" / "TAP_빠른사용가이드_v3.pptx",
     ]
@@ -199,6 +202,56 @@ def main() -> int:
         for marker in markers:
             if marker not in source:
                 errors.append(f"pre/post contract missing in {path.relative_to(ROOT)}: {marker}")
+
+    github_demo_contract = {
+        ROOT / "tap" / "github_demo_store.py": (
+            'ROOT_PATH = "tap-demo/v1"',
+            'DEFAULT_BRANCH = "demo-data"',
+            "def participant_key(",
+            "def save_project(",
+            "def save_submission(",
+            "def access_granted(",
+            "status == 409",
+        ),
+        ROOT / "pages" / "0_user_guide.py": (
+            "기획검증용 GitHub 누적 저장",
+            "프로젝트 코드를 참여자 화면에 입력",
+            "교육 참여자 ID 원문은 저장하지 않고 프로젝트별 가명키",
+            "기획검증 접속코드",
+        ),
+        ROOT / "pages" / "1_project_setup.py": (
+            "project_payload_from_state",
+            ".save_project(",
+        ),
+        ROOT / "pages" / "2_assessment.py": (
+            ".load_project(",
+            "submission_payload_from_state",
+            ".save_submission(",
+        ),
+        ROOT / "docs" / "GITHUB_DEMO_STORE_SETUP.md": (
+            "demo-data",
+            "tap-demo/v1/",
+            "Repository permissions",
+            "Read and write",
+            "participant_hash_salt",
+            "access_code",
+        ),
+        ROOT / ".streamlit" / "secrets.toml.example": (
+            "[github_demo_store]",
+            'branch = "demo-data"',
+            "participant_hash_salt",
+            "access_code",
+        ),
+    }
+    for path, markers in github_demo_contract.items():
+        if not path.is_file():
+            continue
+        source = path.read_text(encoding="utf-8")
+        for marker in markers:
+            if marker not in source:
+                errors.append(
+                    f"GitHub demo contract missing in {path.relative_to(ROOT)}: {marker}"
+                )
 
     navigation_paths = set(ROLE_LANDINGS.values())
     navigation_paths.update(path for items in ROLE_NAV.values() for path, _ in items)

@@ -8,11 +8,13 @@ import streamlit as st
 from tap.runtime_guard import stop_on_stale
 
 
-stop_on_stale(st, ("tap.ui",))
+stop_on_stale(st, ("tap.dashboard", "tap.github_demo_store", "tap.ui"))
 
 from tap.aggregation import aggregate_factor_results
 from tap.config import DATA_DIR, MIN_GROUP_N
+from tap.dashboard import completed_store_submission_factor_rows, fetch_store_snapshot
 from tap.data import load_competencies, questions_for_factors
+from tap.github_demo_store import DemoStoreConfig, DemoStoreError, GitHubDemoStore
 from tap.reporting import (
     build_organization_report_model,
     build_pre_post_group_summary,
@@ -27,6 +29,24 @@ from tap.ui import callout, page_header, setup_page
 
 setup_page("교육 전후 리포트", "4")
 ensure_state(st.session_state)
+
+
+@st.cache_data(ttl=30, show_spinner=False)
+def _read_project_store_snapshot(
+    _secrets: object,
+    project_id: str,
+) -> dict[str, object]:
+    config = DemoStoreConfig.from_sources(secrets=_secrets)
+    store = GitHubDemoStore(config)
+    status = store.status()
+    if not status["read_enabled"]:
+        return {"status": status, "projects": [], "submissions": []}
+    return {
+        "status": status,
+        **fetch_store_snapshot(store, project_id=project_id),
+    }
+
+
 page_header(
     "교육 전후 리포트",
     "조직 교육 전후 리포트",
@@ -47,8 +67,12 @@ P002,CORE-CO,3.7,PROJECT-001,TAP-1.0,manager,2026-10-01,post,4,0,0,3,4,4,3
 """
 
 completed_dates = dict(st.session_state.get("assessment_completed_at_by_phase") or {})
+current_project_id = str(st.session_state.get("project_id") or "").strip()
+current_questions = questions_for_factors(
+    list(st.session_state.get("selected_factors", []))
+)
 session_rows = completed_session_factor_rows(
-    questions_for_factors(list(st.session_state.get("selected_factors", []))),
+    current_questions,
     dict(st.session_state.get("responses_by_phase") or {}),
     dict(st.session_state.get("assessment_completed_by_phase") or {}),
     participant_id=str(st.session_state.get("participant_id", "")),
@@ -69,9 +93,10 @@ session_rows = completed_session_factor_rows(
 with st.expander("데이터 준비와 업로드", expanded=True):
     st.caption(
         "사전·사후 비교에는 같은 사람에게 같은 participant_id를 사용하고 session_type을 pre/post로 구분하세요. "
-        "단일시점 기존 CSV도 계속 사용할 수 있습니다. 공개 데모에는 실제 개인정보나 기밀자료를 업로드하지 마세요."
+        "자료 우선순위는 업로드 CSV → 현재 프로젝트의 GitHub 누적 완료결과 → 현재 브라우저 완료결과 → 합성 예시입니다. "
+        "공개 데모에는 실제 개인정보나 기밀자료를 업로드하지 마세요."
     )
-    download_col, upload_col = st.columns([1, 2])
+    download_col, upload_col, refresh_col = st.columns([1, 2, 1])
     with download_col:
         st.download_button(
             "사전·사후 CSV 양식",
@@ -89,10 +114,81 @@ with st.expander("데이터 준비와 업로드", expanded=True):
                 "assessment_version, target_level, assessment_date. 전후 비교 시 session_type도 필요합니다."
             ),
         )
+    with refresh_col:
+        if st.button("누적자료 새로고침", width="stretch"):
+            _read_project_store_snapshot.clear()
+            st.rerun()
+    store_project_code = st.text_input(
+        "GitHub 누적 프로젝트 코드",
+        value=current_project_id,
+        placeholder="예: TAP-2026-LEADERSHIP",
+        help=(
+            "브라우저 세션이 초기화된 뒤에도 교육담당자가 공유한 프로젝트 코드를 입력하면 "
+            "저장된 프로젝트 설정과 완료 제출을 다시 불러옵니다."
+        ),
+    ).strip()
     show_sample = st.checkbox(
         "예시 리포트 보기",
         value=False,
         help="실제 완료 결과나 업로드 파일이 없을 때만 화면 확인용 합성 예시를 표시합니다.",
+    )
+
+store_rows: list[dict[str, object]] = []
+store_error = ""
+store_validation_warnings: list[str] = []
+stored_project: dict[str, object] = {}
+if uploaded is None and store_project_code:
+    try:
+        demo_store_secrets: object = dict(st.secrets)
+    except Exception:  # No secrets file is the normal local-development state.
+        demo_store_secrets = {}
+    try:
+        stored = _read_project_store_snapshot(demo_store_secrets, store_project_code)
+        store_status = dict(stored["status"])
+        if store_status.get("read_enabled"):
+            stored_project = next(
+                (
+                    row
+                    for row in stored["projects"]
+                    if str(row.get("project_id") or "") == store_project_code
+                ),
+                {},
+            )
+            stored_factors = list(stored_project.get("selected_factors") or [])
+            stored_questions = questions_for_factors(
+                [str(code) for code in stored_factors]
+            )
+            if not stored_project:
+                store_validation_warnings.append(
+                    f"프로젝트 코드 {store_project_code}의 저장된 프로젝트 설정을 찾지 못했습니다."
+                )
+            elif not stored_questions:
+                store_validation_warnings.append(
+                    f"프로젝트 코드 {store_project_code}에 집계 가능한 측정역량이 없습니다."
+                )
+            else:
+                store_rows = completed_store_submission_factor_rows(
+                    stored["submissions"],
+                    stored_questions,
+                    project_id=store_project_code,
+                    assessment_version=str(
+                        stored_project.get("assessment_version") or "TAP-1.0"
+                    ),
+                    target_level=str(stored_project.get("target_level") or "staff"),
+                    target_means=dict(stored_project.get("target_means") or {}),
+                    question_snapshot_hash=str(
+                        stored_project.get("question_snapshot_hash") or ""
+                    ),
+                    warnings=store_validation_warnings,
+                )
+    except DemoStoreError as exc:
+        store_error = str(exc)
+
+for warning in store_validation_warnings:
+    st.warning(warning)
+if store_error:
+    st.warning(
+        f"GitHub 누적 저장소를 읽지 못해 다음 자료 우선순위로 대체했습니다: {store_error}"
     )
 
 if uploaded is not None:
@@ -111,6 +207,15 @@ if uploaded is not None:
         st.error(f"CSV 구조를 읽을 수 없습니다: {exc}")
         st.stop()
     st.success("업로드한 실제 조직결과를 사용하고 있습니다.")
+elif store_rows:
+    source_kind = "store"
+    is_sample = False
+    source = pd.DataFrame(store_rows)
+    stored_participants = int(source["participant_id"].nunique())
+    st.success(
+        f"프로젝트 코드 {store_project_code}의 GitHub 누적 완료결과 {stored_participants}명을 자동으로 사용하고 있습니다. "
+        "참여자 연결에는 원문 ID가 아닌 프로젝트별 가명키를 사용합니다."
+    )
 elif session_rows:
     source_kind = "session"
     is_sample = False
@@ -146,6 +251,7 @@ elif show_sample:
 else:
     st.info(
         "표시할 실제 결과가 없습니다. 이 브라우저에서 검사를 완료하거나 조직결과 CSV를 업로드해 주세요. "
+        "현재 프로젝트의 GitHub 누적 완료자료가 있으면 자동으로 다음 순위에서 사용됩니다. "
         "화면 구성만 확인하려면 ‘예시 리포트 보기’를 선택할 수 있습니다."
     )
     if st.button("검사 진행하기", type="primary"):
@@ -155,7 +261,7 @@ else:
 clean, validation_errors, validation_warnings = prepare_group_results(
     source,
     load_competencies(),
-    require_metadata=source_kind in {"session", "upload"},
+    require_metadata=source_kind in {"session", "store", "upload"},
 )
 for warning in validation_warnings:
     st.warning(warning)
@@ -168,14 +274,20 @@ session_values = set(clean["session_type"].dropna()) if "session_type" in clean.
 is_pre_post = {"pre", "post"}.issubset(session_values)
 pre_post_summary = build_pre_post_group_summary(clean, min_group_n=MIN_GROUP_N) if is_pre_post else None
 
-if source_kind == "session" and int(clean["participant_id"].nunique()) < MIN_GROUP_N:
+if source_kind in {"session", "store"} and int(clean["participant_id"].nunique()) < MIN_GROUP_N:
+    result_scope = "현재 브라우저" if source_kind == "session" else "GitHub 누적 저장소"
     st.warning(
-        f"실제 완료 결과 {int(clean['participant_id'].nunique())}명의 데이터를 읽었습니다. "
+        f"{result_scope}에서 실제 완료 결과 {int(clean['participant_id'].nunique())}명의 데이터를 읽었습니다. "
         f"조직 리포트는 개인정보 보호를 위해 N≥{MIN_GROUP_N}일 때만 평균과 변화량을 공개합니다. "
-        "본인의 실제 교육 전·후 수치는 개인 리포트에서 바로 확인할 수 있습니다."
+        + (
+            "본인의 실제 교육 전·후 수치는 개인 리포트에서 바로 확인할 수 있습니다."
+            if source_kind == "session"
+            else "참여자가 더 누적된 뒤 새로고침해 주세요."
+        )
     )
-    if st.button("내 실제 교육 전·후 비교 보기", type="primary"):
-        st.switch_page("pages/3_individual_report.py")
+    if source_kind == "session":
+        if st.button("내 실제 교육 전·후 비교 보기", type="primary"):
+            st.switch_page("pages/3_individual_report.py")
     st.stop()
 
 if is_pre_post:
@@ -198,6 +310,20 @@ if source_kind == "session":
     organization_priorities = set(st.session_state.get("organization_priorities", []))
     project_name = str(st.session_state.get("project_name", "조직 교육평가"))
     report_period = f"{st.session_state.get('pre_end_date')} ~ {st.session_state.get('post_end_date')}"
+elif source_kind == "store":
+    configured_targets = {
+        str(code): float(value)
+        for code, value in dict(stored_project.get("target_means") or {}).items()
+        if code in source_codes
+    }
+    organization_priorities = set(stored_project.get("organization_priorities") or [])
+    project_name = str(
+        stored_project.get("project_name") or f"TAP 조직 교육평가 · {store_project_code}"
+    )
+    report_period = (
+        f"{stored_project.get('pre_start_date') or '-'} ~ "
+        f"{stored_project.get('post_end_date') or '-'}"
+    )
 elif is_sample:
     configured_targets = {}
     organization_priorities = set()

@@ -56,12 +56,13 @@ class UiRegressionTests(unittest.TestCase):
         self.assertTrue(guide_bytes.startswith(b"%PDF-"))
         self.assertGreater(len(guide_bytes), 100_000)
 
-    def test_user_guide_discloses_cross_browser_mvp_limit(self) -> None:
+    def test_user_guide_explains_project_code_storage_and_session_fallback(self) -> None:
         source = (ROOT / "pages" / "0_user_guide.py").read_text(encoding="utf-8")
-        self.assertIn("프로젝트를 만든 동일 브라우저 세션에서만 시작", source)
-        self.assertIn("다른 브라우저로 프로젝트를 전달하는 링크·코드", source)
-        self.assertIn("교육 후 검사는 사전검사 뒤 저장한 기준파일(JSON)", source)
-        self.assertIn("사전·사후 검사를 모두 완료한 뒤", source)
+        self.assertIn("기획검증용 GitHub 누적 저장", source)
+        self.assertIn("교육 참여자 ID 원문은 저장하지 않고 프로젝트별 가명키", source)
+        self.assertIn("교육담당자가 전달한 프로젝트 코드를 참여자 화면에 입력", source)
+        self.assertIn("사전·사후 완료 결과만 저장", source)
+        self.assertIn("미연결 때에는 동일 브라우저에서 시작하거나 기준파일(JSON)", source)
 
     def test_dark_theme_tokens_and_fixed_paper_report_exist(self) -> None:
         source = (ROOT / "tap" / "ui.py").read_text(encoding="utf-8")

@@ -3,15 +3,21 @@ from __future__ import annotations
 from collections import Counter, defaultdict
 from datetime import date, timedelta
 import hashlib
+import secrets
 
 import streamlit as st
 
 from tap.runtime_guard import stop_on_stale
 
 
-stop_on_stale(st, ("tap.ui",))
+stop_on_stale(st, ("tap.github_demo_store", "tap.ui"))
 
 from tap.data import load_competencies, questions_for_factors
+from tap.github_demo_store import (
+    DemoStoreConfig,
+    GitHubDemoStore,
+    project_payload_from_state,
+)
 from tap.selection import (
     MAX_JOB_FUNCTION,
     MAX_OPTIONAL,
@@ -35,6 +41,96 @@ competencies = load_competencies()
 row_by_code = {row["factor_code"]: row for row in competencies}
 
 level_labels = {"staff": "실무자", "manager": "관리자·리더", "executive": "임원"}
+DEMO_STORE_ACCESS_CODE_KEY = "demo_store_access_code"
+
+
+def _demo_access_code() -> str:
+    return str(st.session_state.get(DEMO_STORE_ACCESS_CODE_KEY, "")).strip()
+
+
+def _render_demo_store_access_gate() -> None:
+    """Render the shared-code gate only when the synthetic store is enabled."""
+
+    try:
+        config = DemoStoreConfig.from_sources(st.secrets)
+    except Exception:
+        return
+    if not config.enabled:
+        return
+
+    with st.container(border=True):
+        st.markdown("#### GitHub 기획검증 저장")
+        st.text_input(
+            "기획검증 접속코드",
+            type="password",
+            key=DEMO_STORE_ACCESS_CODE_KEY,
+            help="합성 테스트 프로젝트와 완료 결과를 GitHub에 저장할 때만 사용합니다.",
+        )
+        if not config.write_enabled:
+            st.caption(
+                "GitHub 쓰기 토큰 또는 서버 접속코드가 미설정되어 현 세션·JSON 방식으로만 진행됩니다."
+            )
+        elif config.access_granted(_demo_access_code()):
+            st.caption("접속코드 확인 완료 · 저장 시 완료 스냅샷만 GitHub 테스트 저장소에 누적됩니다.")
+        elif _demo_access_code():
+            st.warning("기획검증 접속코드가 일치하지 않습니다. 현 세션·JSON 데이터는 그대로 유지됩니다.")
+        else:
+            st.caption("GitHub에 합성 테스트 데이터를 저장하려면 교육담당자가 전달한 접속코드를 입력하세요.")
+
+
+def _save_project_to_demo_store() -> None:
+    """Publish one project snapshot without making GitHub a hard dependency."""
+
+    try:
+        config = DemoStoreConfig.from_sources(st.secrets)
+    except Exception as exc:  # pragma: no cover - defensive config boundary
+        st.session_state["demo_store_project_pending"] = True
+        st.session_state["demo_store_notice"] = {
+            "level": "error",
+            "message": f"GitHub 테스트 저장 설정을 확인하지 못했습니다({type(exc).__name__}). 현 세션의 프로젝트는 유지됩니다.",
+        }
+        return
+
+    if not config.enabled:
+        st.session_state["demo_store_project_pending"] = False
+        st.session_state["demo_store_notice"] = {
+            "level": "info",
+            "message": "GitHub 테스트 저장소가 미설정되어 현재 브라우저 세션과 JSON 파일 방식으로 진행합니다.",
+        }
+        return
+    access_code = _demo_access_code()
+    if not config.write_enabled:
+        st.session_state["demo_store_project_pending"] = True
+        st.session_state["demo_store_notice"] = {
+            "level": "warning",
+            "message": "GitHub 쓰기 토큰 또는 서버 접속코드가 미설정되어 테스트 프로젝트를 게시하지 못했습니다. 현 세션·JSON 방식은 유지됩니다.",
+        }
+        return
+    if not config.access_granted(access_code):
+        st.session_state["demo_store_project_pending"] = True
+        st.session_state["demo_store_notice"] = {
+            "level": "warning",
+            "message": "기획검증 접속코드를 입력하거나 다시 확인해 주세요. 프로젝트는 현 세션에 유지되며 JSON 방식으로도 진행할 수 있습니다.",
+        }
+        return
+
+    try:
+        GitHubDemoStore(config, access_code=access_code).save_project(
+            project_payload_from_state(st.session_state)
+        )
+    except Exception as exc:  # network/API failure must not discard the project
+        st.session_state["demo_store_project_pending"] = True
+        st.session_state["demo_store_notice"] = {
+            "level": "error",
+            "message": f"GitHub 테스트 프로젝트 저장에 실패했습니다({type(exc).__name__}). 현 세션은 유지되며 검사 화면에서 다시 시도할 수 있습니다.",
+        }
+        return
+
+    st.session_state["demo_store_project_pending"] = False
+    st.session_state["demo_store_notice"] = {
+        "level": "success",
+        "message": f"테스트 프로젝트를 GitHub에 저장했습니다. 프로젝트 코드: {st.session_state.get('project_id', '')}",
+    }
 
 
 def _iso_date(value: object, fallback: date) -> date:
@@ -125,6 +221,8 @@ page_header(
     "같은 참여자의 교육 전 기준선과 교육 후 변화를 비교할 수 있도록 일정과 측정역량을 고정합니다.",
     badge="사전·사후 짝지은 비교",
 )
+
+_render_demo_store_access_gate()
 
 with st.container(border=True):
     st.markdown('<h3 class="tap-card-title">1. 교육과 검사 일정</h3>', unsafe_allow_html=True)
@@ -450,12 +548,9 @@ if st.button(
     )
     st.session_state.project_name = next_project_name
     if project_identity_changed or not str(st.session_state.get("project_id", "")).strip():
-        identity_material = "|".join(
-            (next_project_name, next_course_name, target_level, *sorted(selected), *next_schedule)
-        )
-        st.session_state.project_id = "TAP-" + hashlib.sha256(
-            identity_material.encode("utf-8")
-        ).hexdigest()[:16].upper()
+        # A random code prevents two independently created but identically
+        # configured synthetic projects from being merged in the data branch.
+        st.session_state.project_id = "TAP-" + secrets.token_hex(8).upper()
     st.session_state.course_name = next_course_name
     st.session_state.training_date = training_date.isoformat()
     st.session_state.pre_start_date = pre_start_date.isoformat()
@@ -511,4 +606,5 @@ if st.button(
         st.session_state.pop(PARTICIPANT_ID_WIDGET_KEY, None)
     activate_assessment_phase(st.session_state, current_phase)
     st.session_state.current_assessment_phase = current_phase
+    _save_project_to_demo_store()
     st.switch_page("pages/2_assessment.py")

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import ast
 import sys
 import tempfile
 import types
@@ -96,48 +97,77 @@ class RuntimeGuardTests(unittest.TestCase):
 
     def test_every_streamlit_entrypoint_guards_before_symbol_imports(self) -> None:
         cases = {
-            "streamlit_app.py": (
-                'stop_on_stale(st, ("tap.dashboard", "tap.ui"))',
-                "from tap.dashboard import build_session_dashboard",
-            ),
-            "pages/0_user_guide.py": (
-                'stop_on_stale(st, ("tap.ui",))',
-                "from tap.ui import",
-            ),
-            "pages/1_project_setup.py": (
-                'stop_on_stale(st, ("tap.ui",))',
-                "from tap.ui import",
-            ),
-            "pages/2_assessment.py": (
-                'stop_on_stale(st, ("tap.baseline_transfer", "tap.ui"))',
-                "from tap.baseline_transfer import",
-            ),
-            "pages/3_individual_report.py": (
-                'stop_on_stale(st, ("tap.baseline_transfer", "tap.ui"))',
-                "from tap.baseline_transfer import",
-            ),
-            "pages/4_organization_report.py": (
-                'stop_on_stale(st, ("tap.ui",))',
-                "from tap.ui import",
-            ),
-            "pages/5_question_bank.py": (
-                'stop_on_stale(st, ("tap.ui",))',
-                "from tap.ui import",
-            ),
-            "pages/6_kma_dashboard.py": (
-                'stop_on_stale(st, ("tap.dashboard", "tap.ui"))',
-                "from tap.dashboard import",
-            ),
+            "streamlit_app.py": {
+                "tap.dashboard",
+                "tap.github_demo_store",
+                "tap.ui",
+            },
+            "pages/0_user_guide.py": {"tap.ui"},
+            "pages/1_project_setup.py": {"tap.github_demo_store", "tap.ui"},
+            "pages/2_assessment.py": {
+                "tap.baseline_transfer",
+                "tap.github_demo_store",
+                "tap.ui",
+            },
+            "pages/3_individual_report.py": {"tap.baseline_transfer", "tap.ui"},
+            "pages/4_organization_report.py": {
+                "tap.dashboard",
+                "tap.github_demo_store",
+                "tap.ui",
+            },
+            "pages/5_question_bank.py": {"tap.ui"},
+            "pages/6_kma_dashboard.py": {
+                "tap.dashboard",
+                "tap.github_demo_store",
+                "tap.ui",
+            },
         }
 
-        for relative_path, (guard_call, symbol_import) in cases.items():
+        for relative_path, expected_modules in cases.items():
             with self.subTest(path=relative_path):
                 source = (ROOT / relative_path).read_text(encoding="utf-8")
-                self.assertLess(source.index(guard_call), source.index(symbol_import))
-                self.assertNotIn("reload(", source)
+                tree = ast.parse(source, filename=relative_path)
+                guard_calls = [
+                    node
+                    for node in ast.walk(tree)
+                    if isinstance(node, ast.Call)
+                    and isinstance(node.func, ast.Name)
+                    and node.func.id == "stop_on_stale"
+                ]
+                self.assertEqual(1, len(guard_calls))
+                guard = guard_calls[0]
+                self.assertGreaterEqual(len(guard.args), 2)
+                guarded_modules = set(ast.literal_eval(guard.args[1]))
+                self.assertEqual(expected_modules, guarded_modules)
+
+                protected_imports = [
+                    node
+                    for node in tree.body
+                    if isinstance(node, ast.ImportFrom)
+                    and node.module in expected_modules
+                ]
+                self.assertEqual(expected_modules, {node.module for node in protected_imports})
+                self.assertTrue(all(guard.lineno < node.lineno for node in protected_imports))
+                self.assertFalse(
+                    any(
+                        isinstance(node, ast.Call)
+                        and (
+                            isinstance(node.func, ast.Name)
+                            and node.func.id == "reload"
+                            or isinstance(node.func, ast.Attribute)
+                            and node.func.attr == "reload"
+                        )
+                        for node in ast.walk(tree)
+                    )
+                )
 
     def test_guarded_modules_record_their_import_time_source_hash(self) -> None:
-        for module_name in ("tap.ui", "tap.dashboard", "tap.baseline_transfer"):
+        for module_name in (
+            "tap.ui",
+            "tap.dashboard",
+            "tap.baseline_transfer",
+            "tap.github_demo_store",
+        ):
             with self.subTest(module=module_name):
                 module = sys.modules.get(module_name)
                 if module is None:

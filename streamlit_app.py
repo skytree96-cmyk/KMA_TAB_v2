@@ -5,9 +5,14 @@ import streamlit as st
 from tap.runtime_guard import stop_on_stale
 
 
-stop_on_stale(st, ("tap.dashboard", "tap.ui"))
+stop_on_stale(st, ("tap.dashboard", "tap.github_demo_store", "tap.ui"))
 
-from tap.dashboard import build_session_dashboard
+from tap.dashboard import (
+    build_persistent_dashboard,
+    build_session_dashboard,
+    fetch_store_snapshot,
+)
+from tap.github_demo_store import DemoStoreConfig, DemoStoreError, GitHubDemoStore
 from tap.state import ensure_state
 from tap.ui import (
     callout,
@@ -22,7 +27,37 @@ from tap.ui import (
 
 setup_page("관리자 대시보드", "T")
 ensure_state(st.session_state)
-dashboard = build_session_dashboard(st.session_state)
+
+
+@st.cache_data(ttl=30, show_spinner=False)
+def _read_github_demo_snapshot(_secrets: object) -> dict[str, object]:
+    config = DemoStoreConfig.from_sources(secrets=_secrets)
+    store = GitHubDemoStore(config)
+    status = store.status()
+    if not status["read_enabled"]:
+        return {"status": status, "projects": [], "submissions": []}
+    return {"status": status, **fetch_store_snapshot(store)}
+
+
+session_dashboard = build_session_dashboard(st.session_state)
+dashboard = session_dashboard
+dashboard_source = "session"
+store_error = ""
+try:
+    demo_store_secrets: object = dict(st.secrets)
+except Exception:  # No secrets file is the normal local-development state.
+    demo_store_secrets = {}
+try:
+    stored = _read_github_demo_snapshot(demo_store_secrets)
+    store_status = dict(stored["status"])
+    if store_status.get("read_enabled"):
+        dashboard = build_persistent_dashboard(
+            stored["submissions"], stored["projects"]
+        )
+        dashboard_source = "store"
+except DemoStoreError as exc:
+    store_status = {}
+    store_error = str(exc)
 
 page_header(
     "KMA 교육효과 평가",
@@ -43,29 +78,53 @@ with actions[1]:
 with actions[2]:
     if st.button("처음 사용 안내", width="stretch"):
         safe_switch_page("pages/0_user_guide.py")
-st.info(
-    "현재 화면은 이 브라우저 세션에 저장된 실제 프로젝트와 검사 상태만 보여줍니다. "
-    "서버 DB가 연결되지 않은 공개 MVP이므로 다른 참여자·브라우저·회원사의 데이터는 합산되지 않습니다."
-)
+if dashboard_source == "store":
+    refresh_col, source_col = st.columns([1, 3])
+    with refresh_col:
+        if st.button("누적 데이터 새로고침", width="stretch"):
+            _read_github_demo_snapshot.clear()
+            st.rerun()
+    with source_col:
+        st.info(
+            "GitHub 기획검증 저장소에 저장된 완료 제출을 30초 단위로 누적 집계합니다. "
+            "참여자 수는 원문 ID가 아닌 프로젝트별 가명키를 기준으로 계산합니다."
+        )
+elif store_error:
+    st.warning(
+        f"누적 저장소를 읽지 못해 현재 브라우저 세션으로 대체했습니다: {store_error}"
+    )
+    if st.button("누적 데이터 다시 읽기"):
+        _read_github_demo_snapshot.clear()
+        st.rerun()
+else:
+    st.info(
+        "GitHub 기획검증 저장소가 설정되지 않아 이 브라우저 세션의 실제 프로젝트와 검사 상태를 보여줍니다. "
+        "저장소를 설정하면 다른 테스트 브라우저의 완료 제출도 누적됩니다."
+    )
 
 metric_grid(dashboard["metrics"])
 
 left, right = st.columns([1.35, 1], gap="large")
 with left:
     with st.container(border=True):
-        st.markdown('<h3 class="tap-card-title">현재 세션 프로젝트</h3>', unsafe_allow_html=True)
-        st.markdown(
-            '<p class="tap-card-sub">현재 브라우저에서 만든 프로젝트와 한 참여자의 교육 전·후 완료 상태입니다.</p>',
-            unsafe_allow_html=True,
+        project_title = "누적 프로젝트" if dashboard_source == "store" else "현재 세션 프로젝트"
+        project_subtitle = (
+            "저장소에 누적된 프로젝트별 교육 전·후 완료 제출 현황입니다."
+            if dashboard_source == "store"
+            else "현재 브라우저에서 만든 프로젝트와 한 참여자의 교육 전·후 완료 상태입니다."
         )
+        st.markdown(f'<h3 class="tap-card-title">{project_title}</h3>', unsafe_allow_html=True)
+        st.markdown(f'<p class="tap-card-sub">{project_subtitle}</p>', unsafe_allow_html=True)
         if dashboard["projects"]:
             project_rows(dashboard["projects"])
+            participant_scope = "누적 참여자" if dashboard_source == "store" else "현재 세션 참여자"
             st.caption(
                 f"검사 단계 진행률 {dashboard['phase_completion_pct']:.0f}% · "
-                f"교육 전·후 모두 완료한 현재 세션 참여자 {dashboard['paired_count']}명"
+                f"교육 전·후 모두 완료한 {participant_scope} {dashboard['paired_count']}명"
             )
         else:
-            st.info("현재 세션에 저장된 프로젝트가 없습니다. 먼저 교육평가 프로젝트를 만들어 주세요.")
+            empty_scope = "누적 저장소" if dashboard_source == "store" else "현재 세션"
+            st.info(f"{empty_scope}에 완료 제출이 없습니다. 먼저 교육평가 검사를 완료해 주세요.")
 
 with right:
     with st.container(border=True):

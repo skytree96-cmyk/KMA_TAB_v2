@@ -2,6 +2,18 @@
 
 ## 공개 검토용 DEMO
 
+### GitHub 합성 테스트 저장소(선택)
+
+- [ ] `demo-data` 브랜치 존재 확인
+- [ ] Fine-grained token의 대상 저장소를 `KMA_TAB_v2`로 한정
+- [ ] 토큰 권한을 `Contents: Read and write`로만 제한
+- [ ] Streamlit Secrets의 `[github_demo_store]` 설정 및 토큰 비공개 확인
+- [ ] 임의의 `access_code`를 Secrets에 설정하고 기획검증 참여자에게만 별도 전달
+- [ ] 기획검증 종료 후 `enabled=false` 전환 또는 토큰 폐기
+- [ ] 프로젝트 게시·다른 브라우저 프로젝트 코드 불러오기 확인
+- [ ] 교육 전/후 완료 후 누적 대시보드와 조직 리포트 반영 확인
+- [ ] 실명·사번·이메일·실제 응답 미사용 확인
+
 - [ ] 이 폴더만 새 GitHub 저장소 루트에 업로드
 - [ ] `.env`, `.streamlit/secrets.toml`, 개인식별정보 파일이 없는지 확인
 - [ ] `python scripts/validate_project.py` 통과
