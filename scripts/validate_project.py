@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import ast
+import hashlib
+import os
 import sys
 from pathlib import Path
 
@@ -19,8 +21,123 @@ from tap.data import (
 from tap.ui import ROLE_LANDINGS, ROLE_NAV
 
 
+MANIFEST_PATH = ROOT / "MANIFEST_SHA256.txt"
+BINARY_RELEASE_SUFFIXES = {
+    ".gif",
+    ".jpeg",
+    ".jpg",
+    ".pdf",
+    ".png",
+    ".pptx",
+    ".webp",
+    ".xlsx",
+    ".zip",
+}
+MANIFEST_EXCLUDED_TOP_LEVEL = {
+    ".agents",
+    ".codex",
+    ".devcontainer",
+    ".git",
+    ".mypy_cache",
+    ".pytest_cache",
+    ".tmp",
+    "output",
+}
+
+
+def deployable_paths() -> set[str]:
+    paths: set[str] = set()
+    for directory, child_directories, filenames in os.walk(ROOT):
+        directory_path = Path(directory)
+        if directory_path == ROOT:
+            child_directories[:] = [
+                name
+                for name in child_directories
+                if name not in MANIFEST_EXCLUDED_TOP_LEVEL and name != "__pycache__"
+            ]
+        else:
+            child_directories[:] = [
+                name for name in child_directories if name != "__pycache__"
+            ]
+        for filename in filenames:
+            path = directory_path / filename
+            relative = path.relative_to(ROOT)
+            if relative.as_posix() != MANIFEST_PATH.name:
+                paths.add(relative.as_posix())
+    return paths
+
+
+def release_file_digest(path: Path) -> str:
+    """Hash binary bytes exactly and text with platform-neutral LF endings."""
+
+    payload = path.read_bytes()
+    if path.suffix.lower() not in BINARY_RELEASE_SUFFIXES:
+        payload = payload.replace(b"\r\n", b"\n").replace(b"\r", b"\n")
+    return hashlib.sha256(payload).hexdigest()
+
+
+def write_release_manifest() -> None:
+    lines = [
+        f"{release_file_digest(ROOT / relative_path)}  ./{relative_path}"
+        for relative_path in sorted(deployable_paths(), key=str.casefold)
+    ]
+    MANIFEST_PATH.write_text("\n".join(lines) + "\n", encoding="utf-8", newline="\n")
+
+
+def validate_release_manifest() -> list[str]:
+    """Verify that every deployable file is covered by an exact SHA-256."""
+
+    if not MANIFEST_PATH.is_file():
+        return ["release manifest is missing: MANIFEST_SHA256.txt"]
+
+    errors: list[str] = []
+    entries: dict[str, str] = {}
+    for line_number, raw_line in enumerate(
+        MANIFEST_PATH.read_text(encoding="utf-8").splitlines(),
+        start=1,
+    ):
+        if not raw_line.strip():
+            continue
+        digest, separator, raw_path = raw_line.partition("  ")
+        relative_path = raw_path.removeprefix("./").replace("\\", "/")
+        if (
+            not separator
+            or len(digest) != 64
+            or any(character not in "0123456789abcdef" for character in digest)
+            or not relative_path
+        ):
+            errors.append(f"invalid manifest line {line_number}: {raw_line}")
+            continue
+        if relative_path in entries:
+            errors.append(f"duplicate manifest path: {relative_path}")
+            continue
+        target = (ROOT / relative_path).resolve()
+        try:
+            target.relative_to(ROOT.resolve())
+        except ValueError:
+            errors.append(f"manifest path escapes project root: {relative_path}")
+            continue
+        entries[relative_path] = digest
+
+    deployable = deployable_paths()
+
+    missing_entries = sorted(deployable - set(entries))
+    extra_entries = sorted(set(entries) - deployable)
+    if missing_entries:
+        errors.append(f"manifest paths missing: {missing_entries}")
+    if extra_entries:
+        errors.append(f"manifest paths not found: {extra_entries}")
+
+    for relative_path in sorted(deployable & set(entries)):
+        actual = release_file_digest(ROOT / relative_path)
+        if actual != entries[relative_path]:
+            errors.append(f"manifest hash mismatch: {relative_path}")
+    return errors
+
+
 def main() -> int:
     errors: list[str] = []
+    errors.extend(validate_release_manifest())
     report = integrity_report()
     expected = {
         "question_count": 144,
@@ -124,4 +241,8 @@ def main() -> int:
 
 
 if __name__ == "__main__":
+    if "--write-manifest" in sys.argv:
+        write_release_manifest()
+        print(f"WROTE {MANIFEST_PATH}")
+        sys.exit(0)
     sys.exit(main())

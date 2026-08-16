@@ -5,6 +5,11 @@ import io
 import pandas as pd
 import streamlit as st
 
+from tap.runtime_guard import stop_on_stale
+
+
+stop_on_stale(st, ("tap.ui",))
+
 from tap.aggregation import aggregate_factor_results
 from tap.config import DATA_DIR, MIN_GROUP_N
 from tap.data import load_competencies, questions_for_factors

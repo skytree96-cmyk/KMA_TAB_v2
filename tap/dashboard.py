@@ -5,6 +5,10 @@ from functools import lru_cache
 from typing import Any, Iterable, Mapping
 
 from tap.config import DATA_DIR
+from tap.runtime_guard import source_fingerprint
+
+
+__tap_source_sha256__ = source_fingerprint(__file__)
 
 
 @lru_cache(maxsize=1)

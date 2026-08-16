@@ -7,6 +7,11 @@ from time import time
 
 import streamlit as st
 
+from tap.runtime_guard import stop_on_stale
+
+
+stop_on_stale(st, ("tap.baseline_transfer", "tap.ui"))
+
 from tap.baseline_transfer import BaselineValidationError, bootstrap_post_from_pre_baseline
 from tap.config import LIKERT_OPTIONS
 from tap.data import questions_for_factors

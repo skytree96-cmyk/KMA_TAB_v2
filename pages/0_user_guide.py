@@ -4,6 +4,11 @@ from pathlib import Path
 
 import streamlit as st
 
+from tap.runtime_guard import stop_on_stale
+
+
+stop_on_stale(st, ("tap.ui",))
+
 from tap.config import PROJECT_ROOT
 from tap.ui import callout, page_header, setup_page, switch_role_page
 

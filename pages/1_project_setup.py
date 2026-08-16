@@ -6,6 +6,11 @@ import hashlib
 
 import streamlit as st
 
+from tap.runtime_guard import stop_on_stale
+
+
+stop_on_stale(st, ("tap.ui",))
+
 from tap.data import load_competencies, questions_for_factors
 from tap.selection import (
     MAX_JOB_FUNCTION,

@@ -9,7 +9,11 @@ from math import isfinite
 from typing import Any, Mapping, MutableMapping
 
 from tap.data import questions_for_factors
+from tap.runtime_guard import source_fingerprint
 from tap.state import PARTICIPANT_ID_WIDGET_KEY
+
+
+__tap_source_sha256__ = source_fingerprint(__file__)
 
 
 BASELINE_FORMAT = "tap-pre-assessment-baseline"

@@ -8,6 +8,10 @@ import streamlit as st
 from streamlit.errors import StreamlitAPIException, StreamlitPageNotFoundError
 
 from tap.config import APP_TITLE, PROJECT_ROOT
+from tap.runtime_guard import source_fingerprint
+
+
+__tap_source_sha256__ = source_fingerprint(__file__)
 
 
 ROLE_LABELS = {

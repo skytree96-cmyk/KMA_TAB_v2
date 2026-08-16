@@ -3,6 +3,11 @@ from __future__ import annotations
 import pandas as pd
 import streamlit as st
 
+from tap.runtime_guard import stop_on_stale
+
+
+stop_on_stale(st, ("tap.dashboard", "tap.ui"))
+
 from tap.dashboard import load_dashboard_demo
 from tap.data import integrity_report, load_course_map, load_courses
 from tap.ui import callout, metric_grid, page_header, setup_page

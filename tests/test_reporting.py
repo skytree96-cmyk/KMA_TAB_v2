@@ -331,6 +331,44 @@ class ReportingTests(unittest.TestCase):
         self.assertIn('f"tap_pre_baseline_{project_token}_{completed_at}.json"', source)
         self.assertTrue(any("일반 결과 JSON과 다른" in str(item.value) for item in app.caption))
         self.assertTrue(any("본인만 안전하게 보관" in str(item.value) for item in app.caption))
+        self.assertTrue(
+            any("교육 전 완료 결과" in str(item.value) for item in app.markdown)
+        )
+
+    def test_incomplete_single_phase_hides_provisional_results_and_exports(self) -> None:
+        questions = questions_for_factors(["CORE-CO"])
+        first_code = str(questions[0]["question_code"])
+
+        for responses in ({}, {first_code: 3}):
+            with self.subTest(answered=len(responses)):
+                app = AppTest.from_file(
+                    str(ROOT / "pages" / "3_individual_report.py"), default_timeout=30
+                ).run()
+                app.session_state["selected_factors"] = ["CORE-CO"]
+                app.session_state["assessment_phase"] = "pre"
+                app.session_state["responses_by_phase"] = {"pre": responses, "post": {}}
+                app.session_state["assessment_completed_by_phase"] = {
+                    "pre": False,
+                    "post": False,
+                }
+                app.run()
+
+                self.assertEqual([], [str(item.value) for item in app.exception])
+                self.assertTrue(
+                    any("교육 전 검사 진행 중" in str(item.value) for item in app.markdown)
+                )
+                saved = next(item for item in app.metric if item.label == "저장된 응답")
+                self.assertEqual(f"{len(responses)}/{len(questions)}문항", saved.value)
+                self.assertTrue(
+                    any("임시 점수·교육 추천·결과 파일" in str(item.value) for item in app.warning)
+                )
+                self.assertTrue(any(item.label == "검사로 돌아가기" for item in app.button))
+                self.assertFalse(app.dataframe)
+                download_labels = {item.label for item in app.get("download_button")}
+                self.assertNotIn("결과 JSON", download_labels)
+                self.assertNotIn("결과 CSV", download_labels)
+                self.assertNotIn("1. 교육 전 검사 기준파일 저장", download_labels)
+                self.assertFalse(app.checkbox)
 
     def test_organization_report_uses_completed_session_before_sample(self) -> None:
         questions = questions_for_factors(["CORE-CO"])
@@ -372,6 +410,9 @@ class ReportingTests(unittest.TestCase):
         self.assertEqual([], [str(item.value) for item in app.exception])
         self.assertTrue(any("모두 완료" in str(item.value) for item in app.warning))
         self.assertFalse(any("교육 전·후 짝지어진 비교" in str(item.value) for item in app.markdown))
+        self.assertTrue(any("교육 전 완료 결과" in str(item.value) for item in app.markdown))
+        saved = next(item for item in app.metric if item.label == "저장된 응답")
+        self.assertEqual(f"3/{len(questions)}문항", saved.value)
 
     def test_transfer_factor_is_suppressed_below_minimum_n(self) -> None:
         rows = []

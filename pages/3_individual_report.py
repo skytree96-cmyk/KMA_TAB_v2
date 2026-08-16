@@ -9,6 +9,11 @@ from statistics import mean
 import pandas as pd
 import streamlit as st
 
+from tap.runtime_guard import stop_on_stale
+
+
+stop_on_stale(st, ("tap.baseline_transfer", "tap.ui"))
+
 from tap.baseline_transfer import BaselineValidationError, pre_baseline_json_bytes
 from tap.data import load_course_map, load_courses, questions_for_factors
 from tap.recommendation import rank_courses
@@ -75,38 +80,75 @@ def _render_pre_baseline_download(*, key: str) -> None:
             width="stretch",
         )
 
-if not (pre_responses or post_responses or legacy_responses):
-    st.warning("아직 저장된 응답이 없습니다.")
-    if st.button("사전·사후 검사로 이동", type="primary"):
-        st.switch_page("pages/2_assessment.py")
-    st.stop()
+
+def _progress_counts(responses: dict[str, object]) -> tuple[int, int]:
+    question_codes = {str(row["question_code"]) for row in questions}
+    answered = sum(code in responses for code in question_codes)
+    return answered, len(question_codes)
+
+
+def _render_incomplete_progress(phase: str, responses: dict[str, object]) -> None:
+    phase_label = "교육 후" if phase == "post" else "교육 전"
+    answered, total = _progress_counts(responses)
+    missing = max(total - answered, 0)
+    with st.container(border=True):
+        st.markdown(f"#### {phase_label} 검사 진행 상태")
+        c_answered, c_missing = st.columns(2)
+        c_answered.metric("저장된 응답", f"{answered}/{total}문항")
+        c_missing.metric("미응답", f"{missing}문항")
+        st.progress(answered / total if total else 0.0)
+        st.warning(
+            "검사가 최종 제출되기 전에는 임시 점수·교육 추천·결과 파일을 제공하지 않습니다. "
+            "검사 화면에서 남은 문항을 완료해 주세요."
+        )
+        if st.button("검사로 돌아가기", type="primary", key=f"resume_{phase}_assessment"):
+            st.switch_page("pages/2_assessment.py")
+
 
 has_pre_post = bool(pre_responses and post_responses and pre_complete and post_complete)
-if pre_responses and post_responses and not has_pre_post:
-    st.warning("사전·사후 검사가 모두 완료되어야 변화 리포트를 확정할 수 있습니다.")
-    c_pre, c_post = st.columns(2)
-    c_pre.metric("교육 전", "완료" if pre_complete else "진행 중")
-    c_post.metric("교육 후", "완료" if post_complete else "진행 중")
-    _render_pre_baseline_download(key="pre_baseline_download_incomplete")
-    if st.button("검사로 돌아가기", type="primary"):
-        st.switch_page("pages/2_assessment.py")
-    st.stop()
-if post_responses:
-    current_responses = post_responses
-    current_phase_label = "교육 후"
-elif pre_responses:
-    current_responses = pre_responses
-    current_phase_label = "교육 전"
+completed_pre_available = bool(pre_responses and pre_complete)
+completed_post_available = bool(post_responses and post_complete)
+active_phase = session_type if session_type in {"pre", "post"} else "pre"
+active_responses = post_responses if active_phase == "post" else pre_responses
+active_complete = post_complete if active_phase == "post" else pre_complete
+if post_responses and not post_complete:
+    pending_phase, pending_responses = "post", post_responses
+elif pre_responses and not pre_complete:
+    pending_phase, pending_responses = "pre", pre_responses
+elif not active_complete:
+    pending_phase, pending_responses = active_phase, active_responses
 else:
-    current_responses = legacy_responses
-    current_phase_label = {"pre": "교육 전", "post": "교육 후"}.get(session_type, "현재")
+    pending_phase, pending_responses = None, {}
+
+if not has_pre_post and completed_pre_available:
+    current_responses = pre_responses
+    current_phase_label = "교육 전 완료 결과"
+    report_phase = "pre"
+elif not has_pre_post and completed_post_available:
+    current_responses = post_responses
+    current_phase_label = "교육 후 완료 결과"
+    report_phase = "post"
+elif not has_pre_post:
+    page_header(
+        "개인 리포트",
+        f"{'교육 후' if active_phase == 'post' else '교육 전'} 검사 진행 중",
+        "최종 제출이 완료되면 점수와 교육 추천, 결과 파일을 확인할 수 있습니다.",
+        badge="미완료",
+        badge_tone="coral",
+    )
+    _render_incomplete_progress(active_phase, active_responses or legacy_responses)
+    st.stop()
+else:
+    current_responses = post_responses
+    current_phase_label = "교육 전·후 완료 결과"
+    report_phase = "post"
 
 results = score_responses(questions, current_responses, st.session_state.target_means)
 valid_results = [row for row in results if row["status"] == "산출"]
 
 page_header(
     "개인 리포트",
-    "나의 교육 전·후 역량평가" if has_pre_post else "나의 역량진단 결과",
+    "나의 교육 전·후 역량평가" if has_pre_post else current_phase_label,
     (
         "같은 문항에서 교육 전과 교육 후의 자기보고 행동빈도 변화를 확인합니다."
         if has_pre_post
@@ -114,6 +156,13 @@ page_header(
     ),
     badge="본인만 기본 열람",
 )
+
+if not has_pre_post and pending_phase:
+    st.warning(
+        "사전·사후 검사가 모두 완료되어야 변화 리포트를 확정할 수 있습니다. "
+        f"아래에는 {current_phase_label}만 표시하며, 진행 중 응답은 점수에 포함하지 않습니다."
+    )
+    _render_incomplete_progress(pending_phase, pending_responses)
 
 _render_pre_baseline_download(key="pre_baseline_download")
 
@@ -320,7 +369,7 @@ else:
         icon="i",
     )
 
-if has_pre_post or post_responses or session_type == "post":
+if has_pre_post or report_phase == "post":
     st.subheader("교육 후 후속지원")
     st.caption("사후점수가 낮다는 이유만으로 재교육을 자동 추천하지 않습니다.")
     callout(
