@@ -1,6 +1,19 @@
 from __future__ import annotations
 
+from importlib import reload
+
 import streamlit as st
+
+import tap.baseline_transfer as _baseline_transfer_module
+import tap.dashboard as _dashboard_module
+import tap.ui as _ui_module
+
+# Streamlit Cloud can hot-reload a page script while retaining imported local
+# modules from the previous commit.  Refresh the modules changed with this
+# entrypoint before importing their symbols so a deploy never mixes revisions.
+reload(_baseline_transfer_module)
+reload(_dashboard_module)
+reload(_ui_module)
 
 from tap.dashboard import build_session_dashboard
 from tap.state import ensure_state

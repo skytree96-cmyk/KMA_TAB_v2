@@ -123,6 +123,17 @@ class DashboardTests(unittest.TestCase):
         self.assertNotIn("83.8%", rendered)
         self.assertNotIn("216명", rendered)
 
+    def test_entrypoint_refreshes_local_modules_before_symbol_imports(self) -> None:
+        source = (ROOT / "streamlit_app.py").read_text(encoding="utf-8")
+        symbol_import = source.index("from tap.dashboard import build_session_dashboard")
+
+        for module_name in (
+            "_baseline_transfer_module",
+            "_dashboard_module",
+            "_ui_module",
+        ):
+            self.assertLess(source.index(f"reload({module_name})"), symbol_import)
+
     def test_demo_dashboard_contract(self) -> None:
         data = load_dashboard_demo()
         self.assertEqual(validate_dashboard_demo(data), [])
