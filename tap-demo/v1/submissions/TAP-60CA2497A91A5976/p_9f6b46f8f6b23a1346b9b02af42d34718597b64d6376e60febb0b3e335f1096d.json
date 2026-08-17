@@ -55,11 +55,44 @@
   "participant_key": "p_9f6b46f8f6b23a1346b9b02af42d34718597b64d6376e60febb0b3e335f1096d",
   "phases": {
     "post": {
-      "completed": false,
-      "completed_at": null,
-      "duration_seconds": null,
-      "responses": {},
-      "started_at": null
+      "completed": true,
+      "completed_at": "2026-08-17",
+      "duration_seconds": 79.59262013435364,
+      "responses": {
+        "Q-CI-01": 3,
+        "Q-CI-02": 5,
+        "Q-CI-03": 5,
+        "Q-CI-04": 4,
+        "Q-CL-01": 4,
+        "Q-CL-02": 4,
+        "Q-CL-03": 3,
+        "Q-CL-04": 5,
+        "Q-CO-01": 3,
+        "Q-CO-02": 4,
+        "Q-CO-03": 4,
+        "Q-CO-04": 5,
+        "Q-EX-01": 5,
+        "Q-EX-02": 5,
+        "Q-EX-03": 4,
+        "Q-EX-04": 4,
+        "Q-GM-01": 4,
+        "Q-GM-02": 4,
+        "Q-GM-03": 5,
+        "Q-GM-04": 4,
+        "Q-PD-01": 5,
+        "Q-PD-02": 4,
+        "Q-PD-03": 5,
+        "Q-PD-04": 5,
+        "Q-PS-01": 5,
+        "Q-PS-02": 4,
+        "Q-PS-03": 5,
+        "Q-PS-04": 4,
+        "Q-ST-01": 5,
+        "Q-ST-02": 5,
+        "Q-ST-03": 4,
+        "Q-ST-04": 4
+      },
+      "started_at": 1786947833.22782
     },
     "pre": {
       "completed": true,
@@ -105,6 +138,12 @@
   "project_id": "TAP-60CA2497A91A5976",
   "record_type": "submission",
   "schema_version": 1,
-  "transition_responses": {},
-  "updated_at": "2026-08-17T06:23:46Z"
+  "transition_responses": {
+    "application_opportunity": 4,
+    "barriers": [],
+    "resources_authority": 4,
+    "supervisor_support": 5,
+    "time_process_support": 4
+  },
+  "updated_at": "2026-08-17T06:25:13Z"
 }
