@@ -236,6 +236,17 @@ def _project_widget_key(prefix: str, project_key: str) -> str:
     return f"{prefix}_{suffix}"
 
 
+def _render_radar_component(artifact: dict[str, object]) -> None:
+    """Render SVG radar HTML without Streamlit Cloud's ``st.html`` sanitizer."""
+
+    st.iframe(
+        str(artifact.get("html") or ""),
+        width="stretch",
+        height="content",
+        tab_index=0,
+    )
+
+
 def _save_report_preview_code_and_unlock(state: MutableMapping[str, Any]) -> None:
     """Only an explicit preview-code edit unlocks a locked browser session."""
 
@@ -608,7 +619,7 @@ if source_kind in {"session", "store"} and participant_count_for_privacy < MIN_G
                 preferred_codes=preview_codes,
                 max_axes=min(8, len(selected_preview_rows)),
             )
-            st.html(preview_radar["html"])
+            _render_radar_component(preview_radar)
             if preview_radar["axis_count"] == 0:
                 st.info("N각형 레이더를 표시하려면 전·후 결과가 있는 역량이 3개 이상 필요합니다.")
 
@@ -786,7 +797,7 @@ if is_pre_post and pre_post_summary:
             preferred_codes=selected_public_codes,
             max_axes=min(8, len(selected_public_rows)),
         )
-        st.html(radar["html"])
+        _render_radar_component(radar)
     else:
         st.warning("N각형 레이더를 표시하려면 공개 역량을 3개 이상 선택해 주세요.")
 

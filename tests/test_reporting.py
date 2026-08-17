@@ -90,6 +90,18 @@ def _small_n_store_snapshot() -> tuple[dict[str, object], dict[str, object]]:
 
 
 class ReportingTests(unittest.TestCase):
+    def test_organization_report_uses_cloud_safe_svg_iframe(self) -> None:
+        source = (ROOT / "pages" / "4_organization_report.py").read_text(
+            encoding="utf-8"
+        )
+
+        self.assertIn("st.iframe(", source)
+        self.assertIn('height="content"', source)
+        self.assertNotIn("streamlit.components.v1", source)
+        self.assertNotIn("components.html(", source)
+        self.assertNotIn('st.html(preview_radar["html"])', source)
+        self.assertNotIn('st.html(radar["html"])', source)
+
     def test_group_csv_rejects_duplicate_headers_before_pandas_mangles_them(self) -> None:
         raw = (
             "participant_id,participant_id,factor_code,score_1_to_5\n"
@@ -835,6 +847,16 @@ class ReportingTests(unittest.TestCase):
             {item.label for item in app.get("download_button")},
         )
         self.assertTrue(any(item.label == "교육 전 참여" for item in app.metric))
+        frames = app.get("iframe")
+        self.assertEqual(1, len(frames))
+        frame = frames[0]
+        self.assertEqual("iframe", frame.type)
+        self.assertIn("<svg", frame.proto.srcdoc)
+        self.assertIn('data-axis-count="3"', frame.proto.srcdoc)
+        self.assertIn("<table", frame.proto.srcdoc)
+        self.assertTrue(frame.proto.scrolling)
+        self.assertTrue(frame.proto.HasField("tab_index"))
+        self.assertEqual(0, frame.proto.tab_index)
 
     def test_organization_report_does_not_auto_show_sample(self) -> None:
         app = AppTest.from_file(str(ROOT / "pages" / "4_organization_report.py"), default_timeout=30).run()
