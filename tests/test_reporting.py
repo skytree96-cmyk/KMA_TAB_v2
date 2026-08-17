@@ -2,12 +2,16 @@ from __future__ import annotations
 
 import re
 import unittest
+from copy import deepcopy
 from pathlib import Path
+from unittest.mock import MagicMock, patch
 
 import pandas as pd
+import streamlit as st
 from streamlit.testing.v1 import AppTest
 
 from tap.data import load_competencies, questions_for_factors
+from tap.github_demo_store import DemoStoreConfig
 from tap.reporting import (
     build_organization_report_model,
     build_pre_post_group_summary,
@@ -27,6 +31,62 @@ COMPETENCIES = [
     }
 ]
 ROOT = Path(__file__).resolve().parents[1]
+
+
+def _small_n_store_snapshot() -> tuple[dict[str, object], dict[str, object]]:
+    project_id = "TAP-SMALL-N-PREVIEW"
+    selected_factors = ["CORE-CO", "CORE-CL", "CORE-GM"]
+    questions = questions_for_factors(selected_factors)
+    question_codes = [str(row["question_code"]) for row in questions]
+    pre_responses = {code: 2 for code in question_codes}
+    post_responses = {code: 4 for code in question_codes}
+    project: dict[str, object] = {
+        "schema_version": 1,
+        "demo_only": True,
+        "record_type": "project",
+        "project_id": project_id,
+        "project_name": "소표본 화면 검증",
+        "selected_factors": selected_factors,
+        "question_snapshot_codes": question_codes,
+        "question_snapshot_hash": "",
+        "assessment_version": "TAP-1.0",
+        "target_level": "staff",
+        "target_means": {},
+        "organization_priorities": [],
+        "allow_schedule_override": True,
+        "pre_start_date": "2026-08-01",
+        "post_end_date": "2026-10-01",
+        "updated_at": "2026-10-01T12:00:00Z",
+    }
+    submission: dict[str, object] = {
+        "schema_version": 1,
+        "demo_only": True,
+        "record_type": "submission",
+        "project_id": project_id,
+        "participant_key": "p_" + "a" * 64,
+        "instrument": {
+            "assessment_version": "TAP-1.0",
+            "target_level": "staff",
+            "question_snapshot_hash": "",
+            "question_snapshot_codes": question_codes,
+            "selected_factors": selected_factors,
+        },
+        "phases": {
+            "pre": {
+                "responses": pre_responses,
+                "completed": True,
+                "completed_at": "2026-08-01",
+            },
+            "post": {
+                "responses": post_responses,
+                "completed": True,
+                "completed_at": "2026-10-01",
+            },
+        },
+        "transition_responses": {},
+        "updated_at": "2026-10-01T12:00:00Z",
+    }
+    return project, submission
 
 
 class ReportingTests(unittest.TestCase):
@@ -470,11 +530,311 @@ class ReportingTests(unittest.TestCase):
         self.assertTrue(any("실제 완료 결과 1명" in str(item.value) for item in app.warning))
         self.assertTrue(any(item.label == "내 실제 교육 전·후 비교 보기" for item in app.button))
         self.assertFalse(any("합성 예시" in str(item.value) for item in app.warning))
+        self.assertFalse(
+            any(item.label == "리포트 미리보기 코드" for item in app.text_input),
+            "현재 브라우저 결과에는 관리자용 소표본 미리보기를 열어서는 안 됩니다.",
+        )
         self.assertEqual(
             {"교육 전 완료", "교육 후 완료", "전·후 짝지음"},
             {item.label for item in app.metric},
             "N<5에서는 완료 건수만 보여주고 평균·변화량 조직 지표는 숨겨야 합니다.",
         )
+
+    def test_small_n_store_preview_requires_code_and_explicit_opt_in(self) -> None:
+        preview_code = "report-preview-secret"
+        config = DemoStoreConfig(
+            enabled=True,
+            owner="example",
+            repo="tap-demo",
+            report_preview_code=preview_code,
+        )
+        project, submission = _small_n_store_snapshot()
+        store = MagicMock()
+        store.status.return_value = {"read_enabled": True}
+        store.list_projects.return_value = [project]
+        store.list_submissions.return_value = [submission]
+
+        st.cache_data.clear()
+        self.addCleanup(st.cache_data.clear)
+        with (
+            patch(
+                "tap.github_demo_store.DemoStoreConfig.from_sources",
+                return_value=config,
+            ),
+            patch("tap.github_demo_store.GitHubDemoStore", return_value=store),
+        ):
+            app = AppTest.from_file(
+                str(ROOT / "pages" / "4_organization_report.py"),
+                default_timeout=30,
+            ).run()
+
+            self.assertEqual([], [str(item.value) for item in app.exception])
+            code_input = next(
+                item for item in app.text_input if item.label == "리포트 미리보기 코드"
+            )
+            preview_toggle = next(
+                item
+                for item in app.toggle
+                if item.label == "소표본 실제값을 화면에서만 미리보기"
+            )
+            self.assertTrue(preview_toggle.disabled)
+            self.assertFalse(any(item.label == "교육 전 참여" for item in app.metric))
+            self.assertFalse(any("외부 공유·캡처" in str(item.value) for item in app.warning))
+
+            code_input.set_value("wrong-code")
+            app.run()
+            preview_toggle = next(
+                item
+                for item in app.toggle
+                if item.label == "소표본 실제값을 화면에서만 미리보기"
+            )
+            self.assertTrue(preview_toggle.disabled)
+            self.assertFalse(any(item.label == "교육 전 참여" for item in app.metric))
+
+            next(
+                item for item in app.text_input if item.label == "리포트 미리보기 코드"
+            ).set_value(preview_code)
+            app.run()
+            preview_toggle = next(
+                item
+                for item in app.toggle
+                if item.label == "소표본 실제값을 화면에서만 미리보기"
+            )
+            self.assertFalse(preview_toggle.disabled)
+            preview_toggle.set_value(True)
+            app.run()
+
+            self.assertEqual([], [str(item.value) for item in app.exception])
+            self.assertTrue(any(item.label == "교육 전 참여" for item in app.metric))
+            self.assertTrue(any(item.label == "짝지어진 참여" for item in app.metric))
+            self.assertTrue(
+                any("외부 공유·캡처·인쇄 금지" in str(item.value) for item in app.warning)
+            )
+            self.assertFalse(
+                any(item.label == "소표본 역량별 값 보기" for item in app.expander)
+            )
+            self.assertEqual(0, len(app.dataframe))
+            preview_downloads = {item.label for item in app.get("download_button")}
+            self.assertNotIn("인쇄용 리포트 HTML", preview_downloads)
+            self.assertNotIn("상세 결과 CSV", preview_downloads)
+            self.assertNotIn("사전·사후 CSV 양식", preview_downloads)
+            self.assertFalse(
+                any(
+                    item.label == "CSV 파일로 직접 비교하기 · 보조 기능"
+                    for item in app.expander
+                )
+            )
+            lock_button = next(
+                item for item in app.button if item.label == "미리보기 잠금"
+            )
+            lock_button.click()
+            app.run()
+            self.assertEqual("", next(
+                item for item in app.text_input if item.label == "리포트 미리보기 코드"
+            ).value)
+            self.assertFalse(any(item.label == "교육 전 참여" for item in app.metric))
+
+    def test_small_n_preview_reuses_legacy_access_code_in_same_session(self) -> None:
+        legacy_code = "legacy-planning-code"
+        config = DemoStoreConfig(
+            enabled=True,
+            owner="example",
+            repo="tap-demo",
+            access_code=legacy_code,
+        )
+        project, submission = _small_n_store_snapshot()
+        store = MagicMock()
+        store.status.return_value = {"read_enabled": True}
+        store.list_projects.return_value = [project]
+        store.list_submissions.return_value = [submission]
+
+        st.cache_data.clear()
+        self.addCleanup(st.cache_data.clear)
+        with (
+            patch(
+                "tap.github_demo_store.DemoStoreConfig.from_sources",
+                return_value=config,
+            ),
+            patch("tap.github_demo_store.GitHubDemoStore", return_value=store),
+        ):
+            app = AppTest.from_file(
+                str(ROOT / "pages" / "4_organization_report.py"),
+                default_timeout=30,
+            ).run()
+            app.session_state["demo_store_access_code"] = legacy_code
+            app.run()
+
+        preview_input = next(
+            item for item in app.text_input if item.label == "리포트 미리보기 코드"
+        )
+        preview_toggle = next(
+            item
+            for item in app.toggle
+            if item.label == "소표본 실제값을 화면에서만 미리보기"
+        )
+        self.assertEqual(legacy_code, preview_input.value)
+        self.assertFalse(preview_toggle.disabled)
+
+    def test_small_n_preview_lock_survives_project_switches(self) -> None:
+        legacy_code = "legacy-planning-code"
+        config = DemoStoreConfig(
+            enabled=True,
+            owner="example",
+            repo="tap-demo",
+            access_code=legacy_code,
+        )
+        project_a, submission_a = _small_n_store_snapshot()
+        project_b = deepcopy(project_a)
+        project_b["project_id"] = "TAP-SMALL-N-PREVIEW-B"
+        project_b["project_name"] = "소표본 화면 검증 B"
+        submission_b = deepcopy(submission_a)
+        submission_b["project_id"] = project_b["project_id"]
+        submission_b["participant_key"] = "p_" + "b" * 64
+        store = MagicMock()
+        store.status.return_value = {"read_enabled": True}
+        store.list_projects.return_value = [project_a, project_b]
+        store.list_submissions.return_value = [submission_a, submission_b]
+
+        st.cache_data.clear()
+        self.addCleanup(st.cache_data.clear)
+        with (
+            patch(
+                "tap.github_demo_store.DemoStoreConfig.from_sources",
+                return_value=config,
+            ),
+            patch("tap.github_demo_store.GitHubDemoStore", return_value=store),
+        ):
+            app = AppTest.from_file(
+                str(ROOT / "pages" / "4_organization_report.py"),
+                default_timeout=30,
+            ).run()
+            app.session_state["demo_store_access_code"] = legacy_code
+            app.run()
+            next(item for item in app.button if item.label == "미리보기 잠금").click()
+            app.run()
+
+            project_select = next(
+                item for item in app.selectbox if item.label == "프로젝트 선택"
+            )
+            project_select.set_value(f"store:{project_b['project_id']}")
+            app.run()
+            self.assertEqual(
+                "",
+                next(
+                    item
+                    for item in app.text_input
+                    if item.label == "리포트 미리보기 코드"
+                ).value,
+            )
+            self.assertTrue(
+                next(
+                    item
+                    for item in app.toggle
+                    if item.label == "소표본 실제값을 화면에서만 미리보기"
+                ).disabled
+            )
+
+            next(
+                item for item in app.selectbox if item.label == "프로젝트 선택"
+            ).set_value(f"store:{project_a['project_id']}")
+            app.run()
+            self.assertEqual(
+                "",
+                next(
+                    item
+                    for item in app.text_input
+                    if item.label == "리포트 미리보기 코드"
+                ).value,
+            )
+            self.assertTrue(
+                next(
+                    item
+                    for item in app.toggle
+                    if item.label == "소표본 실제값을 화면에서만 미리보기"
+                ).disabled
+            )
+
+    def test_small_n_preview_rejects_non_demo_store_project(self) -> None:
+        config = DemoStoreConfig(
+            enabled=True,
+            owner="example",
+            repo="tap-demo",
+            report_preview_code="report-preview-secret",
+        )
+        project, submission = _small_n_store_snapshot()
+        project["demo_only"] = False
+        store = MagicMock()
+        store.status.return_value = {"read_enabled": True}
+        store.list_projects.return_value = [project]
+        store.list_submissions.return_value = [submission]
+
+        st.cache_data.clear()
+        self.addCleanup(st.cache_data.clear)
+        with (
+            patch(
+                "tap.github_demo_store.DemoStoreConfig.from_sources",
+                return_value=config,
+            ),
+            patch("tap.github_demo_store.GitHubDemoStore", return_value=store),
+        ):
+            app = AppTest.from_file(
+                str(ROOT / "pages" / "4_organization_report.py"),
+                default_timeout=30,
+            ).run()
+
+        self.assertEqual([], [str(item.value) for item in app.exception])
+        self.assertFalse(
+            any(item.label == "리포트 미리보기 코드" for item in app.text_input)
+        )
+        self.assertTrue(
+            any(
+                item.label == "CSV 파일로 직접 비교하기 · 보조 기능"
+                for item in app.expander
+            )
+        )
+
+    def test_five_paired_store_participants_keep_normal_public_report(self) -> None:
+        config = DemoStoreConfig(
+            enabled=True,
+            owner="example",
+            repo="tap-demo",
+            report_preview_code="report-preview-secret",
+        )
+        project, submission = _small_n_store_snapshot()
+        submissions: list[dict[str, object]] = []
+        for index in range(5):
+            item = deepcopy(submission)
+            item["participant_key"] = f"p_{index:064x}"
+            item["updated_at"] = f"2026-10-01T12:00:0{index}Z"
+            submissions.append(item)
+        store = MagicMock()
+        store.status.return_value = {"read_enabled": True}
+        store.list_projects.return_value = [project]
+        store.list_submissions.return_value = submissions
+
+        st.cache_data.clear()
+        self.addCleanup(st.cache_data.clear)
+        with (
+            patch(
+                "tap.github_demo_store.DemoStoreConfig.from_sources",
+                return_value=config,
+            ),
+            patch("tap.github_demo_store.GitHubDemoStore", return_value=store),
+        ):
+            app = AppTest.from_file(
+                str(ROOT / "pages" / "4_organization_report.py"),
+                default_timeout=30,
+            ).run()
+
+        self.assertEqual([], [str(item.value) for item in app.exception])
+        self.assertFalse(
+            any(item.label == "리포트 미리보기 코드" for item in app.text_input)
+        )
+        self.assertIn(
+            "인쇄용 리포트 HTML",
+            {item.label for item in app.get("download_button")},
+        )
+        self.assertTrue(any(item.label == "교육 전 참여" for item in app.metric))
 
     def test_organization_report_does_not_auto_show_sample(self) -> None:
         app = AppTest.from_file(str(ROOT / "pages" / "4_organization_report.py"), default_timeout=30).run()

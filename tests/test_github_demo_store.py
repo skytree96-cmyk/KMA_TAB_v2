@@ -192,6 +192,7 @@ class GitHubDemoStoreTests(unittest.TestCase):
                     "token": "secret-token",
                     "participant_hash_salt": "secret-salt",
                     "access_code": "secret-access-code",
+                    "admin_preview_code": "secret-preview-code",
                 }
             },
             environ={
@@ -206,6 +207,8 @@ class GitHubDemoStoreTests(unittest.TestCase):
         self.assertEqual("secret-token", config.token)
         self.assertEqual("secret-salt", config.salt)
         self.assertTrue(config.access_granted("secret-access-code"))
+        self.assertTrue(config.report_preview_granted("secret-preview-code"))
+        self.assertFalse(config.report_preview_granted("secret-access-code"))
         self.assertTrue(config.enabled)
         self.assertTrue(config.read_enabled)
         self.assertTrue(config.write_enabled)
@@ -228,6 +231,7 @@ class GitHubDemoStoreTests(unittest.TestCase):
                 "GITHUB_DEMO_STORE_TOKEN": "token",
                 "GITHUB_DEMO_STORE_PARTICIPANT_SALT": "salt",
                 "GITHUB_DEMO_STORE_ACCESS_CODE": "access-code",
+                "GITHUB_DEMO_STORE_REPORT_PREVIEW_CODE": "preview-code",
             },
         )
         self.assertEqual(("sample-owner", "sample-repo"), (config.owner, config.repo))
@@ -235,6 +239,7 @@ class GitHubDemoStoreTests(unittest.TestCase):
         self.assertEqual("token", config.token)
         self.assertEqual("salt", config.salt)
         self.assertTrue(config.access_granted("access-code"))
+        self.assertTrue(config.report_preview_granted("preview-code"))
         with self.assertRaisesRegex(DemoStoreError, "enabled=true"):
             DemoStoreConfig(enabled=True)
 
@@ -308,6 +313,41 @@ class GitHubDemoStoreTests(unittest.TestCase):
         self.assertTrue(allowed.status()["write_enabled"])
         allowed.save_project(project)
         self.assertEqual(1, len([row for row in self.transport.requests if row["method"] == "PUT"]))
+
+    def test_report_preview_code_fallback_and_read_only_gate(self) -> None:
+        fallback = DemoStoreConfig(
+            enabled=True,
+            owner="public",
+            repo="demo",
+            access_code="legacy-code",
+        )
+        self.assertFalse(fallback.write_enabled)
+        self.assertTrue(fallback.report_preview_granted("legacy-code"))
+        self.assertFalse(fallback.report_preview_granted("wrong-code"))
+
+        separate = DemoStoreConfig(
+            enabled=True,
+            owner="public",
+            repo="demo",
+            token="private-token",
+            salt="private-salt",
+            access_code="legacy-code",
+            report_preview_code="preview-only-code",
+        )
+        self.assertTrue(separate.report_preview_granted("preview-only-code"))
+        self.assertFalse(separate.report_preview_granted("legacy-code"))
+        self.assertNotIn("legacy-code", repr(separate))
+        self.assertNotIn("preview-only-code", repr(separate))
+        self.assertNotIn("private-token", repr(separate))
+        self.assertNotIn("private-salt", repr(separate))
+
+        disabled = DemoStoreConfig(
+            enabled=False,
+            owner="public",
+            repo="demo",
+            report_preview_code="preview-only-code",
+        )
+        self.assertFalse(disabled.report_preview_granted("preview-only-code"))
 
     def test_project_builder_is_allowlisted_and_restorable(self) -> None:
         state = project_state()
@@ -539,6 +579,11 @@ class GitHubDemoStoreTests(unittest.TestCase):
             submission_payload_from_state(bad_state, salt=self.config.salt)
         with self.assertRaises(DemoStoreError):
             project_payload_from_state({"project_id": "../../escape"})
+
+        duplicate_factors = project_state()
+        duplicate_factors["selected_factors"] = ["CORE-CO", "CORE-CO"]
+        with self.assertRaisesRegex(DemoStoreError, "중복 없는"):
+            project_payload_from_state(duplicate_factors)
 
     def test_completed_snapshot_requires_all_items_and_pre_before_post(self) -> None:
         partial = submission_state(post_complete=False)

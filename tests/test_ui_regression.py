@@ -79,6 +79,8 @@ class UiRegressionTests(unittest.TestCase):
         self.assertIn("교육 전·후 완료 결과만 저장", source)
         self.assertIn("‘교육 전 검사’ 또는 ‘교육 후 검사’를 먼저 선택", source)
         self.assertIn("미연결 때에는 동일 브라우저에서 시작하거나 기준파일(JSON)", source)
+        self.assertIn("소표본 실제값을 화면에서만 미리보기", source)
+        self.assertIn("다운로드·인쇄·외부 공유 대상이 아닙니다", source)
 
     def test_dark_theme_tokens_and_fixed_paper_report_exist(self) -> None:
         source = (ROOT / "tap" / "ui.py").read_text(encoding="utf-8")

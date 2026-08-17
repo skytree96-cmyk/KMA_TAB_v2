@@ -437,10 +437,67 @@ def build_pre_post_radar(
     }
 
 
+def build_planning_preview_radar(
+    rows: Iterable[Mapping[str, Any]],
+    *,
+    paired_n: int,
+    title: str = "교육 전후 역량 비교 · 소표본 기획검증 미리보기",
+    preferred_codes: Iterable[str] = (),
+    max_axes: int = MAX_RADAR_AXES,
+) -> dict[str, Any]:
+    """Return a screen-only small-N radar for an explicitly gated demo flow.
+
+    ``rows`` must already have been restricted to the intended project and
+    selected factors by the caller.  This helper deliberately relaxes only the
+    paired-N chart threshold; all ordinary public report builders retain the
+    default N>=5 rule.  The normal radar normaliser also ensures that unrelated
+    input fields (including participant identifiers) are never copied into the
+    generated HTML.
+
+    The wrapper is hidden when printing and carries a repeated, unmistakable
+    planning-preview watermark.  Callers must still enforce access control and
+    must not expose this artifact through a download action.
+    """
+    clean_paired_n = _paired_count(paired_n)
+    if clean_paired_n is None or clean_paired_n < 1:
+        raise ValueError("paired_n must be a positive integer")
+
+    artifact = build_pre_post_radar(
+        rows,
+        title=title,
+        min_paired_n=1,
+        preferred_codes=preferred_codes,
+        max_axes=max_axes,
+    )
+    watermark = escape(
+        f"기획검증용 · 소표본 N={clean_paired_n} · 외부 공유 금지"
+    )
+    preview_html = f"""
+    <section class="tap-planning-preview" data-preview-mode="true" data-paired-n="{clean_paired_n}" aria-label="기획검증용 소표본 미리보기">
+      <style>
+        .tap-planning-preview{{position:relative;border:2px solid #d97706;border-radius:22px;padding:12px;background:#fffbeb;color:#78350f}}
+        .tap-planning-preview-watermark{{display:block;margin:0 0 10px;padding:10px 14px;border-radius:12px;background:#fef3c7;color:#92400e;text-align:center;font-family:Pretendard,"Noto Sans KR","Malgun Gothic",sans-serif;font-size:15px;font-weight:850;letter-spacing:.01em}}
+        .tap-planning-preview-watermark:last-child{{margin:10px 0 0}}
+        @media print{{.tap-planning-preview{{display:none!important}}}}
+      </style>
+      <div class="tap-planning-preview-watermark" role="note">{watermark}</div>
+      {artifact['html']}
+      <div class="tap-planning-preview-watermark" role="note">{watermark}</div>
+    </section>
+    """
+    return {
+        **artifact,
+        "preview_mode": True,
+        "paired_n": clean_paired_n,
+        "html": preview_html,
+    }
+
+
 __all__ = [
     "DEFAULT_MIN_PAIRED_N",
     "MAX_RADAR_AXES",
     "MIN_RADAR_AXES",
+    "build_planning_preview_radar",
     "build_pre_post_radar",
     "build_pre_post_radar_html",
     "prepare_radar_data",

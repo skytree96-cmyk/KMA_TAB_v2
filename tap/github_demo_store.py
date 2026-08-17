@@ -154,6 +154,7 @@ class DemoStoreConfig:
     branch: str = DEFAULT_BRANCH
     salt: str = field(default="", repr=False)
     access_code: str = field(default="", repr=False)
+    report_preview_code: str = field(default="", repr=False)
     api_url: str = DEFAULT_API_URL
     root_path: str = ROOT_PATH
 
@@ -167,6 +168,7 @@ class DemoStoreConfig:
             "branch",
             "salt",
             "access_code",
+            "report_preview_code",
             "api_url",
             "root_path",
         ):
@@ -214,6 +216,23 @@ class DemoStoreConfig:
             and hmac.compare_digest(self.access_code, _clean(candidate))
         )
 
+    def report_preview_granted(self, candidate: Any) -> bool:
+        """Constant-time check for the read-only small-sample report preview.
+
+        A separately configured preview code takes precedence. Falling back
+        to the legacy shared access code keeps existing planning-demo setups
+        working, but this gate is not a substitute for production RBAC.
+        Unlike the write gate, report preview does not require a GitHub token.
+        """
+
+        configured_code = self.report_preview_code or self.access_code
+        return bool(
+            self.enabled
+            and self.configured
+            and configured_code
+            and hmac.compare_digest(configured_code, _clean(candidate))
+        )
+
     @classmethod
     def from_sources(
         cls,
@@ -224,7 +243,8 @@ class DemoStoreConfig:
 
         Environment variables take precedence.  Supported canonical names are
         ``TAP_DEMO_GITHUB_OWNER``, ``..._REPO``, ``..._TOKEN``, ``..._BRANCH``,
-        ``..._SALT``, ``..._ACCESS_CODE`` and ``..._API_URL``.  A
+        ``..._SALT``, ``..._ACCESS_CODE``, ``..._REPORT_PREVIEW_CODE`` and
+        ``..._API_URL``. A
         ``[github_demo_store]`` secrets section may use the corresponding
         short names.
         """
@@ -317,6 +337,16 @@ class DemoStoreConfig:
             )
             or secret("access_code", "test_access_code")
         )
+        report_preview_code = _clean(
+            _first(
+                env,
+                "GITHUB_DEMO_STORE_REPORT_PREVIEW_CODE",
+                "TAP_DEMO_GITHUB_REPORT_PREVIEW_CODE",
+                "GITHUB_DEMO_STORE_ADMIN_PREVIEW_CODE",
+                "TAP_DEMO_GITHUB_ADMIN_PREVIEW_CODE",
+            )
+            or secret("report_preview_code", "admin_preview_code")
+        )
         api_url = _clean(
             _first(env, "TAP_DEMO_GITHUB_API_URL", "GITHUB_DEMO_API_URL")
             or secret("api_url")
@@ -330,6 +360,7 @@ class DemoStoreConfig:
             branch=branch,
             salt=salt,
             access_code=access_code,
+            report_preview_code=report_preview_code,
             api_url=api_url,
         )
 
@@ -525,8 +556,15 @@ def _validate_project_payload(payload: Mapping[str, Any]) -> None:
         "post",
     }:
         raise DemoStoreError("current_assessment_phase는 pre 또는 post여야 합니다.")
-    if not isinstance(payload.get("selected_factors"), list):
+    selected_factors = payload.get("selected_factors")
+    if not isinstance(selected_factors, list):
         raise DemoStoreError("selected_factors는 목록이어야 합니다.")
+    if (
+        not selected_factors
+        or any(not isinstance(code, str) or not _clean(code) for code in selected_factors)
+        or len(selected_factors) != len(set(selected_factors))
+    ):
+        raise DemoStoreError("selected_factors는 중복 없는 비어 있지 않은 문자열 목록이어야 합니다.")
     if not isinstance(payload.get("target_means"), Mapping):
         raise DemoStoreError("target_means는 객체여야 합니다.")
     if not isinstance(payload.get("question_snapshot_codes"), list):

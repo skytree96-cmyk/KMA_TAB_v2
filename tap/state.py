@@ -8,6 +8,8 @@ ASSESSMENT_PHASES = ("pre", "post")
 PARTICIPANT_ID_WIDGET_KEY = "_participant_id_input"
 DEMO_STORE_ACCESS_CODE_KEY = "demo_store_access_code"
 DEMO_STORE_ACCESS_CODE_WIDGET_KEY = "_demo_store_access_code_input"
+DEMO_STORE_REPORT_PREVIEW_CODE_KEY = "demo_store_report_preview_code"
+DEMO_STORE_REPORT_PREVIEW_CODE_WIDGET_KEY = "_demo_store_report_preview_code_input"
 
 
 DEFAULTS: dict[str, Any] = {
@@ -19,6 +21,7 @@ DEFAULTS: dict[str, Any] = {
     "course_name": "공통역량 교육",
     "participant_id": "",
     "demo_store_access_code": "",
+    "demo_store_report_preview_code": "",
     "assessment_version": "TAP-1.0",
     "question_snapshot_hash": "",
     "question_snapshot_codes": [],
@@ -99,6 +102,24 @@ def save_demo_store_access_code_widget(state: MutableMapping[str, Any]) -> str:
     access_code = str(state.get(DEMO_STORE_ACCESS_CODE_WIDGET_KEY, "")).strip()
     state[DEMO_STORE_ACCESS_CODE_KEY] = access_code
     return access_code
+
+
+def load_demo_store_report_preview_code_widget(state: MutableMapping[str, Any]) -> str:
+    """Restore the durable report-preview code into its disposable widget."""
+
+    preview_code = str(state.get(DEMO_STORE_REPORT_PREVIEW_CODE_KEY, ""))
+    state[DEMO_STORE_REPORT_PREVIEW_CODE_WIDGET_KEY] = preview_code
+    return preview_code
+
+
+def save_demo_store_report_preview_code_widget(state: MutableMapping[str, Any]) -> str:
+    """Persist the report-preview widget without reusing participant access state."""
+
+    preview_code = str(
+        state.get(DEMO_STORE_REPORT_PREVIEW_CODE_WIDGET_KEY, "")
+    ).strip()
+    state[DEMO_STORE_REPORT_PREVIEW_CODE_KEY] = preview_code
+    return preview_code
 
 
 def _ensure_phase_mapping(

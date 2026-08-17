@@ -1,3 +1,3 @@
 streamlit==1.61.1
 pandas>=2.2,<4
-# Rebuild marker: project-select report and radar rollout hotfix (2026-08-17).
+# Rebuild marker: authenticated small-sample radar preview rollout (2026-08-17).

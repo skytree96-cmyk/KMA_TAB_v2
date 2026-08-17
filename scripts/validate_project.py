@@ -203,6 +203,8 @@ def main() -> int:
             "session_type",
             "실시 프로젝트에서 리포트 열기",
             "build_pre_post_radar",
+            "build_planning_preview_radar",
+            "소표본 실제값을 화면에서만 미리보기",
         ),
         ROOT / "pages" / "7_pre_assessment.py": ('"TAP_FORCED_ASSESSMENT_PHASE": "pre"',),
         ROOT / "pages" / "8_post_assessment.py": ('"TAP_FORCED_ASSESSMENT_PHASE": "post"',),
@@ -221,6 +223,7 @@ def main() -> int:
             "def save_project(",
             "def save_submission(",
             "def access_granted(",
+            "def report_preview_granted(",
             "status == 409",
         ),
         ROOT / "pages" / "0_user_guide.py": (
@@ -245,12 +248,14 @@ def main() -> int:
             "Read and write",
             "participant_hash_salt",
             "access_code",
+            "report_preview_code",
         ),
         ROOT / ".streamlit" / "secrets.toml.example": (
             "[github_demo_store]",
             'branch = "demo-data"',
             "participant_hash_salt",
             "access_code",
+            "report_preview_code",
         ),
     }
     for path, markers in github_demo_contract.items():

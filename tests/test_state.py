@@ -3,14 +3,18 @@ import unittest
 from tap.state import (
     DEMO_STORE_ACCESS_CODE_KEY,
     DEMO_STORE_ACCESS_CODE_WIDGET_KEY,
+    DEMO_STORE_REPORT_PREVIEW_CODE_KEY,
+    DEMO_STORE_REPORT_PREVIEW_CODE_WIDGET_KEY,
     PARTICIPANT_ID_WIDGET_KEY,
     activate_assessment_phase,
     ensure_state,
     load_demo_store_access_code_widget,
+    load_demo_store_report_preview_code_widget,
     load_participant_id_widget,
     reset_all_assessments,
     reset_assessment,
     save_demo_store_access_code_widget,
+    save_demo_store_report_preview_code_widget,
     save_participant_id_widget,
     sync_assessment_phase,
 )
@@ -149,6 +153,27 @@ class StateTests(unittest.TestCase):
         self.assertEqual("demo-code", state[DEMO_STORE_ACCESS_CODE_KEY])
         self.assertEqual("demo-code", load_demo_store_access_code_widget(state))
         self.assertEqual("demo-code", state[DEMO_STORE_ACCESS_CODE_WIDGET_KEY])
+
+    def test_report_preview_code_has_separate_durable_widget_state(self):
+        state = {}
+        ensure_state(state)
+        load_demo_store_report_preview_code_widget(state)
+        state[DEMO_STORE_REPORT_PREVIEW_CODE_WIDGET_KEY] = "  report-only-code  "
+        save_demo_store_report_preview_code_widget(state)
+
+        del state[DEMO_STORE_REPORT_PREVIEW_CODE_WIDGET_KEY]
+        activate_assessment_phase(state, "post")
+
+        self.assertEqual("", state[DEMO_STORE_ACCESS_CODE_KEY])
+        self.assertEqual(
+            "report-only-code", state[DEMO_STORE_REPORT_PREVIEW_CODE_KEY]
+        )
+        self.assertEqual(
+            "report-only-code", load_demo_store_report_preview_code_widget(state)
+        )
+        self.assertEqual(
+            "report-only-code", state[DEMO_STORE_REPORT_PREVIEW_CODE_WIDGET_KEY]
+        )
 
 
 if __name__ == "__main__":

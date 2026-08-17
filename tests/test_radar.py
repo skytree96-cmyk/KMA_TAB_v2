@@ -1,6 +1,7 @@
 import unittest
 
 from tap.radar import (
+    build_planning_preview_radar,
     build_pre_post_radar,
     build_pre_post_radar_html,
     prepare_radar_data,
@@ -135,6 +136,63 @@ class RadarTests(unittest.TestCase):
             select_radar_factors([_row(1)], min_paired_n=0)
         with self.assertRaises(ValueError):
             select_radar_factors([_row(1)], max_axes=9)
+
+    def test_planning_preview_renders_small_n_values_with_visible_print_safe_watermark(self) -> None:
+        rows = [
+            {
+                **_row(index, pre=1.25 + index / 10, post=4.25 + index / 10, paired_n=1),
+                "participant_id": "PARTICIPANT-SECRET",
+            }
+            for index in range(1, 4)
+        ]
+
+        artifact = build_planning_preview_radar(
+            rows,
+            paired_n=1,
+            preferred_codes=["F3", "F1", "F2"],
+        )
+        html = artifact["html"]
+
+        self.assertTrue(artifact["preview_mode"])
+        self.assertEqual(1, artifact["paired_n"])
+        self.assertEqual(3, artifact["axis_count"])
+        self.assertIn('data-preview-mode="true"', html)
+        self.assertIn('data-axis-count="3"', html)
+        self.assertIn("1.35", html)
+        self.assertIn("4.55", html)
+        self.assertGreaterEqual(
+            html.count("기획검증용 · 소표본 N=1 · 외부 공유 금지"),
+            2,
+        )
+        self.assertIn("@media print", html)
+        self.assertIn("display:none!important", html)
+        self.assertNotIn("PARTICIPANT-SECRET", html)
+
+    def test_normal_radar_still_suppresses_small_n_values_by_default(self) -> None:
+        rows = [_row(index, pre=1.17, post=4.91, paired_n=1) for index in range(1, 4)]
+
+        artifact = build_pre_post_radar(rows)
+
+        self.assertEqual(0, artifact["axis_count"])
+        self.assertIn('data-axis-count="0"', artifact["html"])
+        self.assertNotIn("1.17", artifact["html"])
+        self.assertNotIn("4.91", artifact["html"])
+        self.assertNotIn("<svg", artifact["html"])
+
+    def test_planning_preview_escapes_title_and_factor_names(self) -> None:
+        rows = [_row(index, paired_n=1) for index in range(1, 4)]
+        rows[0]["factor_name_ko"] = '<img src=x onerror="alert(1)">'
+
+        html = build_planning_preview_radar(
+            rows,
+            paired_n=1,
+            title="<script>alert(1)</script>",
+        )["html"]
+
+        self.assertNotIn("<script>alert(1)</script>", html)
+        self.assertNotIn("<img src=x", html)
+        self.assertIn("&lt;script&gt;alert(1)&lt;/script&gt;", html)
+        self.assertIn("&lt;img", html)
 
 
 if __name__ == "__main__":
