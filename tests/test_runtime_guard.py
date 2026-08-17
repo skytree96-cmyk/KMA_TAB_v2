@@ -121,6 +121,16 @@ class RuntimeGuardTests(unittest.TestCase):
                 "tap.github_demo_store",
                 "tap.ui",
             },
+            "pages/7_pre_assessment.py": {
+                "tap.baseline_transfer",
+                "tap.github_demo_store",
+                "tap.ui",
+            },
+            "pages/8_post_assessment.py": {
+                "tap.baseline_transfer",
+                "tap.github_demo_store",
+                "tap.ui",
+            },
         }
 
         for relative_path, expected_modules in cases.items():
@@ -146,8 +156,25 @@ class RuntimeGuardTests(unittest.TestCase):
                     if isinstance(node, ast.ImportFrom)
                     and node.module in expected_modules
                 ]
-                self.assertEqual(expected_modules, {node.module for node in protected_imports})
-                self.assertTrue(all(guard.lineno < node.lineno for node in protected_imports))
+                if relative_path in {
+                    "pages/7_pre_assessment.py",
+                    "pages/8_post_assessment.py",
+                }:
+                    run_path_calls = [
+                        node
+                        for node in ast.walk(tree)
+                        if isinstance(node, ast.Call)
+                        and isinstance(node.func, ast.Attribute)
+                        and isinstance(node.func.value, ast.Name)
+                        and node.func.value.id == "runpy"
+                        and node.func.attr == "run_path"
+                    ]
+                    self.assertEqual(1, len(run_path_calls))
+                    self.assertLess(guard.lineno, run_path_calls[0].lineno)
+                    self.assertEqual([], protected_imports)
+                else:
+                    self.assertEqual(expected_modules, {node.module for node in protected_imports})
+                    self.assertTrue(all(guard.lineno < node.lineno for node in protected_imports))
                 self.assertFalse(
                     any(
                         isinstance(node, ast.Call)

@@ -26,6 +26,11 @@ from tap.ui import callout, page_header, setup_page
 setup_page("개인 리포트", "3")
 ensure_state(st.session_state)
 
+ASSESSMENT_PAGE_BY_PHASE = {
+    "pre": "pages/7_pre_assessment.py",
+    "post": "pages/8_post_assessment.py",
+}
+
 questions = questions_for_factors(st.session_state.selected_factors)
 phase_store = dict(st.session_state.get("responses_by_phase") or {})
 pre_responses = dict(phase_store.get("pre") or st.session_state.get("pre_responses") or {})
@@ -51,14 +56,15 @@ def _render_pre_baseline_download(*, key: str) -> None:
         return
 
     with st.container(border=True):
-        st.markdown("#### 교육 후 검사를 이어가기 위한 필수 파일")
+        st.markdown("#### 교육 후 검사 연결용 백업 파일")
         st.markdown(
-            "**1. 아래 기준파일 저장 → 2. 교육 후 검사일까지 안전 보관 → "
-            "3. 참여자 화면의 `교육 후 검사 이어하기`에서 파일 선택**"
+            "**GitHub 저장 결과를 불러오지 못할 때만 사용하는 보조 수단입니다.** "
+            "다른 브라우저에서 이어할 가능성에 대비해 저장해 두세요."
         )
         st.caption(
-            "이 기준파일은 일반 결과 JSON과 다른 사후검사 연결용 파일입니다. "
-            "교육 후 검사 때 불러오면 동일 문항의 사전 응답과 교육 참여자 ID가 연결됩니다. "
+            "교육 후에는 왼쪽 `교육 후 검사`로 이동해 같은 프로젝트 코드·교육 참여자 ID로 연결하세요. "
+            "저장 결과 조회가 어려울 때 이 기준파일을 불러오면 동일 문항의 사전 응답과 ID가 복원됩니다. "
+            "일반 결과 JSON과 다른 파일입니다. "
             "파일에는 가명 ID와 문항별 응답이 있으므로 타인에게 전달하지 말고 본인만 안전하게 보관하세요. "
             "SHA-256 검사는 우발적 파일 변경을 확인할 뿐, 전자서명이나 보안 인증은 아닙니다."
         )
@@ -101,8 +107,26 @@ def _render_incomplete_progress(phase: str, responses: dict[str, object]) -> Non
             "검사가 최종 제출되기 전에는 임시 점수·교육 추천·결과 파일을 제공하지 않습니다. "
             "검사 화면에서 남은 문항을 완료해 주세요."
         )
-        if st.button("검사로 돌아가기", type="primary", key=f"resume_{phase}_assessment"):
-            st.switch_page("pages/2_assessment.py")
+        if st.button(
+            f"{phase_label} 검사로 돌아가기",
+            type="primary",
+            key=f"resume_{phase}_assessment",
+        ):
+            st.switch_page(ASSESSMENT_PAGE_BY_PHASE[phase])
+
+
+def _render_post_assessment_cta() -> None:
+    """Make the next assessment step explicit after the pre report is complete."""
+    if not pre_complete or post_complete or post_responses:
+        return
+    with st.container(border=True):
+        st.markdown("#### 다음 단계 · 교육 후 검사")
+        st.caption(
+            "교육 후 검사 기간에 같은 프로젝트 코드와 교육 참여자 ID로 접속하면 "
+            "교육 전 결과와 연결됩니다."
+        )
+        if st.button("교육 후 검사 시작", type="primary", key="open_post_assessment", width="stretch"):
+            st.switch_page(ASSESSMENT_PAGE_BY_PHASE["post"])
 
 
 has_pre_post = bool(pre_responses and post_responses and pre_complete and post_complete)
@@ -164,6 +188,7 @@ if not has_pre_post and pending_phase:
     )
     _render_incomplete_progress(pending_phase, pending_responses)
 
+_render_post_assessment_cta()
 _render_pre_baseline_download(key="pre_baseline_download")
 
 if has_pre_post:

@@ -334,6 +334,8 @@ class ReportingTests(unittest.TestCase):
         self.assertTrue(
             any("교육 전 완료 결과" in str(item.value) for item in app.markdown)
         )
+        self.assertTrue(any(item.label == "교육 후 검사 시작" for item in app.button))
+        self.assertIn('"post": "pages/8_post_assessment.py"', source)
 
     def test_incomplete_single_phase_hides_provisional_results_and_exports(self) -> None:
         questions = questions_for_factors(["CORE-CO"])
@@ -362,7 +364,9 @@ class ReportingTests(unittest.TestCase):
                 self.assertTrue(
                     any("임시 점수·교육 추천·결과 파일" in str(item.value) for item in app.warning)
                 )
-                self.assertTrue(any(item.label == "검사로 돌아가기" for item in app.button))
+                self.assertTrue(
+                    any(item.label == "교육 전 검사로 돌아가기" for item in app.button)
+                )
                 self.assertFalse(app.dataframe)
                 download_labels = {item.label for item in app.get("download_button")}
                 self.assertNotIn("결과 JSON", download_labels)

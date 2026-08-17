@@ -104,7 +104,7 @@ class DemoPersistencePageTests(unittest.TestCase):
             next(
                 item
                 for item in app.button
-                if item.label == "설정 저장 후 실제 검사 시작"
+                if item.label == "설정 저장 후 교육 전 검사 시작"
             ).click()
             app.run()
 
@@ -123,7 +123,7 @@ class DemoPersistencePageTests(unittest.TestCase):
             next(
                 item
                 for item in app.button
-                if item.label == "설정 저장 후 실제 검사 시작"
+                if item.label == "설정 저장 후 교육 전 검사 시작"
             ).click()
             app.run()
 

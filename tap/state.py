@@ -6,6 +6,8 @@ from typing import Any, MutableMapping, cast
 
 ASSESSMENT_PHASES = ("pre", "post")
 PARTICIPANT_ID_WIDGET_KEY = "_participant_id_input"
+DEMO_STORE_ACCESS_CODE_KEY = "demo_store_access_code"
+DEMO_STORE_ACCESS_CODE_WIDGET_KEY = "_demo_store_access_code_input"
 
 
 DEFAULTS: dict[str, Any] = {
@@ -16,6 +18,7 @@ DEFAULTS: dict[str, Any] = {
     "project_end_date": "2026-08-28",
     "course_name": "공통역량 교육",
     "participant_id": "",
+    "demo_store_access_code": "",
     "assessment_version": "TAP-1.0",
     "question_snapshot_hash": "",
     "question_snapshot_codes": [],
@@ -74,6 +77,28 @@ def save_participant_id_widget(state: MutableMapping[str, Any]) -> str:
     participant_id = str(state.get(PARTICIPANT_ID_WIDGET_KEY, "")).strip()
     state["participant_id"] = participant_id
     return participant_id
+
+
+def load_demo_store_access_code_widget(state: MutableMapping[str, Any]) -> str:
+    """Restore the durable demo-store access code into its page widget.
+
+    Each registered Streamlit page owns its widget keys. Moving from the
+    project page to the dedicated pre/post pages therefore removes the input
+    widget state. The canonical access code deliberately lives under a
+    non-widget key so the participant does not have to enter it again.
+    """
+
+    access_code = str(state.get(DEMO_STORE_ACCESS_CODE_KEY, ""))
+    state[DEMO_STORE_ACCESS_CODE_WIDGET_KEY] = access_code
+    return access_code
+
+
+def save_demo_store_access_code_widget(state: MutableMapping[str, Any]) -> str:
+    """Persist the temporary access-code widget value across pages."""
+
+    access_code = str(state.get(DEMO_STORE_ACCESS_CODE_WIDGET_KEY, "")).strip()
+    state[DEMO_STORE_ACCESS_CODE_KEY] = access_code
+    return access_code
 
 
 def _ensure_phase_mapping(

@@ -13,7 +13,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class PrePostPageTests(unittest.TestCase):
-    def test_project_setup_collects_course_schedule_and_active_phase(self) -> None:
+    def test_project_setup_collects_course_schedule_and_uses_split_phase_navigation(self) -> None:
         source = (ROOT / "pages" / "1_project_setup.py").read_text(encoding="utf-8")
         for label in (
             "교육과정명",
@@ -22,11 +22,12 @@ class PrePostPageTests(unittest.TestCase):
             "교육 전 검사 마감일",
             "교육 후 검사 시작일",
             "교육 후 검사 마감일",
-            "현재 참여자에게 열 검사",
         ):
             self.assertIn(label, source)
         self.assertIn("56 <= post_delay_days <= 70", source)
         self.assertIn("activate_assessment_phase", source)
+        self.assertIn("왼쪽 메뉴의 ‘교육 전 검사’와 ‘교육 후 검사’", source)
+        self.assertNotIn('"현재 참여자에게 열 검사"', source)
 
     def test_project_identity_change_invalidates_saved_assessments(self) -> None:
         source = (ROOT / "pages" / "1_project_setup.py").read_text(encoding="utf-8")
@@ -45,7 +46,7 @@ class PrePostPageTests(unittest.TestCase):
         app.run()
 
         save = next(
-            item for item in app.button if item.label == "설정 저장 후 실제 검사 시작"
+            item for item in app.button if item.label == "설정 저장 후 교육 전 검사 시작"
         )
         with patch("streamlit.switch_page"):
             save.click()
@@ -55,23 +56,20 @@ class PrePostPageTests(unittest.TestCase):
         self.assertEqual("", app.session_state["participant_id"])
         self.assertNotIn("_participant_id_input", app.session_state)
 
-    def test_phase_only_switch_keeps_participant_pairing(self) -> None:
+    def test_resaving_same_project_keeps_participant_pairing(self) -> None:
         app = AppTest.from_file(str(ROOT / "pages" / "1_project_setup.py"), default_timeout=30).run()
         with patch("streamlit.switch_page"):
             next(
-                item for item in app.button if item.label == "설정 저장 후 실제 검사 시작"
+                item for item in app.button if item.label == "설정 저장 후 교육 전 검사 시작"
             ).click()
             app.run()
 
         project_id = app.session_state["project_id"]
         app.session_state["participant_id"] = "KEEP-P001"
         app.session_state["_participant_id_input"] = "KEEP-P001"
-        next(
-            item for item in app.radio if item.label == "현재 참여자에게 열 검사"
-        ).set_value("post")
         with patch("streamlit.switch_page"):
             next(
-                item for item in app.button if item.label == "설정 저장 후 실제 검사 시작"
+                item for item in app.button if item.label == "설정 저장 후 교육 전 검사 시작"
             ).click()
             app.run()
 
@@ -79,7 +77,7 @@ class PrePostPageTests(unittest.TestCase):
         self.assertEqual(project_id, app.session_state["project_id"])
         self.assertEqual("KEEP-P001", app.session_state["participant_id"])
         self.assertEqual("KEEP-P001", app.session_state["_participant_id_input"])
-        self.assertEqual("post", app.session_state["assessment_phase"])
+        self.assertEqual("pre", app.session_state["assessment_phase"])
 
     def test_project_setup_preserves_custom_target_and_delivery_on_reentry(self) -> None:
         app = AppTest.from_file(str(ROOT / "pages" / "1_project_setup.py"), default_timeout=30)

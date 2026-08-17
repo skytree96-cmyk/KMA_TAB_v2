@@ -255,7 +255,7 @@ else:
         "화면 구성만 확인하려면 ‘예시 리포트 보기’를 선택할 수 있습니다."
     )
     if st.button("검사 진행하기", type="primary"):
-        st.switch_page("pages/2_assessment.py")
+        st.switch_page("pages/7_pre_assessment.py")
     st.stop()
 
 clean, validation_errors, validation_warnings = prepare_group_results(

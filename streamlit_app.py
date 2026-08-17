@@ -167,7 +167,7 @@ with next_b:
         st.markdown("**② 사전·사후 화면 확인**")
         st.caption("두 시점 모두 같은 문항·척도와 최근 8주 회상기간을 사용하고, 교육 참여자 ID로 짝을 맞춥니다.")
         if st.button("실제 검사 시작", key="home_assessment", width="stretch"):
-            safe_switch_page("pages/2_assessment.py")
+            safe_switch_page("pages/7_pre_assessment.py")
 with next_c:
     with st.container(border=True):
         st.markdown("**③ 관찰된 변화 확인**")

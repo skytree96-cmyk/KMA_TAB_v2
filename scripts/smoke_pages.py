@@ -21,6 +21,8 @@ PAGES = [
     "pages/4_organization_report.py",
     "pages/5_question_bank.py",
     "pages/6_kma_dashboard.py",
+    "pages/7_pre_assessment.py",
+    "pages/8_post_assessment.py",
 ]
 
 
@@ -56,6 +58,8 @@ def main() -> int:
     _assert_clean(app, "participant role switch")
     if not any(button.label == "교육평가 프로젝트 설정으로 이동" for button in app.button):
         raise AssertionError("assessment landing is missing after participant role switch")
+    app.switch_page("pages/8_post_assessment.py").run()
+    _assert_clean(app, "post-assessment sidebar entry")
     if not any(
         uploader.label == "교육 전 검사 기준파일(JSON)"
         for uploader in app.get("file_uploader")

@@ -24,21 +24,32 @@ from tap.github_demo_store import (
     submission_payload_from_state,
 )
 from tap.state import (
+    DEMO_STORE_ACCESS_CODE_KEY,
+    DEMO_STORE_ACCESS_CODE_WIDGET_KEY,
     PARTICIPANT_ID_WIDGET_KEY,
     activate_assessment_phase,
     ensure_state,
+    load_demo_store_access_code_widget,
     load_participant_id_widget,
     reset_assessment,
     reset_all_assessments,
+    save_demo_store_access_code_widget,
     save_participant_id_widget,
     sync_assessment_phase,
 )
-from tap.ui import callout, page_header, setup_page
+from tap.ui import callout, page_header, safe_switch_page, setup_page
 
 
 setup_page("검사 참여", "2")
 ensure_state(st.session_state)
-DEMO_STORE_ACCESS_CODE_KEY = "demo_store_access_code"
+
+# The two registered sidebar pages execute this shared implementation with a
+# fixed phase. Reapply it on every Streamlit rerun so loading a stored project
+# cannot overwrite the participant's explicit menu choice.
+_forced_phase = globals().get("TAP_FORCED_ASSESSMENT_PHASE")
+if _forced_phase in {"pre", "post"}:
+    activate_assessment_phase(st.session_state, str(_forced_phase))
+    st.session_state["current_assessment_phase"] = str(_forced_phase)
 
 
 def _demo_access_code() -> str:
@@ -50,10 +61,13 @@ def _render_demo_store_access_gate(config: DemoStoreConfig) -> None:
 
     if not config.enabled:
         return
+    load_demo_store_access_code_widget(st.session_state)
     st.text_input(
         "기획검증 접속코드",
         type="password",
-        key=DEMO_STORE_ACCESS_CODE_KEY,
+        key=DEMO_STORE_ACCESS_CODE_WIDGET_KEY,
+        on_change=save_demo_store_access_code_widget,
+        args=(st.session_state,),
         help="합성 테스트 프로젝트 게시, 완료 결과 저장, 교육 전 결과 연결에만 사용합니다.",
     )
     if not config.write_enabled:
@@ -512,18 +526,42 @@ def _render_post_baseline_entry(*, key: str) -> None:
 
 
 if not st.session_state.selected_factors:
-    page_header(
-        "검사 참여",
-        "교육 전·후 검사 시작",
-        "교육 전 검사는 설정된 프로젝트로 시작하고, 교육 후 검사는 저장해 둔 기준파일로 바로 이어갑니다.",
-        badge="참여자",
-    )
-    _render_demo_project_entry()
-    _render_post_baseline_entry(key="pre_baseline_bootstrap_uploader")
-    st.markdown("#### 교육 전 검사를 시작하시나요?")
-    st.caption("교육담당자가 먼저 교육과정·일정·측정역량을 설정해야 합니다.")
-    if st.button("교육평가 프로젝트 설정으로 이동", type="primary"):
-        st.switch_page("pages/1_project_setup.py")
+    bootstrap_phase = str(st.session_state.get("assessment_phase", "pre"))
+    if _forced_phase not in {"pre", "post"}:
+        # Backward-compatible landing for existing /assessment bookmarks.
+        page_header(
+            "검사 참여",
+            "교육 전·후 검사 시작",
+            "새 메뉴에서는 교육 전 검사와 교육 후 검사가 분리되어 있습니다. 기존 링크에서는 두 이어가기 방법을 모두 제공합니다.",
+            badge="참여자",
+        )
+        _render_demo_project_entry()
+        _render_post_baseline_entry(key="pre_baseline_bootstrap_uploader")
+        st.markdown("#### 교육 전 검사를 시작하시나요?")
+        st.caption("교육담당자가 먼저 교육과정·일정·측정역량을 설정해야 합니다.")
+        if st.button("교육평가 프로젝트 설정으로 이동", type="primary"):
+            st.switch_page("pages/1_project_setup.py")
+    elif bootstrap_phase == "post":
+        page_header(
+            "검사 참여",
+            "교육 후 검사 이어하기",
+            "프로젝트 코드와 같은 교육 참여자 ID로 교육 전 완료결과를 연결하거나, 저장해 둔 기준파일을 불러오세요.",
+            badge="교육 후",
+        )
+        _render_demo_project_entry()
+        _render_post_baseline_entry(key="pre_baseline_bootstrap_uploader")
+    else:
+        page_header(
+            "검사 참여",
+            "교육 전 검사 시작",
+            "교육담당자에게 받은 프로젝트 코드를 불러오거나, 이 브라우저에서 설정한 프로젝트로 시작합니다.",
+            badge="교육 전",
+        )
+        _render_demo_project_entry()
+        st.markdown("#### 교육 전 검사를 시작하시나요?")
+        st.caption("교육담당자가 먼저 교육과정·일정·측정역량을 설정해야 합니다.")
+        if st.button("교육평가 프로젝트 설정으로 이동", type="primary"):
+            st.switch_page("pages/1_project_setup.py")
     st.stop()
 
 phase = str(st.session_state.get("assessment_phase", "pre"))
@@ -767,8 +805,16 @@ if st.session_state.assessment_completed:
         if st.button("GitHub 검사결과 저장 다시 시도", width="stretch"):
             _save_completed_submission(phase)
             st.rerun()
-    if st.button("결과 다시 보기", type="primary", width="stretch"):
-        st.switch_page("pages/3_individual_report.py")
+    if phase == "pre":
+        result_col, post_col = st.columns(2)
+        with result_col:
+            if st.button("교육 전 결과 보기", width="stretch"):
+                safe_switch_page("pages/3_individual_report.py")
+        with post_col:
+            if st.button("교육 후 검사로 이동", type="primary", width="stretch"):
+                safe_switch_page("pages/8_post_assessment.py")
+    elif st.button("교육 전·후 비교 리포트 보기", type="primary", width="stretch"):
+        safe_switch_page("pages/3_individual_report.py")
     st.stop()
 
 options = list(LIKERT_OPTIONS)

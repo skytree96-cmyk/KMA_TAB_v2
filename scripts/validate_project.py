@@ -175,6 +175,8 @@ def main() -> int:
         ROOT / ".streamlit" / "secrets.toml.example",
         ROOT / "pages" / "0_user_guide.py",
         ROOT / "pages" / "1_project_setup.py",
+        ROOT / "pages" / "7_pre_assessment.py",
+        ROOT / "pages" / "8_post_assessment.py",
         ROOT / "pages" / "6_kma_dashboard.py",
         ROOT / "tap" / "github_demo_store.py",
         ROOT / "docs" / "GITHUB_DEMO_STORE_SETUP.md",
@@ -196,6 +198,8 @@ def main() -> int:
         ROOT / "pages" / "2_assessment.py": ("사전·사후 모두 동일하게 최근 8주", "교육 참여자 ID"),
         ROOT / "pages" / "3_individual_report.py": ("교육 전·후 짝지어진 비교", "assessment_completed_by_phase"),
         ROOT / "pages" / "4_organization_report.py": ("교육 전후 리포트", "session_type"),
+        ROOT / "pages" / "7_pre_assessment.py": ('"TAP_FORCED_ASSESSMENT_PHASE": "pre"',),
+        ROOT / "pages" / "8_post_assessment.py": ('"TAP_FORCED_ASSESSMENT_PHASE": "post"',),
     }
     for path, markers in prepost_contract.items():
         source = path.read_text(encoding="utf-8")
@@ -215,7 +219,7 @@ def main() -> int:
         ),
         ROOT / "pages" / "0_user_guide.py": (
             "기획검증용 GitHub 누적 저장",
-            "프로젝트 코드를 참여자 화면에 입력",
+            "프로젝트 코드를 선택한 검사 화면에 입력",
             "교육 참여자 ID 원문은 저장하지 않고 프로젝트별 가명키",
             "기획검증 접속코드",
         ),
@@ -260,8 +264,15 @@ def main() -> int:
             errors.append(f"navigation target missing: {relative_path}")
 
     ui_source = (ROOT / "tap" / "ui.py").read_text(encoding="utf-8")
+    for required_navigation in (
+        '("pages/7_pre_assessment.py", "교육 전 검사")',
+        '("pages/8_post_assessment.py", "교육 후 검사")',
+    ):
+        if required_navigation not in ui_source:
+            errors.append(f"split assessment navigation missing in tap/ui.py: {required_navigation}")
     for legacy_reference in (
         "pages/7_user_guide.py",
+        '("pages/2_assessment.py", "사전·사후 검사")',
         '"participant": "임직원"',
         '"kma": "KMA 운영자"',
     ):

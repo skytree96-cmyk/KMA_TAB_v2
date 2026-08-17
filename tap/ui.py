@@ -22,7 +22,7 @@ ROLE_LABELS = {
 
 ROLE_LANDINGS = {
     "company": "streamlit_app.py",
-    "participant": "pages/2_assessment.py",
+    "participant": "pages/7_pre_assessment.py",
     "kma": "pages/6_kma_dashboard.py",
 }
 
@@ -32,11 +32,13 @@ ROLE_NAV = {
         ("streamlit_app.py", "관리자 대시보드"),
         ("pages/1_project_setup.py", "교육평가 프로젝트"),
         ("pages/4_organization_report.py", "교육 전후 리포트"),
-        ("pages/2_assessment.py", "사전·사후 검사"),
+        ("pages/7_pre_assessment.py", "교육 전 검사"),
+        ("pages/8_post_assessment.py", "교육 후 검사"),
     ),
     "participant": (
         ("pages/0_user_guide.py", "처음 사용 안내"),
-        ("pages/2_assessment.py", "사전·사후 검사"),
+        ("pages/7_pre_assessment.py", "교육 전 검사"),
+        ("pages/8_post_assessment.py", "교육 후 검사"),
         ("pages/3_individual_report.py", "내 변화 리포트"),
     ),
     "kma": (

@@ -27,10 +27,14 @@ from tap.selection import (
     selection_errors,
 )
 from tap.state import (
+    DEMO_STORE_ACCESS_CODE_KEY,
+    DEMO_STORE_ACCESS_CODE_WIDGET_KEY,
     PARTICIPANT_ID_WIDGET_KEY,
     activate_assessment_phase,
     ensure_state,
+    load_demo_store_access_code_widget,
     reset_all_assessments,
+    save_demo_store_access_code_widget,
 )
 from tap.ui import callout, domain_header, page_header, setup_page, summary_strip
 
@@ -41,7 +45,6 @@ competencies = load_competencies()
 row_by_code = {row["factor_code"]: row for row in competencies}
 
 level_labels = {"staff": "실무자", "manager": "관리자·리더", "executive": "임원"}
-DEMO_STORE_ACCESS_CODE_KEY = "demo_store_access_code"
 
 
 def _demo_access_code() -> str:
@@ -60,10 +63,13 @@ def _render_demo_store_access_gate() -> None:
 
     with st.container(border=True):
         st.markdown("#### GitHub 기획검증 저장")
+        load_demo_store_access_code_widget(st.session_state)
         st.text_input(
             "기획검증 접속코드",
             type="password",
-            key=DEMO_STORE_ACCESS_CODE_KEY,
+            key=DEMO_STORE_ACCESS_CODE_WIDGET_KEY,
+            on_change=save_demo_store_access_code_widget,
+            args=(st.session_state,),
             help="합성 테스트 프로젝트와 완료 결과를 GitHub에 저장할 때만 사용합니다.",
         )
         if not config.write_enabled:
@@ -282,14 +288,12 @@ with st.container(border=True):
     with post_right:
         post_end_date = st.date_input("교육 후 검사 마감일", value=default_post_end, key="post_end_picker")
 
-    current_phase = st.radio(
-        "현재 참여자에게 열 검사",
-        options=["pre", "post"],
-        format_func={"pre": "교육 전 역량평가", "post": "교육 후 역량평가"}.get,
-        index=0 if st.session_state.get("assessment_phase", "pre") == "pre" else 1,
-        horizontal=True,
-        key="assessment_phase_picker",
-        help="사전검사 종료 후 사후검사로 바꾸면, 참여자는 사후 문항과 현업전이 문항에 응답합니다.",
+    # 검사 단계는 별도 사이드바 메뉴에서 선택한다. 프로젝트 스냅샷에는
+    # 하위 버전 호환을 위해 pre를 기록하고 실제 진입 페이지가 단계를 정한다.
+    current_phase = "pre"
+    st.info(
+        "검사 단계 선택은 왼쪽 메뉴의 ‘교육 전 검사’와 ‘교육 후 검사’에서 합니다. "
+        "프로젝트 저장 후에는 교육 전 검사로 이동합니다."
     )
     allow_schedule_override = st.checkbox(
         "공개 시연에서 검사기간 예외 허용",
@@ -502,7 +506,7 @@ if not date_errors and not 56 <= post_delay_days <= 70:
     )
 
 if st.button(
-    "설정 저장 후 실제 검사 시작",
+    "설정 저장 후 교육 전 검사 시작",
     type="primary",
     disabled=item_count == 0 or bool(selection_issues) or bool(date_errors),
     width="stretch",
@@ -607,4 +611,4 @@ if st.button(
     activate_assessment_phase(st.session_state, current_phase)
     st.session_state.current_assessment_phase = current_phase
     _save_project_to_demo_store()
-    st.switch_page("pages/2_assessment.py")
+    st.switch_page("pages/7_pre_assessment.py")
