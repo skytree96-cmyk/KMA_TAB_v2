@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import csv
+import io
 import math
 from datetime import date
 from html import escape
@@ -23,6 +25,38 @@ GROUP_TRANSFER_COLUMNS = (
     "time_process_support_1_to_5",
 )
 SESSION_TYPES = {"pre", "post"}
+
+
+def read_group_results_csv(raw: bytes) -> pd.DataFrame:
+    """Decode an uploaded group CSV without silently mangling duplicate headers."""
+
+    if not raw:
+        raise ValueError("CSV 파일이 비어 있습니다.")
+    for encoding in ("utf-8-sig", "cp949"):
+        try:
+            text = raw.decode(encoding)
+        except UnicodeDecodeError:
+            continue
+        try:
+            header = next(csv.reader(io.StringIO(text)))
+        except (csv.Error, StopIteration) as exc:
+            raise ValueError(f"CSV 헤더를 읽을 수 없습니다: {exc}") from exc
+        normalized = [str(name).strip() for name in header]
+        duplicates = sorted(
+            {name for name in normalized if normalized.count(name) > 1}
+        )
+        if duplicates:
+            raise ValueError(
+                "CSV 열 이름이 중복되었습니다: " + ", ".join(duplicates)
+            )
+        try:
+            # 모든 열을 문자열로 먼저 보존한다. 특히 참여자 ID의 선행 0을
+            # pandas 숫자 추론으로 잃으면 서로 다른 참여자가 잘못 짝지어진다.
+            # 점수·품질·전이 열은 아래 canonical validator가 명시적으로 숫자화한다.
+            return pd.read_csv(io.StringIO(text), dtype="string")
+        except (pd.errors.ParserError, pd.errors.EmptyDataError) as exc:
+            raise ValueError(f"CSV 구조를 읽을 수 없습니다: {exc}") from exc
+    raise ValueError("CSV는 UTF-8 또는 CP949 인코딩으로 저장해 주세요.")
 
 
 def completed_session_factor_rows(

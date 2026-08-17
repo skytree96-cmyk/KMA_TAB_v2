@@ -15,6 +15,7 @@ from tap.reporting import (
     organization_report_fragment,
     prepare_group_results,
     printable_organization_report_html,
+    read_group_results_csv,
 )
 
 
@@ -29,6 +30,30 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class ReportingTests(unittest.TestCase):
+    def test_group_csv_rejects_duplicate_headers_before_pandas_mangles_them(self) -> None:
+        raw = (
+            "participant_id,participant_id,factor_code,score_1_to_5\n"
+            "P1,P2,CORE-CO,3.5\n"
+        ).encode("utf-8")
+
+        with self.assertRaisesRegex(ValueError, "CSV 열 이름이 중복.*participant_id"):
+            read_group_results_csv(raw)
+
+    def test_group_csv_preserves_leading_zero_participant_ids(self) -> None:
+        frame = read_group_results_csv(
+            (
+                "participant_id,factor_code,score_1_to_5,session_type\n"
+                "001,F1,2.0,pre\n"
+                "1,F1,4.0,post\n"
+            ).encode("utf-8")
+        )
+
+        self.assertEqual(["001", "1"], frame["participant_id"].tolist())
+        clean, errors, _ = prepare_group_results(frame, COMPETENCIES)
+        self.assertEqual([], errors)
+        summary = build_pre_post_group_summary(clean, min_group_n=1)
+        self.assertEqual(0, summary["paired_participant_count"])
+
     def test_individual_report_uses_canonical_common_item_export_and_direction(self) -> None:
         source = (ROOT / "pages" / "3_individual_report.py").read_text(encoding="utf-8")
         self.assertIn("csv_rows = completed_session_factor_rows(", source)
@@ -388,19 +413,65 @@ class ReportingTests(unittest.TestCase):
         app.run()
 
         self.assertEqual([], [str(item.value) for item in app.exception])
+        self.assertTrue(any(item.label == "프로젝트 선택" for item in app.selectbox))
+        self.assertTrue(
+            any(
+                item.label == "CSV 파일로 직접 비교하기 · 보조 기능"
+                for item in app.expander
+            )
+        )
         self.assertTrue(any("실제 교육 전·후 결과" in str(item.value) for item in app.success))
         self.assertTrue(any("실제 완료 결과 1명" in str(item.value) for item in app.warning))
         self.assertTrue(any(item.label == "내 실제 교육 전·후 비교 보기" for item in app.button))
         self.assertFalse(any("합성 예시" in str(item.value) for item in app.warning))
-        self.assertFalse(app.metric, "N<5 실제 세션은 조직 지표를 렌더링하면 안 됩니다.")
+        self.assertEqual(
+            {"교육 전 완료", "교육 후 완료", "전·후 짝지음"},
+            {item.label for item in app.metric},
+            "N<5에서는 완료 건수만 보여주고 평균·변화량 조직 지표는 숨겨야 합니다.",
+        )
 
     def test_organization_report_does_not_auto_show_sample(self) -> None:
         app = AppTest.from_file(str(ROOT / "pages" / "4_organization_report.py"), default_timeout=30).run()
 
         self.assertEqual([], [str(item.value) for item in app.exception])
         self.assertTrue(any(item.label == "예시 리포트 보기" and not item.value for item in app.checkbox))
+        self.assertTrue(
+            any(
+                item.label == "CSV 파일로 직접 비교하기 · 보조 기능"
+                for item in app.expander
+            )
+        )
         self.assertTrue(any("표시할 실제 결과가 없습니다" in str(item.value) for item in app.info))
         self.assertFalse(any("예시 데이터를 표시" in str(item.value) for item in app.info))
+
+    def test_organization_report_sample_option_renders_without_widget_errors(self) -> None:
+        app = AppTest.from_file(
+            str(ROOT / "pages" / "4_organization_report.py"), default_timeout=30
+        ).run()
+        sample_toggle = next(
+            item for item in app.checkbox if item.label == "예시 리포트 보기"
+        )
+
+        sample_toggle.set_value(True)
+        app.run()
+
+        self.assertEqual([], [str(item.value) for item in app.exception])
+        self.assertTrue(
+            any("모든 수치와 변화량은 합성 예시" in str(item.value) for item in app.warning)
+        )
+        self.assertTrue(
+            any("교육 전후 비교 포인트" in str(item.value) for item in app.markdown)
+        )
+        self.assertEqual(
+            {"교육 전 참여", "교육 후 참여", "짝지어진 참여", "사후 이탈률"},
+            {item.label for item in app.metric},
+        )
+        self.assertTrue(
+            any(
+                item.label == "CSV 파일로 직접 비교하기 · 보조 기능"
+                for item in app.expander
+            )
+        )
 
     def test_incomplete_post_does_not_render_change_report(self) -> None:
         questions = questions_for_factors(["CORE-CO"])

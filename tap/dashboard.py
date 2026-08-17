@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import math
 from functools import lru_cache
 from typing import Any, Iterable, Mapping, Protocol
 
@@ -216,7 +217,6 @@ def build_kma_persistent_dashboard(
     organizations = [
         {
             "name": row["name"],
-            "projects": 1,
             "invited": row["invited"],
             "completion_pct": row["completion_pct"],
             "activity": _display_timestamp(row["updated_at"]),
@@ -242,6 +242,45 @@ def build_kma_persistent_dashboard(
     }
 
 
+def format_kma_organization_rows(
+    organizations: Iterable[Mapping[str, Any]],
+    *,
+    persistent: bool,
+) -> list[dict[str, Any]]:
+    """Return KMA overview rows with a stable, unique display-column contract.
+
+    Persistent rows already represent one project each, so their legacy
+    ``projects`` count is intentionally omitted.  Mapping both ``name`` and
+    ``projects`` to the Korean label ``프로젝트`` creates duplicate pandas
+    columns, which PyArrow refuses to serialize in ``st.dataframe``.
+    """
+
+    layout = (
+        (
+            ("name", "프로젝트"),
+            ("invited", "검사 참여자"),
+            ("completion_pct", "사전·사후 짝지음률(%)"),
+            ("activity", "최근 집계 갱신"),
+        )
+        if persistent
+        else (
+            ("name", "회원사"),
+            ("projects", "프로젝트"),
+            ("invited", "초대 인원"),
+            ("completion_pct", "완료율(%)"),
+            ("activity", "최근 활동"),
+        )
+    )
+    return [
+        {
+            display_name: row.get(source_name, "")
+            for source_name, display_name in layout
+        }
+        for row in organizations
+        if isinstance(row, Mapping)
+    ]
+
+
 def completed_store_submission_factor_rows(
     submissions: Iterable[Mapping[str, Any]],
     question_rows: Iterable[Mapping[str, Any]],
@@ -264,6 +303,7 @@ def completed_store_submission_factor_rows(
     excluded_code_set = 0
     excluded_snapshot_hash = 0
     output: list[dict[str, Any]] = []
+    fallback_targets = normalize_target_means(target_means, warnings=warnings)
     for record in _latest_completed_submissions(submissions):
         if str(record["project_id"]) != str(project_id):
             continue
@@ -299,9 +339,12 @@ def completed_store_submission_factor_rows(
             phase: str(dict(phases.get(phase) or {}).get("completed_at") or "")
             for phase in ("pre", "post")
         }
-        stored_targets = instrument.get("target_means")
-        if not isinstance(stored_targets, Mapping):
-            stored_targets = target_means or {}
+        stored_targets = {
+            **fallback_targets,
+            **normalize_target_means(
+                instrument.get("target_means"), warnings=warnings
+            ),
+        }
         output.extend(
             completed_session_factor_rows(
                 questions,
@@ -331,6 +374,42 @@ def completed_store_submission_factor_rows(
             f"현재 프로젝트와 문항 스냅샷 버전이 다른 누적 제출 {excluded_snapshot_hash}건을 집계에서 제외했습니다."
         )
     return output
+
+
+def normalize_target_means(
+    value: Any,
+    *,
+    warnings: list[str] | None = None,
+) -> dict[str, float]:
+    """Keep only finite 1–5 target means from persisted demo metadata."""
+
+    if value in (None, ""):
+        return {}
+    if not isinstance(value, Mapping):
+        message = "저장된 목표수준 형식이 올바르지 않아 리포트 목표값에서 제외했습니다."
+        if warnings is not None and message not in warnings:
+            warnings.append(message)
+        return {}
+    normalized: dict[str, float] = {}
+    invalid_codes: list[str] = []
+    for raw_code, raw_target in value.items():
+        code = str(raw_code or "").strip()
+        try:
+            target = float(raw_target)
+        except (TypeError, ValueError):
+            target = math.nan
+        if code and math.isfinite(target) and 1.0 <= target <= 5.0:
+            normalized[code] = target
+        else:
+            invalid_codes.append(code or "이름 없음")
+    if invalid_codes:
+        message = (
+            "저장된 목표수준 중 숫자 1~5 범위가 아닌 항목을 제외했습니다: "
+            + ", ".join(sorted(set(invalid_codes)))
+        )
+        if warnings is not None and message not in warnings:
+            warnings.append(message)
+    return normalized
 
 
 def build_session_dashboard(state: Mapping[str, Any]) -> dict[str, Any]:

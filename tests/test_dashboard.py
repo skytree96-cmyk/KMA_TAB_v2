@@ -12,7 +12,9 @@ from tap.dashboard import (
     completed_store_submission_factor_rows,
     completion_rate,
     fetch_store_snapshot,
+    format_kma_organization_rows,
     load_dashboard_demo,
+    normalize_target_means,
     validate_dashboard_demo,
 )
 from tap.data import questions_for_factors
@@ -126,15 +128,26 @@ class DashboardTests(unittest.TestCase):
         self.assertIn("감사 이벤트 이력이 아닙니다", page_source)
         self.assertIn('"최근 집계 갱신" if dashboard_source == "store"', page_source)
 
-    def test_organization_report_prefers_store_over_one_browser_session(self) -> None:
+    def test_organization_report_uses_explicit_project_selection_before_csv(self) -> None:
         source = (ROOT / "pages" / "4_organization_report.py").read_text(
             encoding="utf-8"
         )
 
-        self.assertLess(source.index("elif store_rows:"), source.index("elif session_rows:"))
-        self.assertIn("업로드 CSV → 현재 프로젝트의 GitHub 누적 완료결과", source)
-        self.assertIn('"GitHub 누적 프로젝트 코드"', source)
+        self.assertIn('"프로젝트 선택"', source)
+        self.assertIn("실시 프로젝트에서 리포트 열기", source)
+        self.assertIn('"CSV 파일로 직접 비교하기 · 보조 기능"', source)
+        self.assertIn("CSV가 선택 프로젝트보다 우선합니다", source)
+        self.assertIn("if uploaded is not None and use_uploaded:", source)
+        self.assertIn('elif selected_project_key:', source)
         self.assertIn('stored_project.get("selected_factors")', source)
+
+        audit_table = source.index('with st.expander("집계 검수표 보기"):')
+        final_csv_tools = source.rfind("_render_csv_tools()")
+        self.assertGreater(final_csv_tools, audit_table)
+        self.assertTrue(
+            source.rstrip().endswith("_render_csv_tools()"),
+            "CSV 업로드는 프로젝트 리포트와 최종 검수표 뒤의 보조 영역이어야 합니다.",
+        )
 
     def test_persistent_project_row_shows_reloadable_project_code(self) -> None:
         dashboard = build_persistent_dashboard(
@@ -198,6 +211,35 @@ class DashboardTests(unittest.TestCase):
         self.assertNotIn("secret-pseudonymous-key", rendered)
         self.assertNotIn("participant_id", rendered)
 
+    def test_kma_store_organization_columns_are_unique_and_project_scoped(self) -> None:
+        dashboard = build_kma_persistent_dashboard(
+            [_stored_submission("pk-table", post_complete=True)]
+        )
+
+        # Reproduce the previous persisted row shape: ``name`` and ``projects``
+        # used to be renamed to the same display label before Arrow conversion.
+        legacy_row = {**dashboard["organizations"][0], "projects": 1}
+        rows = format_kma_organization_rows([legacy_row], persistent=True)
+
+        self.assertEqual(1, len(rows))
+        self.assertEqual(
+            ["프로젝트", "검사 참여자", "사전·사후 짝지음률(%)", "최근 집계 갱신"],
+            list(rows[0]),
+        )
+        self.assertEqual(len(rows[0]), len(set(rows[0])))
+        self.assertNotIn("projects", dashboard["organizations"][0])
+
+    def test_kma_sample_organization_columns_remain_unique(self) -> None:
+        rows = format_kma_organization_rows(
+            load_dashboard_demo()["kma"]["organizations"], persistent=False
+        )
+
+        self.assertEqual(
+            ["회원사", "프로젝트", "초대 인원", "완료율(%)", "최근 활동"],
+            list(rows[0]),
+        )
+        self.assertEqual(len(rows[0]), len(set(rows[0])))
+
     def test_store_item_responses_convert_to_group_factor_rows(self) -> None:
         questions = questions_for_factors(["CORE-CO"])
         rows = completed_store_submission_factor_rows(
@@ -210,6 +252,46 @@ class DashboardTests(unittest.TestCase):
         self.assertEqual({"pre", "post"}, {row["session_type"] for row in rows})
         self.assertEqual({"pk-report"}, {row["participant_id"] for row in rows})
         self.assertEqual({"PROJECT-REAL-001"}, {row["project_id"] for row in rows})
+
+    def test_normalize_target_means_excludes_invalid_persisted_values(self) -> None:
+        warnings: list[str] = []
+
+        normalized = normalize_target_means(
+            {
+                "VALID": "3.5",
+                "TEXT": "not-a-number",
+                "NAN": float("nan"),
+                "INFINITE": float("inf"),
+                "TOO-LOW": 0.9,
+                "TOO-HIGH": 5.1,
+                "": 3.0,
+            },
+            warnings=warnings,
+        )
+
+        self.assertEqual({"VALID": 3.5}, normalized)
+        self.assertEqual(1, len(warnings))
+        for code in ("TEXT", "NAN", "INFINITE", "TOO-LOW", "TOO-HIGH"):
+            self.assertIn(code, warnings[0])
+
+    def test_store_report_survives_invalid_persisted_target_mean(self) -> None:
+        questions = questions_for_factors(["CORE-CO"])
+        malformed = _stored_submission("pk-invalid-target", post_complete=True)
+        malformed["instrument"]["target_means"] = {"CORE-CO": "oops"}
+        warnings: list[str] = []
+
+        rows = completed_store_submission_factor_rows(
+            [malformed],
+            questions,
+            project_id="PROJECT-REAL-001",
+            target_means={"CORE-CO": "also-invalid"},
+            question_snapshot_hash="hash-current",
+            warnings=warnings,
+        )
+
+        self.assertEqual({"pre", "post"}, {row["session_type"] for row in rows})
+        self.assertEqual({"pk-invalid-target"}, {row["participant_id"] for row in rows})
+        self.assertTrue(any("CORE-CO" in warning for warning in warnings))
 
     def test_store_report_excludes_mismatched_question_snapshot(self) -> None:
         questions = questions_for_factors(["CORE-CO"])

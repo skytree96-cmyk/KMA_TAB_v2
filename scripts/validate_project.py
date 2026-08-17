@@ -179,6 +179,7 @@ def main() -> int:
         ROOT / "pages" / "8_post_assessment.py",
         ROOT / "pages" / "6_kma_dashboard.py",
         ROOT / "tap" / "github_demo_store.py",
+        ROOT / "tap" / "radar.py",
         ROOT / "docs" / "GITHUB_DEMO_STORE_SETUP.md",
         ROOT / "docs" / "TAP_사용설명서_v3.pdf",
         ROOT / "docs" / "TAP_빠른사용가이드_v3.pptx",
@@ -197,7 +198,12 @@ def main() -> int:
         ROOT / "pages" / "1_project_setup.py": ("교육평가 프로젝트 만들기", "56 <= post_delay_days <= 70"),
         ROOT / "pages" / "2_assessment.py": ("사전·사후 모두 동일하게 최근 8주", "교육 참여자 ID"),
         ROOT / "pages" / "3_individual_report.py": ("교육 전·후 짝지어진 비교", "assessment_completed_by_phase"),
-        ROOT / "pages" / "4_organization_report.py": ("교육 전후 리포트", "session_type"),
+        ROOT / "pages" / "4_organization_report.py": (
+            "교육 전후 리포트",
+            "session_type",
+            "실시 프로젝트에서 리포트 열기",
+            "build_pre_post_radar",
+        ),
         ROOT / "pages" / "7_pre_assessment.py": ('"TAP_FORCED_ASSESSMENT_PHASE": "pre"',),
         ROOT / "pages" / "8_post_assessment.py": ('"TAP_FORCED_ASSESSMENT_PHASE": "post"',),
     }

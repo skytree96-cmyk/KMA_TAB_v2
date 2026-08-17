@@ -11,6 +11,7 @@ stop_on_stale(st, ("tap.dashboard", "tap.github_demo_store", "tap.ui"))
 from tap.dashboard import (
     build_kma_persistent_dashboard,
     fetch_store_snapshot,
+    format_kma_organization_rows,
     load_dashboard_demo,
 )
 from tap.data import integrity_report, load_course_map, load_courses
@@ -136,16 +137,10 @@ st.caption(
     if dashboard_source == "store"
     else "KMA 관리자는 프로젝트 진행 상태만 확인하며 회원사의 조직점수·격차·개인결과는 열람하지 않습니다."
 )
-organizations = pd.DataFrame(dashboard["organizations"]).rename(
-    columns={
-        "name": "프로젝트" if dashboard_source == "store" else "회원사",
-        "projects": "프로젝트",
-        "invited": "검사 참여자" if dashboard_source == "store" else "초대 인원",
-        "completion_pct": (
-            "사전·사후 짝지음률(%)" if dashboard_source == "store" else "완료율(%)"
-        ),
-        "activity": "최근 집계 갱신" if dashboard_source == "store" else "최근 활동",
-    }
+organizations = pd.DataFrame(
+    format_kma_organization_rows(
+        dashboard["organizations"], persistent=dashboard_source == "store"
+    )
 )
 st.dataframe(organizations, hide_index=True, width="stretch")
 

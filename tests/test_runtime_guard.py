@@ -113,6 +113,7 @@ class RuntimeGuardTests(unittest.TestCase):
             "pages/4_organization_report.py": {
                 "tap.dashboard",
                 "tap.github_demo_store",
+                "tap.radar",
                 "tap.ui",
             },
             "pages/5_question_bank.py": {"tap.ui"},
@@ -194,6 +195,7 @@ class RuntimeGuardTests(unittest.TestCase):
             "tap.dashboard",
             "tap.baseline_transfer",
             "tap.github_demo_store",
+            "tap.radar",
         ):
             with self.subTest(module=module_name):
                 module = sys.modules.get(module_name)
