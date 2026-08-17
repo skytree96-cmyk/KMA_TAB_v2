@@ -152,6 +152,7 @@ def prepare_group_results(
     competency_rows: Iterable[Mapping[str, Any]],
     *,
     require_metadata: bool = False,
+    allow_schedule_override: bool = False,
 ) -> tuple[pd.DataFrame, list[str], list[str]]:
     """Validate uploaded factor-level results and apply canonical Korean names."""
     errors: list[str] = []
@@ -301,7 +302,14 @@ def prepare_group_results(
                     pre_dates = group.loc[group[GROUP_SESSION_COLUMN].eq("pre"), "_assessment_date"].dropna()
                     post_dates = group.loc[group[GROUP_SESSION_COLUMN].eq("post"), "_assessment_date"].dropna()
                     if not pre_dates.empty and not post_dates.empty and pre_dates.max() >= post_dates.min():
-                        errors.append("동일 참여자·역량의 사전검사일은 사후검사일보다 빨라야 합니다.")
+                        message = "동일 참여자·역량의 사전검사일은 사후검사일보다 빨라야 합니다."
+                        if allow_schedule_override:
+                            warnings.append(
+                                message
+                                + " 공개 시연의 검사기간 예외가 설정되어 날짜 경고만 표시합니다."
+                            )
+                        else:
+                            errors.append(message)
                         break
 
     ordered = list(GROUP_REQUIRED_COLUMNS) + ["factor_name_ko"]

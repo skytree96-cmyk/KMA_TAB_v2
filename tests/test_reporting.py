@@ -159,6 +159,52 @@ class ReportingTests(unittest.TestCase):
         _, followup_errors, _ = prepare_group_results(followup, COMPETENCIES)
         self.assertTrue(any("추적검사" in error for error in followup_errors))
 
+    def test_demo_schedule_override_downgrades_same_day_pair_to_warning(self) -> None:
+        frame = pd.DataFrame(
+            [
+                {
+                    "participant_id": "P1",
+                    "factor_code": "F1",
+                    "score_1_to_5": 3.0,
+                    "project_id": "P-DEMO",
+                    "assessment_version": "TAP-1.0",
+                    "target_level": "staff",
+                    "assessment_date": "2026-08-17",
+                    "session_type": "pre",
+                    "valid_items": 4,
+                    "na_items": 0,
+                    "missing_items": 0,
+                },
+                {
+                    "participant_id": "P1",
+                    "factor_code": "F1",
+                    "score_1_to_5": 4.0,
+                    "project_id": "P-DEMO",
+                    "assessment_version": "TAP-1.0",
+                    "target_level": "staff",
+                    "assessment_date": "2026-08-17",
+                    "session_type": "post",
+                    "valid_items": 4,
+                    "na_items": 0,
+                    "missing_items": 0,
+                },
+            ]
+        )
+
+        _, strict_errors, _ = prepare_group_results(
+            frame, COMPETENCIES, require_metadata=True
+        )
+        _, demo_errors, demo_warnings = prepare_group_results(
+            frame,
+            COMPETENCIES,
+            require_metadata=True,
+            allow_schedule_override=True,
+        )
+
+        self.assertTrue(any("사전검사일" in error for error in strict_errors))
+        self.assertEqual([], demo_errors)
+        self.assertTrue(any("날짜 경고" in warning for warning in demo_warnings))
+
     def test_group_pre_post_is_paired_and_reports_attrition(self) -> None:
         frame = pd.DataFrame(
             [

@@ -378,10 +378,18 @@ elif not source_kind:
     _render_csv_tools()
     st.stop()
 
+allow_report_schedule_override = (
+    bool(stored_project.get("allow_schedule_override"))
+    if source_kind == "store"
+    else bool(st.session_state.get("allow_schedule_override"))
+    if source_kind == "session"
+    else False
+)
 clean, validation_errors, validation_warnings = prepare_group_results(
     source,
     load_competencies(),
     require_metadata=source_kind in {"session", "store", "upload"},
+    allow_schedule_override=allow_report_schedule_override,
 )
 for warning in validation_warnings:
     st.warning(warning)
