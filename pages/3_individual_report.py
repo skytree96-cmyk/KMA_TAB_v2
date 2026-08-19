@@ -228,7 +228,7 @@ if has_pre_post:
         f"""
         <section class="tap-report-hero">
           <div>
-            <span class="tap-chip teal">교육 전·후 짝지어진 비교</span>
+            <span class="tap-chip teal">교육 전·후 비교</span>
             <h2>{headline}</h2>
             <p>같은 문항에 두 시점 모두 1~5점으로 응답한 결과만 비교했습니다. 변화는 관찰값이며 교육의 인과효과를 뜻하지 않습니다.</p>
           </div>

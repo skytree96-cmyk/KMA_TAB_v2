@@ -88,7 +88,7 @@ class RadarTests(unittest.TestCase):
         self.assertIn("교육 전", html)
         self.assertIn("교육 후", html)
         self.assertIn("척도 1~5", html)
-        self.assertIn("짝지어진 N", html)
+        self.assertIn("전·후 유효응답 N", html)
         self.assertEqual(8, html.count('<th scope="row">'))
 
     def test_fewer_than_eight_uses_actual_axis_count_without_fake_data(self) -> None:

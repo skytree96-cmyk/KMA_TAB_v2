@@ -161,7 +161,7 @@ def build_persistent_dashboard(
         {
             "value": f"{post_completed_count}건",
             "label": "교육 후 완료",
-            "note": f"전·후 짝지음 {paired_count}명",
+            "note": f"전·후 모두 완료 {paired_count}명",
         },
     ]
     return {
@@ -210,7 +210,7 @@ def build_kma_persistent_dashboard(
         },
         {
             "value": f"{accumulated['paired_count']}명",
-            "label": "전·후 짝지음",
+            "label": "전·후 모두 완료",
             "note": f"교육 후 완료 {accumulated['post_completed_count']}건",
         },
     ]
@@ -259,7 +259,7 @@ def format_kma_organization_rows(
         (
             ("name", "프로젝트"),
             ("invited", "검사 참여자"),
-            ("completion_pct", "사전·사후 짝지음률(%)"),
+            ("completion_pct", "사전·사후 모두 완료율(%)"),
             ("activity", "최근 집계 갱신"),
         )
         if persistent

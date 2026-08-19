@@ -243,7 +243,7 @@ def _accessible_table(factors: list[dict[str, Any]], chart_id: str) -> str:
       <div class="tap-radar-table-wrap" tabindex="0" aria-label="교육 전후 역량 비교 상세표">
         <table class="tap-radar-table">
           <caption id="{chart_id}-table-caption">차트에 표시된 역량의 교육 전후 상세 수치</caption>
-          <thead><tr><th scope="col">역량</th><th scope="col">교육 전</th><th scope="col">교육 후</th><th scope="col">변화</th><th scope="col">짝지어진 N</th></tr></thead>
+          <thead><tr><th scope="col">역량</th><th scope="col">교육 전</th><th scope="col">교육 후</th><th scope="col">변화</th><th scope="col">전·후 유효응답 N</th></tr></thead>
           <tbody>{rows}</tbody>
         </table>
       </div>

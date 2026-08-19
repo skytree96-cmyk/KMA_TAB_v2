@@ -150,8 +150,8 @@ def aggregate_paired_factor_results(
                 # Compatibility for consumers that previously displayed one
                 # group mean; for a pre/post row it represents the paired post.
                 "group_mean": post_mean,
-                "status": "공개" if disclosed else f"비공개(짝지어진 N<{min_group_n})",
-                "comparison_basis": "동일 참여자 짝지어진 결과",
+                "status": "공개" if disclosed else f"비공개(전·후 유효응답 N<{min_group_n})",
+                "comparison_basis": "동일 참여자의 사전·사후 결과",
                 "interpretation": "교육 전후 관찰된 자기보고 변화",
             }
         )

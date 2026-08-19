@@ -34,7 +34,8 @@ class UiRegressionTests(unittest.TestCase):
         self.assertIn('("pages/8_post_assessment.py", "교육 후 검사")', source)
         self.assertNotIn('("pages/2_assessment.py", "사전·사후 검사")', source)
         self.assertNotIn('("pages/2_assessment.py", "검사 미리보기")', source)
-        self.assertIn('("streamlit_app.py", "회원사 운영 화면")', source)
+        self.assertIn('("pages/9_manager_dashboard.py", "회원사 운영 화면")', source)
+        self.assertNotIn('("streamlit_app.py", "회원사 운영 화면")', source)
         self.assertNotIn('("streamlit_app.py", "회원사 화면 미리보기")', source)
 
         setup_source = (ROOT / "pages" / "1_project_setup.py").read_text(encoding="utf-8")

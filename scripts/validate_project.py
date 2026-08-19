@@ -43,6 +43,11 @@ MANIFEST_EXCLUDED_TOP_LEVEL = {
     ".tmp",
     "output",
 }
+MANIFEST_EXCLUDED_DIRECTORY_NAMES = {
+    ".wrangler",
+    "__pycache__",
+    "node_modules",
+}
 
 
 def deployable_paths() -> set[str]:
@@ -57,7 +62,13 @@ def deployable_paths() -> set[str]:
             ]
         else:
             child_directories[:] = [
-                name for name in child_directories if name != "__pycache__"
+                name
+                for name in child_directories
+                if name not in MANIFEST_EXCLUDED_DIRECTORY_NAMES
+                and not (
+                    directory_path == ROOT / "cloudflare"
+                    and name == "dist"
+                )
             ]
         for filename in filenames:
             path = directory_path / filename
@@ -177,12 +188,20 @@ def main() -> int:
         ROOT / "pages" / "1_project_setup.py",
         ROOT / "pages" / "7_pre_assessment.py",
         ROOT / "pages" / "8_post_assessment.py",
+        ROOT / "pages" / "9_manager_dashboard.py",
         ROOT / "pages" / "6_kma_dashboard.py",
         ROOT / "tap" / "github_demo_store.py",
+        ROOT / "tap" / "open_page.py",
         ROOT / "tap" / "radar.py",
         ROOT / "docs" / "GITHUB_DEMO_STORE_SETUP.md",
+        ROOT / "docs" / "TAP_오픈페이지_와이어프레임_v1.html",
         ROOT / "docs" / "TAP_사용설명서_v3.pdf",
         ROOT / "docs" / "TAP_빠른사용가이드_v3.pptx",
+        ROOT / "cloudflare" / "build.mjs",
+        ROOT / "cloudflare" / "package.json",
+        ROOT / "cloudflare" / "pnpm-lock.yaml",
+        ROOT / "cloudflare" / "pnpm-workspace.yaml",
+        ROOT / "cloudflare" / "wrangler.jsonc",
     ]
     for path in required_pages:
         if not path.exists():
@@ -197,7 +216,7 @@ def main() -> int:
     prepost_contract = {
         ROOT / "pages" / "1_project_setup.py": ("교육평가 프로젝트 만들기", "56 <= post_delay_days <= 70"),
         ROOT / "pages" / "2_assessment.py": ("사전·사후 모두 동일하게 최근 8주", "교육 참여자 ID"),
-        ROOT / "pages" / "3_individual_report.py": ("교육 전·후 짝지어진 비교", "assessment_completed_by_phase"),
+        ROOT / "pages" / "3_individual_report.py": ("교육 전·후 비교", "assessment_completed_by_phase"),
         ROOT / "pages" / "4_organization_report.py": (
             "교육 전후 리포트",
             "session_type",
@@ -214,6 +233,63 @@ def main() -> int:
         for marker in markers:
             if marker not in source:
                 errors.append(f"pre/post contract missing in {path.relative_to(ROOT)}: {marker}")
+
+    open_page_contract = {
+        ROOT / "streamlit_app.py": (
+            'stop_on_stale(st, ("tap.open_page",))',
+            "from tap.open_page import render_open_page",
+            "render_open_page()",
+        ),
+        ROOT / "tap" / "open_page.py": (
+            "__tap_source_sha256__ = source_fingerprint(__file__)",
+            "TAP_오픈페이지_와이어프레임_v1.html",
+            "st.iframe(",
+        ),
+        ROOT / "docs" / "TAP_오픈페이지_와이어프레임_v1.html": (
+            "현업 행동의 변화",
+            "사전·사후 비교",
+            "표본 보호",
+        ),
+    }
+    for path, markers in open_page_contract.items():
+        if not path.is_file():
+            continue
+        source = path.read_text(encoding="utf-8")
+        for marker in markers:
+            if marker not in source:
+                errors.append(
+                    f"open-page contract missing in {path.relative_to(ROOT)}: {marker}"
+                )
+    cloudflare_contract = {
+        ROOT / "cloudflare" / "build.mjs": (
+            "https://kmatap.streamlit.app",
+            "tap-user-guide.pdf",
+            "GitHub repository link",
+        ),
+        ROOT / "cloudflare" / "wrangler.jsonc": (
+            '"name": "kma-tap-open"',
+            '"directory": "./dist"',
+        ),
+        ROOT / "cloudflare" / "package.json": (
+            '"build": "node build.mjs"',
+            '"wrangler"',
+        ),
+    }
+    for path, markers in cloudflare_contract.items():
+        if not path.is_file():
+            continue
+        source = path.read_text(encoding="utf-8")
+        for marker in markers:
+            if marker not in source:
+                errors.append(
+                    f"Cloudflare open-page contract missing in {path.relative_to(ROOT)}: {marker}"
+                )
+    open_page_html = ROOT / "docs" / "TAP_오픈페이지_와이어프레임_v1.html"
+    if open_page_html.is_file():
+        source = open_page_html.read_text(encoding="utf-8")
+        for forbidden in ("DATA TRANSPARENCY", "현재 저장 방식", "짝지은", "소표본 보호"):
+            if forbidden in source:
+                errors.append(f"removed open-page content remains: {forbidden}")
 
     github_demo_contract = {
         ROOT / "tap" / "github_demo_store.py": (

@@ -26,5 +26,8 @@ reports/
 .idea/
 .vscode/
 coverage/
+node_modules/
+.wrangler/
 .tmp/
+cloudflare/dist/
 output/

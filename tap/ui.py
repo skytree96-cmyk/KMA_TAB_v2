@@ -21,7 +21,7 @@ ROLE_LABELS = {
 }
 
 ROLE_LANDINGS = {
-    "company": "streamlit_app.py",
+    "company": "pages/9_manager_dashboard.py",
     "participant": "pages/7_pre_assessment.py",
     "kma": "pages/6_kma_dashboard.py",
 }
@@ -29,7 +29,7 @@ ROLE_LANDINGS = {
 ROLE_NAV = {
     "company": (
         ("pages/0_user_guide.py", "처음 사용 안내"),
-        ("streamlit_app.py", "관리자 대시보드"),
+        ("pages/9_manager_dashboard.py", "관리자 대시보드"),
         ("pages/1_project_setup.py", "교육평가 프로젝트"),
         ("pages/4_organization_report.py", "교육 전후 리포트"),
         ("pages/7_pre_assessment.py", "교육 전 검사"),
@@ -45,7 +45,7 @@ ROLE_NAV = {
         ("pages/0_user_guide.py", "처음 사용 안내"),
         ("pages/6_kma_dashboard.py", "KMA 대시보드"),
         ("pages/5_question_bank.py", "문항은행·검수"),
-        ("streamlit_app.py", "회원사 운영 화면"),
+        ("pages/9_manager_dashboard.py", "회원사 운영 화면"),
     ),
 }
 
@@ -786,6 +786,10 @@ def safe_switch_page(path: str) -> bool:
 
 def _render_sidebar() -> str:
     # Apply a role requested by a CTA before drawing the destination sidebar.
+    query_role = st.query_params.get("tap_role")
+    if query_role in ROLE_LABELS:
+        st.session_state.active_role = query_role
+
     pending_role = st.session_state.pop("tap_pending_role", None)
     if pending_role in ROLE_LABELS:
         st.session_state.active_role = pending_role
@@ -849,7 +853,7 @@ def _render_sidebar() -> str:
         notes = {
             "company": (
                 "회원사 교육담당자 화면",
-                "교육 일정과 사전·사후 참여율을 운영하고 짝지어진 참여자 N≥5 조직 변화를 확인합니다.",
+                "교육 일정과 사전·사후 참여율을 운영하고 전·후 유효응답 N≥5 조직 변화를 확인합니다.",
             ),
             "participant": (
                 "참여자 교육평가 화면",

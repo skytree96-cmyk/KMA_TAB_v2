@@ -66,11 +66,11 @@ page_header(
     "교육 전후 리포트",
     "조직 교육 전후 리포트",
     "교육 전·후 자료가 있으면 같은 참여자의 변화를, 단일시점 자료이면 교육수요를 보여줍니다.",
-    badge=f"짝지어진 참여자 N≥{MIN_GROUP_N}만 공개",
+    badge=f"전·후 유효응답 N≥{MIN_GROUP_N}만 공개",
 )
 callout(
     "개인 순위와 단정적 교육효과는 제공하지 않습니다",
-    "전후 비교는 동일 교육 참여자 ID로 짝지은 자기보고 변화이며, 비교집단이 없으면 교육의 인과효과로 확정하지 않습니다.",
+    "전후 비교는 동일 교육 참여자 ID의 사전·사후 자기보고 변화이며, 비교집단이 없으면 교육의 인과효과로 확정하지 않습니다.",
     icon="5+",
 )
 
@@ -208,7 +208,7 @@ if project_keys:
         pre_col, post_col, pair_col = st.columns(3)
         pre_col.metric("교육 전 완료", f"{selected_overview['pre']}명")
         post_col.metric("교육 후 완료", f"{selected_overview['post']}명")
-        pair_col.metric("전·후 짝지음", f"{selected_overview['paired']}명")
+        pair_col.metric("전·후 모두 완료", f"{selected_overview['paired']}명")
 else:
     st.info(
         "저장된 실시 프로젝트가 없습니다. 현재 브라우저에서 프로젝트를 만들고 검사를 완료하면 여기에 표시됩니다."
@@ -610,7 +610,7 @@ if source_kind in {"session", "store"} and participant_count_for_privacy < MIN_G
             pre_col, post_col, pair_col = st.columns(3)
             pre_col.metric("교육 전 참여", f"{preview_summary['pre_participant_count']}명")
             post_col.metric("교육 후 참여", f"{preview_summary['post_participant_count']}명")
-            pair_col.metric("짝지어진 참여", f"{preview_summary['paired_participant_count']}명")
+            pair_col.metric("전·후 비교 참여자", f"{preview_summary['paired_participant_count']}명")
 
             preview_codes = [str(row["factor_code"]) for row in selected_preview_rows]
             preview_radar = build_planning_preview_radar(
@@ -723,7 +723,7 @@ if is_pre_post and pre_post_summary:
     k1, k2, k3, k4 = st.columns(4)
     k1.metric("교육 전 참여", f"{pre_post_summary['pre_participant_count']}명")
     k2.metric("교육 후 참여", f"{pre_post_summary['post_participant_count']}명")
-    k3.metric("짝지어진 참여", f"{pre_post_summary['paired_participant_count']}명")
+    k3.metric("전·후 비교 참여자", f"{pre_post_summary['paired_participant_count']}명")
     attrition_rate = pre_post_summary.get("attrition_rate")
     k4.metric("사후 이탈률", "—" if attrition_rate is None else f"{attrition_rate:.1f}%")
     result = pd.DataFrame(pre_post_summary["comparison_rows"])
@@ -732,7 +732,7 @@ if is_pre_post and pre_post_summary:
             "factor_name_ko": "역량",
             "pre_n": "교육 전 N",
             "post_n": "교육 후 N",
-            "paired_n": "짝지어진 N",
+            "paired_n": "전·후 유효응답 N",
             "pre_mean": "교육 전 평균",
             "post_mean": "교육 후 평균",
             "change": "관찰 변화",
@@ -831,7 +831,7 @@ st.html(organization_report_fragment(model))
 
 with st.expander("집계 검수표 보기"):
     st.caption(
-        "전후 비교는 동일 participant_id의 짝지어진 결과만 사용합니다. N≥5는 개인정보 보호를 위한 최소 공개 규칙이며 "
+        "전후 비교는 동일 participant_id의 전·후 유효 결과만 사용합니다. N≥5는 개인정보 보호를 위한 최소 공개 규칙이며 "
         "평균의 통계적 안정성이나 교육의 인과효과를 보장하지 않습니다."
     )
     st.dataframe(result_download, hide_index=True, width="stretch")

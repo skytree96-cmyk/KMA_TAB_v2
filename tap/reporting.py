@@ -51,7 +51,7 @@ def read_group_results_csv(raw: bytes) -> pd.DataFrame:
             )
         try:
             # 모든 열을 문자열로 먼저 보존한다. 특히 참여자 ID의 선행 0을
-            # pandas 숫자 추론으로 잃으면 서로 다른 참여자가 잘못 짝지어진다.
+            # pandas 숫자 추론으로 잃으면 서로 다른 참여자 결과가 잘못 연결된다.
             # 점수·품질·전이 열은 아래 canonical validator가 명시적으로 숫자화한다.
             return pd.read_csv(io.StringIO(text), dtype="string")
         except (pd.errors.ParserError, pd.errors.EmptyDataError) as exc:
@@ -547,11 +547,11 @@ def _pre_post_report_body(model: Mapping[str, Any]) -> str:
 
     if largest:
         summary = (
-            f"짝지어진 참여자 기준 가장 큰 관찰 변화는 <b>{escape(str(largest['factor_name_ko']))}</b> "
+            f"전·후 비교 참여자 기준 가장 큰 관찰 변화는 <b>{escape(str(largest['factor_name_ko']))}</b> "
             f"{float(largest['change']):+.2f}점입니다. 비교집단이 없는 자기보고 변화는 교육의 인과효과로 확정하지 않습니다."
         )
     else:
-        summary = "공개 가능한 짝지어진 결과가 없습니다. 사전·사후 완료자 수와 소표본 보호기준을 확인하세요."
+        summary = "공개 가능한 사전·사후 비교 결과가 없습니다. 사전·사후 완료자 수와 표본 보호 기준을 확인하세요."
 
     change_rows: list[str] = []
     detail_rows: list[str] = []
@@ -568,7 +568,7 @@ def _pre_post_report_body(model: Mapping[str, Any]) -> str:
             change_rows.append(
                 f"""
                 <div class="tap-change-row">
-                  <div><b>{escape(str(row['factor_name_ko']))}</b><small>교육 전 {float(pre_score):.2f} · 교육 후 {float(post_score):.2f} · 짝지어진 N={row['paired_n']}</small></div>
+                  <div><b>{escape(str(row['factor_name_ko']))}</b><small>교육 전 {float(pre_score):.2f} · 교육 후 {float(post_score):.2f} · 전·후 유효응답 N={row['paired_n']}</small></div>
                   <div class="tap-change-track"><span class="tap-change-link" style="left:{link_left:.1f}%;width:{link_width:.1f}%"></span><i class="tap-change-dot pre" style="left:{pre_pos:.1f}%"></i><i class="tap-change-dot post" style="left:{post_pos:.1f}%"></i></div>
                   <strong class="tap-change-value {tone}">{float(change):+.2f}</strong>
                 </div>
@@ -591,7 +591,7 @@ def _pre_post_report_body(model: Mapping[str, Any]) -> str:
             value = detail.get("mean")
             n = int(detail.get("n", 0))
             display = "비공개" if value is None else f"{float(value):.2f}"
-            note = f"짝지어진 응답 N={n} · {detail.get('status', '')}"
+            note = f"전·후 유효응답 N={n} · {detail.get('status', '')}"
         else:
             value = detail
             display = "미수집" if value is None else f"{float(value):.2f}"
@@ -605,7 +605,7 @@ def _pre_post_report_body(model: Mapping[str, Any]) -> str:
     action_rows = [
         ("1", "변화가 작거나 감소한 역량", "교육내용보다 적용기회·상사지원·도구·권한을 먼저 확인합니다."),
         ("2", "변화가 확인된 행동", "현업 과제와 피드백으로 반복해 유지 여부를 다음 추적검사에서 확인합니다."),
-        ("3", "다음 측정", "같은 문항·척도·회상기간과 도구버전을 유지하고 짝지어진 참여자를 추적합니다."),
+        ("3", "다음 측정", "같은 문항·척도·회상기간과 도구버전을 유지하고 전·후 모두 완료한 참여자를 추적합니다."),
     ]
     actions = "".join(
         f'<div class="tap-action"><span>{number}</span><div><b>{title}</b><small>{detail}</small></div></div>'
@@ -632,7 +632,7 @@ def _pre_post_report_body(model: Mapping[str, Any]) -> str:
               <div class="tap-report-kicker">01 · 교육 전후 비교{page_label}</div>
               <h2>교육 전과 교육 후를 같은 1~5점 축에서 봅니다</h2>
               <p class="tap-report-desc">회색은 교육 전, 청록은 교육 후입니다. 변화량은 같은 참여자의 사후−사전 평균이며 작은 차이를 효과로 단정하지 않습니다.</p>
-              <div class="tap-legend"><span><i class="pre"></i>교육 전</span><span><i class="post"></i>교육 후</span><span>공개 기준 짝지어진 참여자 N≥{pre_post.get('min_group_n', 5)}</span></div>
+              <div class="tap-legend"><span><i class="pre"></i>교육 전</span><span><i class="post"></i>교육 후</span><span>공개 기준 전·후 유효응답 N≥{pre_post.get('min_group_n', 5)}</span></div>
               <div class="tap-change-list">{''.join(page_rows) or '<p>공개 가능한 비교 결과 없음</p>'}</div>
               {average_block}
               <footer>서로 다른 참여자 집단의 평균을 단순 차감하지 않았습니다.</footer>
@@ -647,7 +647,7 @@ def _pre_post_report_body(model: Mapping[str, Any]) -> str:
         quality_block = (
             f"""
             <div class="tap-quality-grid">
-              <div><b>{pre_post['paired_participant_count']}명</b><span>짝지어진 참여자</span></div>
+              <div><b>{pre_post['paired_participant_count']}명</b><span>전·후 비교 참여자</span></div>
               <div><b>{pre_post['attrition_count']}명</b><span>사후 미완료</span></div>
               <div><b>{pre_na}</b><span>교육 전 수행기회 없음</span></div>
               <div><b>{post_na}</b><span>교육 후 수행기회 없음</span></div>
@@ -660,7 +660,7 @@ def _pre_post_report_body(model: Mapping[str, Any]) -> str:
             f"""
             <div class="tap-report-method-grid">
               <div><b>비교 규칙</b><span>동일 교육 참여자 ID·동일 역량·교육 전/후가 모두 있는 참여자만 변화 산출</span></div>
-              <div><b>집계 보호</b><span>짝지어진 참여자 N&lt;{pre_post.get('min_group_n', 5)} 비공개. 이 기준은 통계적 안정성을 보장하지 않음</span></div>
+              <div><b>집계 보호</b><span>전·후 유효응답 N&lt;{pre_post.get('min_group_n', 5)} 비공개. 이 기준은 통계적 안정성을 보장하지 않음</span></div>
               <div><b>허용 표현</b><span>교육 전후 자기보고 행동빈도 변화</span></div>
               <div><b>금지 표현</b><span>비교집단 없는 결과를 교육의 인과효과로 확정</span></div>
             </div>
@@ -673,9 +673,9 @@ def _pre_post_report_body(model: Mapping[str, Any]) -> str:
             <section class="tap-report-sheet tap-report-detail-page">
               {sample_badge}
               <div class="tap-report-kicker">03 · 데이터 품질 및 상세{page_label}</div>
-              <h2>짝지어진 N과 수행기회 정보를 함께 공개합니다</h2>
+              <h2>전·후 유효응답 N과 수행기회 정보를 함께 공개합니다</h2>
               {quality_block}
-              <table class="tap-report-table"><thead><tr><th>역량</th><th>전 N</th><th>후 N</th><th>짝지어진 N</th><th>교육 전</th><th>교육 후</th><th>변화</th><th>상태</th></tr></thead><tbody>{''.join(page_rows)}</tbody></table>
+              <table class="tap-report-table"><thead><tr><th>역량</th><th>전 N</th><th>후 N</th><th>전·후 유효응답 N</th><th>교육 전</th><th>교육 후</th><th>변화</th><th>상태</th></tr></thead><tbody>{''.join(page_rows)}</tbody></table>
               {method_block}
               <footer>KMA TAP · 도구버전, 검사 간격, 회상기간을 동일하게 유지하세요.</footer>
             </section>
@@ -686,18 +686,18 @@ def _pre_post_report_body(model: Mapping[str, Any]) -> str:
     <section class="tap-report-sheet tap-report-cover">
       {sample_badge}
       <header class="tap-report-brand"><span>TAP</span><div><b>KMA TAP</b><small>교육 전·후 업무행동 변화</small></div></header>
-      <div class="tap-report-kicker">조직 리포트 · 짝지어진 비교</div>
+      <div class="tap-report-kicker">조직 리포트 · 사전·사후 비교</div>
       <h1>조직 교육 전·후 변화 리포트</h1>
       <p class="tap-report-lead">같은 참여자의 교육 전·후 응답을 연결해 관찰된 행동빈도 변화를 확인합니다.</p>
       <div class="tap-report-meta"><b>{escape(str(model['project_name']))}</b><span>{escape(str(model['report_period']))}</span><span>생성일 {model['generated_on']}</span></div>
       <div class="tap-report-kpis">
         <div><b>{pre_post['pre_participant_count']}명</b><span>교육 전 참여</span></div>
         <div><b>{pre_post['post_participant_count']}명</b><span>교육 후 참여</span></div>
-        <div><b>{pre_post['paired_participant_count']}명</b><span>짝지어진 참여자</span></div>
+        <div><b>{pre_post['paired_participant_count']}명</b><span>전·후 비교 참여자</span></div>
         <div><b>{attrition_text}</b><span>사후 이탈률</span></div>
       </div>
       <div class="tap-report-summary">{summary}</div>
-      <footer>자기보고 행동빈도 · 동일 참여자 짝지어진 비교 · 개인순위 미제공</footer>
+      <footer>자기보고 행동빈도 · 동일 참여자 사전·사후 비교 · 개인순위 미제공</footer>
     </section>
 
     {'\n'.join(change_pages)}
@@ -800,7 +800,7 @@ def _report_body(model: Mapping[str, Any]) -> str:
       <div class="tap-report-kpis">
         <div><b>{model['participant_count']}명</b><span>익명 참여자</span></div>
         <div><b>{model['published_factor_count']}개</b><span>공개 역량</span></div>
-        <div><b>{model['suppressed_factor_count']}개</b><span>소표본 보호</span></div>
+        <div><b>{model['suppressed_factor_count']}개</b><span>표본 보호</span></div>
         <div><b>1~5점</b><span>행동빈도 평균</span></div>
       </div>
       <div class="tap-report-summary">{summary}</div>

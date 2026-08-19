@@ -1,0 +1,1028 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
+  <meta name="description" content="KMA TAP 교육 전·후 업무행동 변화점검 공개 안내">
+  <title>KMA TAP | 교육 전·후 업무행동 변화점검</title>
+  <style>
+    @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css');
+
+    :root {
+      --ink: #102a2d;
+      --muted: #5e7375;
+      --teal: #087b76;
+      --teal-deep: #075e5a;
+      --mint: #dff4f1;
+      --mint-soft: #eff9f7;
+      --canvas: #f4f8f7;
+      --paper: #ffffff;
+      --line: #d7e4e2;
+      --coral: #ff735c;
+      --blue: #3e6fdb;
+      --amber: #c98a13;
+      --shadow: 0 24px 70px rgba(14, 68, 65, 0.12);
+      --radius-xl: 32px;
+      --radius-lg: 24px;
+      --radius-md: 16px;
+      --max: 1200px;
+    }
+
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      color: var(--ink);
+      background: var(--paper);
+      font-family: Pretendard, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      line-height: 1.62;
+      word-break: keep-all;
+      -webkit-font-smoothing: antialiased;
+    }
+    a { color: inherit; }
+    section[id] { scroll-margin-top: 96px; }
+    .sr-only {
+      position: absolute !important;
+      width: 1px !important;
+      height: 1px !important;
+      padding: 0 !important;
+      margin: -1px !important;
+      overflow: hidden !important;
+      clip: rect(0, 0, 0, 0) !important;
+      white-space: nowrap !important;
+      border: 0 !important;
+    }
+    button, a { -webkit-tap-highlight-color: transparent; }
+    .skip-link {
+      position: fixed;
+      left: 16px;
+      top: -80px;
+      z-index: 200;
+      padding: 12px 16px;
+      color: #fff;
+      background: var(--teal-deep);
+      border-radius: 10px;
+      font-weight: 800;
+    }
+    .skip-link:focus { top: 16px; }
+    :focus-visible {
+      outline: 3px solid rgba(255, 115, 92, 0.75);
+      outline-offset: 3px;
+    }
+
+    .notice {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 10px;
+      min-height: 40px;
+      padding: 8px 20px;
+      color: #fff;
+      background: var(--teal-deep);
+      font-size: 14px;
+      font-weight: 700;
+      text-align: center;
+    }
+    .notice-dot {
+      width: 8px;
+      height: 8px;
+      flex: 0 0 auto;
+      border-radius: 999px;
+      background: #71e0d7;
+      box-shadow: 0 0 0 5px rgba(113, 224, 215, 0.14);
+    }
+
+    .site-header {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      border-bottom: 1px solid rgba(215, 228, 226, 0.9);
+      background: rgba(255, 255, 255, 0.92);
+      backdrop-filter: blur(18px);
+    }
+    .header-inner {
+      width: min(calc(100% - 40px), var(--max));
+      min-height: 78px;
+      margin: 0 auto;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 24px;
+    }
+    .brand {
+      display: inline-flex;
+      align-items: center;
+      gap: 12px;
+      color: inherit;
+      text-decoration: none;
+      flex: 0 0 auto;
+    }
+    .brand-mark {
+      display: grid;
+      place-items: center;
+      width: 48px;
+      height: 48px;
+      color: #fff;
+      border-radius: 16px;
+      background: linear-gradient(145deg, #09aaa1, var(--teal));
+      box-shadow: 0 12px 28px rgba(8, 123, 118, 0.22);
+      font-size: 16px;
+      font-weight: 900;
+      letter-spacing: -0.04em;
+    }
+    .brand-copy { display: grid; line-height: 1.16; }
+    .brand-copy strong { font-size: 18px; letter-spacing: -0.035em; }
+    .brand-copy small { margin-top: 5px; color: var(--muted); font-size: 11px; }
+    .nav-wrap { display: flex; align-items: center; gap: 26px; }
+    .nav-list {
+      display: flex;
+      align-items: center;
+      gap: 24px;
+      margin: 0;
+      padding: 0;
+      list-style: none;
+    }
+    .nav-list a {
+      color: #30494b;
+      text-decoration: none;
+      font-size: 14px;
+      font-weight: 700;
+    }
+    .nav-list a:hover { color: var(--teal); }
+    .menu-button {
+      display: none;
+      width: 46px;
+      height: 46px;
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      background: #fff;
+      color: var(--ink);
+      font: inherit;
+      font-weight: 900;
+      cursor: pointer;
+    }
+
+    .button {
+      min-height: 48px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 0 20px;
+      border: 1px solid transparent;
+      border-radius: 14px;
+      text-decoration: none;
+      font-size: 15px;
+      font-weight: 800;
+      transition: transform 0.18s ease, box-shadow 0.18s ease, background 0.18s ease;
+    }
+    .button:hover { transform: translateY(-2px); }
+    .button-primary {
+      color: #fff;
+      background: var(--teal);
+      box-shadow: 0 12px 28px rgba(8, 123, 118, 0.22);
+    }
+    .button-primary:hover { background: var(--teal-deep); }
+    .button-secondary {
+      color: var(--ink);
+      border-color: var(--line);
+      background: #fff;
+    }
+    .button-secondary:hover { border-color: #9ccbc6; background: var(--mint-soft); }
+    .button-ghost {
+      min-height: 42px;
+      color: var(--teal-deep);
+      border-color: #a9d9d4;
+      background: transparent;
+      font-size: 14px;
+    }
+
+    .section { padding: 112px 0; }
+    .section-soft { background: var(--canvas); }
+    .section-dark { color: #fff; background: #0d292b; }
+    .container { width: min(calc(100% - 40px), var(--max)); margin: 0 auto; }
+    .eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 18px;
+      color: var(--teal);
+      font-size: 13px;
+      font-weight: 900;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+    .eyebrow::before {
+      content: "";
+      width: 24px;
+      height: 2px;
+      background: currentColor;
+    }
+    .section-heading { max-width: 760px; margin-bottom: 50px; }
+    .section-heading.center { margin-inline: auto; text-align: center; }
+    .section-heading h2 {
+      margin: 0;
+      font-size: clamp(34px, 4.4vw, 54px);
+      line-height: 1.18;
+      letter-spacing: -0.055em;
+    }
+    .section-heading p {
+      margin: 20px 0 0;
+      color: var(--muted);
+      font-size: 18px;
+    }
+    .section-dark .section-heading p { color: #b8cdcb; }
+
+    .hero {
+      position: relative;
+      overflow: hidden;
+      padding: 92px 0 76px;
+      background:
+        radial-gradient(circle at 92% 10%, rgba(69, 208, 195, 0.20), transparent 32%),
+        radial-gradient(circle at 3% 70%, rgba(255, 115, 92, 0.08), transparent 28%),
+        linear-gradient(180deg, #fff, #f5fbfa);
+    }
+    .hero::after {
+      content: "";
+      position: absolute;
+      right: -110px;
+      top: 70px;
+      width: 360px;
+      height: 360px;
+      border: 1px solid rgba(8, 123, 118, 0.10);
+      border-radius: 50%;
+      box-shadow: 0 0 0 50px rgba(8, 123, 118, 0.025), 0 0 0 100px rgba(8, 123, 118, 0.02);
+      pointer-events: none;
+    }
+    .hero-grid {
+      position: relative;
+      z-index: 1;
+      display: grid;
+      grid-template-columns: minmax(0, 0.98fr) minmax(520px, 1.02fr);
+      gap: 56px;
+      align-items: center;
+    }
+    .hero-copy h1 {
+      max-width: 680px;
+      margin: 0;
+      font-size: clamp(48px, 5.8vw, 76px);
+      line-height: 1.06;
+      letter-spacing: -0.065em;
+    }
+    .hero-copy h1 span { color: var(--teal); }
+    .hero-copy > p {
+      max-width: 650px;
+      margin: 28px 0 0;
+      color: #506769;
+      font-size: clamp(17px, 1.8vw, 21px);
+    }
+    .hero-actions { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 34px; }
+    .hero-note {
+      width: max-content;
+      max-width: 100%;
+      margin-top: 22px;
+      color: #6c7f80;
+      font-size: 13px;
+      font-weight: 700;
+      line-height: 1.55;
+      text-align: center;
+      text-wrap: balance;
+    }
+
+    .product-window {
+      position: relative;
+      padding: 20px;
+      border: 1px solid rgba(184, 211, 207, 0.9);
+      border-radius: var(--radius-xl);
+      background: rgba(255, 255, 255, 0.92);
+      box-shadow: var(--shadow);
+    }
+    .window-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+    .window-dots { display: flex; gap: 6px; }
+    .window-dots i { width: 9px; height: 9px; border-radius: 50%; background: #d9e5e3; }
+    .window-title { color: #526b6d; font-size: 11px; font-weight: 800; }
+    .demo-badge {
+      display: inline-flex;
+      align-items: center;
+      min-height: 28px;
+      padding: 0 10px;
+      color: #8b5610;
+      border: 1px solid #eed6a7;
+      border-radius: 999px;
+      background: #fff9e8;
+      font-size: 11px;
+      font-weight: 900;
+    }
+    .preview-card {
+      padding: 22px;
+      border-radius: 22px;
+      background: #f6faf9;
+      border: 1px solid #e0ebe9;
+    }
+    .preview-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; }
+    .preview-head h3 { margin: 0; font-size: 18px; letter-spacing: -0.035em; }
+    .preview-head p { margin: 5px 0 0; color: var(--muted); font-size: 12px; }
+    .mini-metrics { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 18px 0; }
+    .mini-metric { padding: 12px; border: 1px solid var(--line); border-radius: 14px; background: #fff; }
+    .mini-metric span { display: block; color: var(--muted); font-size: 10px; }
+    .mini-metric strong { display: block; margin-top: 2px; font-size: 18px; }
+    .mini-metric em { color: var(--teal); font-size: 10px; font-style: normal; font-weight: 800; }
+    .radar-frame { position: relative; width: 100%; min-height: 286px; }
+    .radar-frame canvas { width: 100%; height: 286px; display: block; }
+    .chart-legend { display: flex; justify-content: center; gap: 18px; color: var(--muted); font-size: 11px; font-weight: 700; }
+    .legend-item { display: inline-flex; align-items: center; gap: 6px; }
+    .legend-swatch { width: 18px; height: 4px; border-radius: 999px; background: var(--blue); }
+    .legend-swatch.post { background: var(--teal); }
+    .floating-change {
+      position: absolute;
+      right: -24px;
+      bottom: 56px;
+      width: 152px;
+      padding: 15px 16px;
+      border: 1px solid #cce4e0;
+      border-radius: 16px;
+      background: #fff;
+      box-shadow: 0 18px 44px rgba(14, 68, 65, 0.15);
+    }
+    .floating-change span { display: block; color: var(--muted); font-size: 10px; }
+    .floating-change strong { display: block; margin-top: 2px; color: var(--teal); font-size: 23px; }
+
+    .principle-strip {
+      margin-top: 64px;
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      border: 1px solid var(--line);
+      border-radius: 20px;
+      background: rgba(255, 255, 255, 0.9);
+      overflow: hidden;
+    }
+    .principle {
+      min-height: 92px;
+      padding: 22px;
+      display: flex;
+      align-items: center;
+      gap: 13px;
+      border-right: 1px solid var(--line);
+    }
+    .principle:last-child { border-right: 0; }
+    .principle-number {
+      display: grid;
+      place-items: center;
+      width: 32px;
+      height: 32px;
+      flex: 0 0 auto;
+      color: var(--teal);
+      border-radius: 10px;
+      background: var(--mint);
+      font-size: 11px;
+      font-weight: 900;
+    }
+    .principle strong { display: block; font-size: 14px; }
+    .principle small { display: block; margin-top: 2px; color: var(--muted); font-size: 11px; }
+
+    .problem-grid { display: grid; grid-template-columns: 0.95fr 1.05fr; gap: 64px; align-items: center; }
+    .problem-copy h2 { margin: 0; font-size: clamp(34px, 4.5vw, 54px); line-height: 1.17; letter-spacing: -0.055em; }
+    .problem-copy p { margin: 22px 0 0; color: var(--muted); font-size: 18px; }
+    .contrast-card {
+      padding: 36px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius-lg);
+      background: #fff;
+      box-shadow: 0 18px 48px rgba(14, 68, 65, 0.07);
+    }
+    .contrast-row { display: grid; grid-template-columns: 110px 1fr; gap: 22px; padding: 23px 0; border-bottom: 1px solid var(--line); }
+    .contrast-row:first-child { padding-top: 0; }
+    .contrast-row:last-child { padding-bottom: 0; border-bottom: 0; }
+    .contrast-label { display: flex; align-items: flex-start; gap: 8px; color: #536b6d; font-size: 13px; font-weight: 800; }
+    .contrast-label.after { color: var(--teal); }
+    .contrast-row strong { display: block; font-size: 18px; }
+    .contrast-row p { margin: 6px 0 0; color: var(--muted); font-size: 14px; }
+
+    .step-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 14px; }
+    .step-card {
+      position: relative;
+      min-height: 244px;
+      padding: 26px 22px;
+      border: 1px solid var(--line);
+      border-radius: 20px;
+      background: #fff;
+    }
+    .step-card:not(:last-child)::after {
+      content: "→";
+      position: absolute;
+      right: -18px;
+      top: 49%;
+      z-index: 2;
+      display: grid;
+      place-items: center;
+      width: 30px;
+      height: 30px;
+      color: var(--teal);
+      border: 1px solid var(--line);
+      border-radius: 50%;
+      background: var(--canvas);
+      font-size: 13px;
+      font-weight: 900;
+    }
+    .step-index { color: var(--teal); font-size: 12px; font-weight: 900; letter-spacing: 0.08em; }
+    .step-icon {
+      width: 56px;
+      height: 56px;
+      margin: 22px 0;
+      display: grid;
+      place-items: center;
+      color: var(--teal-deep);
+      border-radius: 18px;
+      background: var(--mint);
+      font-size: 21px;
+      font-weight: 900;
+    }
+    .step-card h3 { margin: 0; font-size: 18px; }
+    .step-card p { margin: 9px 0 0; color: var(--muted); font-size: 13px; }
+
+    .report-grid { display: grid; grid-template-columns: minmax(0, 1.13fr) minmax(330px, 0.87fr); gap: 54px; align-items: center; }
+    .report-surface {
+      padding: 26px;
+      color: var(--ink);
+      border-radius: 30px;
+      background: #fff;
+      box-shadow: 0 30px 80px rgba(0, 0, 0, 0.25);
+    }
+    .report-toolbar { display: flex; justify-content: space-between; align-items: center; padding-bottom: 18px; border-bottom: 1px solid var(--line); }
+    .report-toolbar strong { font-size: 16px; }
+    .report-toolbar small { color: var(--muted); }
+    .report-body { display: grid; grid-template-columns: minmax(0, 1fr) 180px; gap: 20px; padding-top: 18px; }
+    .report-radar { min-height: 360px; border-radius: 20px; background: #f7faf9; }
+    .report-radar canvas { width: 100%; height: 360px; display: block; }
+    .report-aside { display: grid; gap: 10px; align-content: start; }
+    .change-item { padding: 15px; border: 1px solid var(--line); border-radius: 14px; }
+    .change-item span { display: block; color: var(--muted); font-size: 10px; }
+    .change-item strong { display: block; margin-top: 2px; font-size: 18px; }
+    .change-item strong.up { color: var(--teal); }
+    .report-copy h2 { margin: 0; font-size: clamp(34px, 4.2vw, 52px); line-height: 1.17; letter-spacing: -0.055em; }
+    .report-copy > p { margin: 20px 0 0; color: #b8cdcb; font-size: 17px; }
+    .feature-list { margin: 32px 0 0; padding: 0; list-style: none; }
+    .feature-list li { position: relative; margin: 14px 0; padding-left: 30px; color: #e9f3f2; }
+    .feature-list li::before {
+      content: "✓";
+      position: absolute;
+      left: 0;
+      top: 1px;
+      display: grid;
+      place-items: center;
+      width: 20px;
+      height: 20px;
+      color: #062e2b;
+      border-radius: 50%;
+      background: #79d9d0;
+      font-size: 11px;
+      font-weight: 900;
+    }
+
+    .role-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; }
+    .role-card {
+      position: relative;
+      min-height: 390px;
+      padding: 32px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius-lg);
+      background: #fff;
+      overflow: hidden;
+      transition: transform 0.18s ease, box-shadow 0.18s ease;
+    }
+    .role-card:hover { transform: translateY(-6px); box-shadow: var(--shadow); }
+    .role-card::after {
+      content: "";
+      position: absolute;
+      right: -65px;
+      top: -65px;
+      width: 180px;
+      height: 180px;
+      border-radius: 50%;
+      background: var(--mint-soft);
+    }
+    .role-card.featured { color: #fff; border-color: var(--teal-deep); background: var(--teal-deep); }
+    .role-card.featured::after { background: rgba(255, 255, 255, 0.08); }
+    .role-kicker { position: relative; z-index: 1; color: var(--teal); font-size: 12px; font-weight: 900; letter-spacing: 0.08em; }
+    .role-card.featured .role-kicker { color: #92e7df; }
+    .role-card h3 { position: relative; z-index: 1; margin: 22px 0 0; font-size: 28px; letter-spacing: -0.04em; }
+    .role-card p { position: relative; z-index: 1; min-height: 52px; margin: 12px 0 0; color: var(--muted); font-size: 14px; }
+    .role-card.featured p { color: #c9dddb; }
+    .role-list { position: relative; z-index: 1; margin: 24px 0 30px; padding: 0; list-style: none; }
+    .role-list li { margin: 10px 0; font-size: 14px; }
+    .role-list li::before { content: "·"; margin-right: 8px; color: var(--coral); font-weight: 900; }
+    .role-card > .button { position: absolute; left: 32px; bottom: 30px; z-index: 1; }
+    .role-actions { position: absolute; left: 32px; right: 32px; bottom: 30px; z-index: 1; display: flex; gap: 8px; }
+    .role-actions .button { min-height: 44px; flex: 1; padding-inline: 13px; }
+    .role-card.featured .button-secondary { color: var(--teal-deep); border-color: #fff; background: #fff; }
+
+    .method-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; }
+    .method-card { min-height: 210px; padding: 28px; border: 1px solid var(--line); border-radius: 20px; background: #fff; }
+    .method-card .method-number { color: var(--teal); font-size: 12px; font-weight: 900; }
+    .method-card h3 { margin: 16px 0 0; font-size: 21px; }
+    .method-card p { margin: 10px 0 0; color: var(--muted); font-size: 14px; }
+    .caution {
+      margin-top: 22px;
+      padding: 24px 28px;
+      display: flex;
+      align-items: flex-start;
+      gap: 16px;
+      color: #714811;
+      border: 1px solid #ecd5a8;
+      border-radius: 18px;
+      background: #fff9e9;
+    }
+    .caution strong { display: block; }
+    .caution p { margin: 4px 0 0; font-size: 13px; }
+
+    .faq-grid { display: grid; grid-template-columns: 0.72fr 1.28fr; gap: 60px; align-items: start; }
+    .faq-copy h2 { margin: 0; font-size: clamp(34px, 4vw, 50px); line-height: 1.17; letter-spacing: -0.055em; }
+    .faq-copy p { margin: 18px 0 0; color: var(--muted); }
+    .faq-list { display: grid; gap: 10px; }
+    details { border: 1px solid var(--line); border-radius: 16px; background: #fff; }
+    summary { padding: 20px 22px; cursor: pointer; font-weight: 800; list-style: none; }
+    summary::-webkit-details-marker { display: none; }
+    summary::after { content: "+"; float: right; color: var(--teal); font-size: 20px; }
+    details[open] summary::after { content: "−"; }
+    details p { margin: 0; padding: 0 22px 22px; color: var(--muted); font-size: 14px; }
+
+    .final-cta { padding: 86px 0; background: linear-gradient(135deg, #0b6c67, #0d938b); }
+    .final-inner { display: flex; align-items: center; justify-content: space-between; gap: 40px; color: #fff; }
+    .final-inner h2 { margin: 0; font-size: clamp(34px, 4.4vw, 54px); line-height: 1.13; letter-spacing: -0.055em; }
+    .final-inner p { margin: 14px 0 0; color: #d1ece9; }
+    .final-actions { display: flex; flex: 0 0 auto; gap: 10px; }
+    .final-actions .button-primary { color: var(--teal-deep); background: #fff; }
+    .final-actions .button-ghost { color: #fff; border-color: rgba(255, 255, 255, 0.55); }
+
+    .site-footer { padding: 42px 0; color: #adbfbe; background: #0b2325; }
+    .footer-grid { display: grid; grid-template-columns: 1fr auto; gap: 30px; align-items: end; }
+    .footer-brand { display: flex; align-items: center; gap: 12px; }
+    .footer-brand .brand-mark { width: 40px; height: 40px; border-radius: 13px; }
+    .footer-brand strong { color: #fff; }
+    .footer-links { display: flex; flex-wrap: wrap; justify-content: flex-end; align-items: center; gap: 14px; }
+    .footer-links a { color: #d9e6e5; text-decoration: none; font-size: 13px; }
+    .footer-links .footer-guide-button {
+      min-height: 44px;
+      padding: 0 18px;
+      color: #fff;
+      background: var(--teal);
+      box-shadow: none;
+    }
+    .footer-links .footer-guide-button:hover { color: #fff; background: #0a928b; }
+    .footer-note { margin: 24px 0 0; padding-top: 20px; border-top: 1px solid rgba(255, 255, 255, 0.12); font-size: 12px; }
+
+    @media (max-width: 1060px) {
+      .nav-list { display: none; }
+      .menu-button { display: inline-grid; place-items: center; }
+      .nav-wrap.open .nav-list {
+        position: absolute;
+        left: 20px;
+        right: 20px;
+        top: 82px;
+        display: grid;
+        gap: 0;
+        padding: 12px;
+        border: 1px solid var(--line);
+        border-radius: 18px;
+        background: #fff;
+        box-shadow: var(--shadow);
+      }
+      .nav-wrap.open .nav-list a { display: block; padding: 14px; }
+      .hero-grid { grid-template-columns: 1fr; }
+      .hero-copy { max-width: 780px; }
+      .product-window { max-width: 760px; }
+      .principle-strip { grid-template-columns: repeat(2, 1fr); }
+      .principle:nth-child(2) { border-right: 0; }
+      .principle:nth-child(-n+2) { border-bottom: 1px solid var(--line); }
+      .problem-grid, .report-grid, .faq-grid { grid-template-columns: 1fr; }
+      .step-grid { grid-template-columns: repeat(3, 1fr); }
+      .step-card:nth-child(3)::after { display: none; }
+      .role-grid { grid-template-columns: 1fr; }
+      .role-card { min-height: 340px; }
+    }
+
+    @media (max-width: 720px) {
+      .notice { font-size: 12px; }
+      .header-inner { width: min(calc(100% - 28px), var(--max)); min-height: 70px; }
+      .brand-copy small { display: none; }
+      .nav-wrap > .button { display: none; }
+      .section { padding: 82px 0; }
+      .container { width: min(calc(100% - 28px), var(--max)); }
+      .hero { padding: 68px 0 54px; }
+      .hero-copy h1 { font-size: clamp(42px, 13vw, 60px); }
+      .hero-actions { display: grid; }
+      .hero-actions .button { width: 100%; }
+      .product-window { padding: 13px; border-radius: 24px; }
+      .preview-card { padding: 16px; }
+      .mini-metrics { grid-template-columns: 1fr; }
+      .radar-frame, .radar-frame canvas { min-height: 250px; height: 250px; }
+      .floating-change { right: 8px; bottom: 48px; width: 132px; }
+      .principle-strip { grid-template-columns: 1fr; margin-top: 40px; }
+      .principle { border-right: 0; border-bottom: 1px solid var(--line); }
+      .principle:last-child { border-bottom: 0; }
+      .contrast-card { padding: 24px; }
+      .contrast-row { grid-template-columns: 1fr; gap: 8px; }
+      .step-grid { grid-template-columns: 1fr; }
+      .step-card { min-height: auto; }
+      .step-card::after { display: none !important; }
+      .report-surface { padding: 16px; border-radius: 22px; }
+      .report-body { grid-template-columns: 1fr; }
+      .report-aside { grid-template-columns: repeat(2, 1fr); }
+      .change-item { padding: 11px; }
+      .change-item strong { font-size: 15px; }
+      .method-grid { grid-template-columns: 1fr; }
+      .role-card { min-height: auto; }
+      .role-card > .button, .role-actions { position: static; margin-top: 26px; }
+      .flow-row { grid-template-columns: 1fr; }
+      .flow-arrow { min-height: 34px; transform: rotate(90deg); }
+      .final-inner, .footer-grid { align-items: flex-start; flex-direction: column; display: flex; }
+      .final-actions { width: 100%; display: grid; }
+      .footer-links { justify-content: flex-start; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      html { scroll-behavior: auto; }
+      *, *::before, *::after { transition: none !important; animation: none !important; }
+    }
+  </style>
+</head>
+<body>
+  <a class="skip-link" href="#main">본문 바로가기</a>
+
+  <div class="notice" role="note">
+    <span class="notice-dot" aria-hidden="true"></span>
+    기획검증용 공개 데모 · 실명·사번·이메일 등 개인정보를 입력하지 마세요.
+  </div>
+
+  <header class="site-header">
+    <div class="header-inner">
+      <a class="brand" href="#top" aria-label="KMA TAP 첫 화면으로 이동">
+        <span class="brand-mark" aria-hidden="true">TAP</span>
+        <span class="brand-copy">
+          <strong>KMA TAP</strong>
+          <small>교육 전·후 업무행동 변화점검</small>
+        </span>
+      </a>
+      <div class="nav-wrap" id="navWrap">
+        <nav aria-label="주요 메뉴">
+          <ul class="nav-list" id="navList">
+            <li><a href="#about">서비스 소개</a></li>
+            <li><a href="#process">작동 방식</a></li>
+            <li><a href="#report">리포트 예시</a></li>
+            <li><a href="#method">측정 원칙</a></li>
+            <li><a href="#faq">FAQ</a></li>
+          </ul>
+        </nav>
+        <a class="button button-primary" href="#roles">검사 참여</a>
+        <button class="menu-button" id="menuButton" type="button" aria-expanded="false" aria-controls="navList" aria-label="메뉴 열기">☰</button>
+      </div>
+    </div>
+  </header>
+
+  <main id="main">
+    <section class="hero" id="top">
+      <div class="container">
+        <div class="hero-grid">
+          <div class="hero-copy">
+            <span class="eyebrow">Training Assessment Platform</span>
+            <h1>교육 전과 후,<br><span>현업 행동의 변화</span>를<br>확인합니다.</h1>
+            <p>동일 참여자·동일 문항의 교육 전후 결과를 비교하고, 자기보고 업무행동 지표의 관찰 변화와 교육전이 환경을 다음 교육 설계로 연결합니다.</p>
+            <div class="hero-actions">
+              <a class="button button-primary" href="#report">샘플 리포트 보기 <span aria-hidden="true">↓</span></a>
+              <a class="button button-secondary" href="#roles">프로젝트 코드로 검사 참여</a>
+            </div>
+            <p class="hero-note">교육개발 전용 · 채용·승진·보상·성과평가에는 사용하지 않습니다.</p>
+          </div>
+
+          <div class="product-window" aria-label="합성 데이터 기반 전후 비교 리포트 미리보기">
+            <div class="window-top">
+              <span class="window-dots" aria-hidden="true"><i></i><i></i><i></i></span>
+              <span class="window-title">교육 전후 비교 리포트</span>
+              <span class="demo-badge">합성 예시 데이터</span>
+            </div>
+            <div class="preview-card">
+              <div class="preview-head">
+                <div>
+                  <h3>공통역량 교육 · 전후 변화</h3>
+                  <p>동일 참여자 10명 · 역량별 유효 N≥5</p>
+                </div>
+                <span class="demo-badge">교육 후</span>
+              </div>
+              <div class="mini-metrics">
+                <div class="mini-metric"><span>교육 전 평균</span><strong>3.06</strong><em>최근 8주</em></div>
+                <div class="mini-metric"><span>교육 후 평균</span><strong>3.71</strong><em>최근 8주</em></div>
+                <div class="mini-metric"><span>관찰 변화</span><strong>+0.65</strong><em>1–5점</em></div>
+              </div>
+              <div class="radar-frame">
+                <canvas id="heroRadar" role="img" aria-label="8개 역량의 교육 전후 점수를 비교한 레이더 그래프">교육 전후 역량 비교 그래프</canvas>
+              </div>
+              <div class="chart-legend">
+                <span class="legend-item"><i class="legend-swatch"></i>교육 전</span>
+                <span class="legend-item"><i class="legend-swatch post"></i>교육 후</span>
+              </div>
+              <table class="sr-only">
+                <caption>합성 예시 8개 업무행동 지표의 교육 전후 값</caption>
+                <thead><tr><th>지표</th><th>교육 전</th><th>교육 후</th></tr></thead>
+                <tbody><tr><td>문제해결</td><td>2.70</td><td>3.62</td></tr><tr><td>협업</td><td>3.10</td><td>3.81</td></tr><tr><td>실행력</td><td>3.00</td><td>3.66</td></tr><tr><td>소통</td><td>3.40</td><td>3.92</td></tr><tr><td>고객지향</td><td>3.20</td><td>3.74</td></tr><tr><td>디지털</td><td>2.60</td><td>3.38</td></tr><tr><td>학습민첩</td><td>3.00</td><td>3.61</td></tr><tr><td>자기관리</td><td>3.50</td><td>3.97</td></tr></tbody>
+              </table>
+            </div>
+            <div class="floating-change" aria-hidden="true"><span>가장 큰 관찰 변화</span><strong>+0.92</strong><span>문제해결 역량</span></div>
+          </div>
+        </div>
+
+        <div class="principle-strip" aria-label="TAP 핵심 측정 원칙">
+          <div class="principle"><span class="principle-number">01</span><span><strong>동일 문항 비교</strong><small>같은 기준의 전후 변화</small></span></div>
+          <div class="principle"><span class="principle-number">02</span><span><strong>최근 8주 업무행동</strong><small>실제 업무에서 한 행동을 기준으로 응답</small></span></div>
+          <div class="principle"><span class="principle-number">03</span><span><strong>조직 결과 공개 기준</strong><small>각 역량의 전·후 응답자가 5명 이상일 때 공개</small></span></div>
+          <div class="principle"><span class="principle-number">04</span><span><strong>원문 ID 미저장</strong><small>프로젝트별 가명 연결</small></span></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="about">
+      <div class="container problem-grid">
+        <div class="problem-copy">
+          <span class="eyebrow">Why TAP</span>
+          <h2>교육 만족도만으로는<br>현업의 변화를 설명하기 어렵습니다.</h2>
+          <p>TAP은 교육 전의 출발점과 교육 후의 업무행동을 같은 기준으로 연결하여, 다음 교육과 현업 지원에 필요한 정보를 제공합니다.</p>
+        </div>
+        <div class="contrast-card">
+          <div class="contrast-row">
+            <div class="contrast-label">기존 확인</div>
+            <div><strong>교육은 만족스러웠나요?</strong><p>교육 직후의 반응과 만족도 중심 확인</p></div>
+          </div>
+          <div class="contrast-row">
+            <div class="contrast-label after">TAP 확인</div>
+            <div><strong>현업 행동은 어떻게 달라졌나요?</strong><p>동일 참여자의 교육 전후 변화와 적용환경을 함께 확인</p></div>
+          </div>
+          <div class="contrast-row">
+            <div class="contrast-label after">다음 활용</div>
+            <div><strong>다음 교육과 지원은 무엇이어야 하나요?</strong><p>역량별 변화, 전이요인, 교육과정 매핑을 교육 설계로 환류</p></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section section-soft" id="process">
+      <div class="container">
+        <div class="section-heading center">
+          <span class="eyebrow">How it works</span>
+          <h2>한 번의 진단이 아니라,<br>교육 전후의 흐름을 연결합니다.</h2>
+          <p>교육담당자가 프로젝트를 설정하고 참여자가 같은 ID와 같은 문항으로 교육 전후 검사를 완료합니다.</p>
+        </div>
+        <div class="step-grid">
+          <article class="step-card"><span class="step-index">STEP 01</span><div class="step-icon">설정</div><h3>프로젝트 구성</h3><p>교육명·일정·대상·공통 측정역량 설정</p></article>
+          <article class="step-card"><span class="step-index">STEP 02</span><div class="step-icon">전</div><h3>교육 전 검사</h3><p>최근 8주 실제 업무행동을 기준으로 응답</p></article>
+          <article class="step-card"><span class="step-index">STEP 03</span><div class="step-icon">중</div><h3>교육·현업 적용</h3><p>교육 이수 후 8~10주간 실제 업무에 적용</p></article>
+          <article class="step-card"><span class="step-index">STEP 04</span><div class="step-icon">후</div><h3>교육 후 검사</h3><p>동일 문항과 동일 참여자 ID로 다시 측정</p></article>
+          <article class="step-card"><span class="step-index">STEP 05</span><div class="step-icon">보고</div><h3>변화 리포트</h3><p>사전·사후 변화·전이환경·교육추천 확인</p></article>
+        </div>
+      </div>
+    </section>
+
+    <section class="section section-dark" id="report">
+      <div class="container report-grid">
+        <div class="report-surface" aria-label="합성 데이터 기반 샘플 조직 리포트">
+          <div class="report-toolbar"><strong>조직 교육수요 리포트</strong><small>합성 예시 · N=10</small></div>
+          <div class="report-body">
+            <div class="report-radar">
+              <canvas id="reportRadar" role="img" aria-label="8개 업무행동 지표의 교육 전후 관찰 변화를 나타낸 합성 예시 그래프">교육 전후 관찰 변화 그래프</canvas>
+              <table class="sr-only">
+                <caption>합성 예시 8개 업무행동 지표의 교육 전후 값</caption>
+                <thead><tr><th>지표</th><th>교육 전</th><th>교육 후</th></tr></thead>
+                <tbody><tr><td>문제해결</td><td>2.70</td><td>3.62</td></tr><tr><td>협업</td><td>3.10</td><td>3.81</td></tr><tr><td>실행력</td><td>3.00</td><td>3.66</td></tr><tr><td>소통</td><td>3.40</td><td>3.92</td></tr><tr><td>고객지향</td><td>3.20</td><td>3.74</td></tr><tr><td>디지털</td><td>2.60</td><td>3.38</td></tr><tr><td>학습민첩</td><td>3.00</td><td>3.61</td></tr><tr><td>자기관리</td><td>3.50</td><td>3.97</td></tr></tbody>
+              </table>
+            </div>
+            <div class="report-aside">
+              <div class="change-item"><span>문제해결</span><strong class="up">+0.92</strong></div>
+              <div class="change-item"><span>협업</span><strong class="up">+0.71</strong></div>
+              <div class="change-item"><span>실행력</span><strong class="up">+0.66</strong></div>
+              <div class="change-item"><span>적용 기회</span><strong>3.8 / 5</strong></div>
+            </div>
+          </div>
+        </div>
+        <div class="report-copy">
+          <span class="eyebrow">Report preview</span>
+          <h2>변화와 함께,<br>현업 적용환경까지 봅니다.</h2>
+          <p>역량별 교육 전후 변화와 업무 적용기회, 상사지원, 도구·권한, 시간·프로세스를 함께 해석합니다.</p>
+          <ul class="feature-list">
+            <li>선택 역량 최대 8축 전후 레이더</li>
+            <li>역량별 사전·사후 유효 참여자 수</li>
+            <li>현업 전이요인과 적용 장애요인</li>
+            <li>교육과정 검토 우선순위 및 후속조치</li>
+            <li>A4형 인쇄 리포트와 상세 CSV</li>
+          </ul>
+          <a class="button button-ghost" href="/organization_report?tap_role=company" target="_top">리포트 기능 화면 열기</a>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="roles">
+      <div class="container">
+        <div class="section-heading center">
+          <span class="eyebrow">For every role</span>
+          <h2>나는 어떤 역할로 이용하나요?</h2>
+          <p>목적에 맞는 화면으로 바로 이동할 수 있습니다.</p>
+        </div>
+        <div class="role-grid">
+          <article class="role-card featured">
+            <span class="role-kicker">HRD · L&amp;D</span><h3>교육담당자</h3>
+            <p>프로젝트 운영과 조직의 교육 전후 변화를 확인합니다.</p>
+            <ul class="role-list"><li>교육·검사 일정 및 역량 설정</li><li>참여·전후 완료 현황</li><li>조직 변화 및 교육추천</li></ul>
+            <a class="button button-secondary" href="/project_setup?tap_role=company" target="_top">프로젝트 시작</a>
+          </article>
+          <article class="role-card">
+            <span class="role-kicker">LEARNER</span><h3>참여자</h3>
+            <p>교육 전후 검사를 완료하고 개인의 관찰 변화를 확인합니다.</p>
+            <ul class="role-list"><li>프로젝트 코드로 검사 참여</li><li>교육 전·후 행동빈도 응답</li><li>개인 변화 및 후속지원 확인</li></ul>
+            <div class="role-actions">
+              <a class="button button-secondary" href="/pre_assessment?tap_role=participant" target="_top">교육 전 검사</a>
+              <a class="button button-secondary" href="/post_assessment?tap_role=participant" target="_top">교육 후 검사</a>
+            </div>
+          </article>
+          <article class="role-card">
+            <span class="role-kicker">KMA OPERATOR</span><h3>KMA 관리자</h3>
+            <p>평가도구와 문항, 교육과정 매핑의 품질을 관리합니다.</p>
+            <ul class="role-list"><li>기획검증 프로젝트 현황</li><li>문항은행 및 검수 근거</li><li>역량·교육과정 매핑 확인</li></ul>
+            <a class="button button-secondary" href="/kma_dashboard?tap_role=kma" target="_top">관리 화면</a>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section class="section section-soft" id="method">
+      <div class="container">
+        <div class="section-heading">
+          <span class="eyebrow">Measurement principles</span>
+          <h2>교육평가 원칙을<br>기능 안에 반영했습니다.</h2>
+          <p>결과를 과장하지 않고, 비교 가능한 응답만 연결하며, 교육개발 목적에 맞게 해석합니다.</p>
+        </div>
+        <div class="method-grid">
+          <article class="method-card"><span class="method-number">01 · PRE/POST MEASUREMENT</span><h3>사전·사후 비교</h3><p>동일 참여자·동일 역량·동일 문항버전의 유효응답만 변화량으로 계산합니다.</p></article>
+          <article class="method-card"><span class="method-number">02 · BEHAVIOR LEVEL</span><h3>업무행동 중심 측정</h3><p>Kirkpatrick 행동 수준을 참고하여 최근 8주의 자기보고 업무행동에서 관찰되는 변화를 탐색합니다.</p></article>
+          <article class="method-card"><span class="method-number">03 · TRANSFER CONTEXT</span><h3>교육전이 환경 확인</h3><p>적용기회, 상사지원, 도구·권한, 시간·프로세스를 함께 확인하여 변화의 조건을 해석합니다.</p></article>
+          <article class="method-card"><span class="method-number">04 · RESPONSE QUALITY</span><h3>응답품질과 표본 보호</h3><p>수행 기회 없음과 미응답을 분리하고, 각 역량에서 교육 전·후에 모두 응답한 참여자가 5명 이상일 때만 조직 평균과 변화량을 표시합니다.</p></article>
+        </div>
+        <div class="caution" role="note"><strong aria-hidden="true">!</strong><div><strong>관찰 변화와 교육의 인과효과는 다릅니다.</strong><p>비교집단이 없는 자기보고형 사전·사후 결과는 교육의 단독 인과효과가 아니라 교육 전후 관찰된 변화로 해석합니다.</p></div></div>
+      </div>
+    </section>
+
+    <section class="section section-soft" id="faq">
+      <div class="container faq-grid">
+        <div class="faq-copy"><span class="eyebrow">FAQ</span><h2>시작 전 확인해 주세요.</h2><p>검사 운영과 결과 해석에 자주 묻는 내용을 정리했습니다.</p></div>
+        <div class="faq-list">
+          <details open><summary>교육 후 검사는 언제 진행하나요?</summary><p>동일한 최근 8주 행동기준을 유지하기 위해 교육 후 8–10주 시점의 검사를 권장합니다.</p></details>
+          <details><summary>교육 전과 후에 같은 ID를 사용하는 이유는 무엇인가요?</summary><p>동일 참여자의 결과를 연결하기 위해서입니다. 실명이나 사번 대신 기관에서 정한 가명 교육 참여자 ID를 사용해야 합니다.</p></details>
+          <details><summary>조직 리포트는 언제 공개되나요?</summary><p>각 역량에서 교육 전·후에 모두 응답한 참여자가 5명 이상일 때만 조직 평균과 변화량을 표시합니다. 5명은 개인정보 보호를 위한 최소 기준이며, 전체 조직을 대표한다는 뜻은 아닙니다.</p></details>
+          <details><summary>결과를 인사평가에 사용할 수 있나요?</summary><p>아니요. TAP은 교육개발 목적의 자기보고형 변화검사이며 채용·승진·보상·성과평가의 단독 판단자료로 사용할 수 없습니다.</p></details>
+        </div>
+      </div>
+    </section>
+
+    <section class="final-cta">
+      <div class="container final-inner">
+        <div><h2>교육 전후의 관찰 변화를<br>직접 확인해 보세요.</h2><p>합성 샘플 리포트를 먼저 보거나 교육 전·후 검사 단계로 이동할 수 있습니다.</p></div>
+        <div class="final-actions"><a class="button button-primary" href="#report">샘플 리포트</a><a class="button button-ghost" href="#roles">검사 참여</a></div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="container">
+      <div class="footer-grid">
+        <div class="footer-brand"><span class="brand-mark" aria-hidden="true">TAP</span><span><strong>KMA TAP</strong><br><small>교육 전·후 업무행동 변화점검 기획검증 MVP</small></span></div>
+        <div class="footer-links"><a class="button footer-guide-button" href="/user_guide?tap_role=company" target="_top">사용설명서 보기</a><a href="https://www.kma.or.kr/kr/main.do" target="_blank" rel="noreferrer">KMA 홈페이지</a></div>
+      </div>
+      <p class="footer-note">현재 버전은 합성 데이터를 사용하는 기획검증용 공개 데모입니다. 개인정보를 입력하지 마십시오. TAP 글자마크는 와이어프레임용이며 정식 공개 전 승인된 KMA BI 적용 여부를 확인해야 합니다. © KMA TAP.</p>
+    </div>
+  </footer>
+
+  <script>
+    const menuButton = document.getElementById('menuButton');
+    const navWrap = document.getElementById('navWrap');
+    menuButton.addEventListener('click', () => {
+      const isOpen = navWrap.classList.toggle('open');
+      menuButton.setAttribute('aria-expanded', String(isOpen));
+      menuButton.setAttribute('aria-label', isOpen ? '메뉴 닫기' : '메뉴 열기');
+      menuButton.textContent = isOpen ? '×' : '☰';
+      if (isOpen) document.querySelector('.nav-list a')?.focus();
+    });
+    document.querySelectorAll('.nav-list a').forEach((link) => {
+      link.addEventListener('click', () => {
+        navWrap.classList.remove('open');
+        menuButton.setAttribute('aria-expanded', 'false');
+        menuButton.setAttribute('aria-label', '메뉴 열기');
+        menuButton.textContent = '☰';
+      });
+    });
+    document.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape' && navWrap.classList.contains('open')) {
+        navWrap.classList.remove('open');
+        menuButton.setAttribute('aria-expanded', 'false');
+        menuButton.setAttribute('aria-label', '메뉴 열기');
+        menuButton.textContent = '☰';
+        menuButton.focus();
+      }
+    });
+
+    const radarConfig = {
+      labels: ['문제해결', '협업', '실행력', '소통', '고객지향', '디지털', '학습민첩', '자기관리'],
+      pre: [2.7, 3.1, 3.0, 3.4, 3.2, 2.6, 3.0, 3.5],
+      post: [3.62, 3.81, 3.66, 3.92, 3.74, 3.38, 3.61, 3.97]
+    };
+
+    function drawRadar(canvas, compact = false) {
+      if (!canvas) return;
+      const rect = canvas.getBoundingClientRect();
+      const ratio = Math.max(window.devicePixelRatio || 1, 1);
+      const width = Math.max(rect.width, 300);
+      const height = Math.max(rect.height, compact ? 250 : 340);
+      canvas.width = width * ratio;
+      canvas.height = height * ratio;
+      const ctx = canvas.getContext('2d');
+      ctx.scale(ratio, ratio);
+      ctx.clearRect(0, 0, width, height);
+
+      const cx = width / 2;
+      const cy = height / 2 + (compact ? 4 : 2);
+      const count = radarConfig.labels.length;
+      const radius = Math.min(width, height) * (compact ? 0.31 : 0.33);
+      const levels = 5;
+      const angleAt = (i) => -Math.PI / 2 + (Math.PI * 2 * i) / count;
+      const point = (i, value, extra = 0) => ({
+        x: cx + Math.cos(angleAt(i)) * (radius * (value / 5) + extra),
+        y: cy + Math.sin(angleAt(i)) * (radius * (value / 5) + extra)
+      });
+
+      ctx.lineWidth = 1;
+      for (let level = 1; level <= levels; level += 1) {
+        ctx.beginPath();
+        for (let i = 0; i < count; i += 1) {
+          const p = point(i, level);
+          if (i === 0) ctx.moveTo(p.x, p.y); else ctx.lineTo(p.x, p.y);
+        }
+        ctx.closePath();
+        ctx.strokeStyle = level === levels ? '#b9cfcc' : '#dce8e6';
+        ctx.stroke();
+      }
+
+      for (let i = 0; i < count; i += 1) {
+        const end = point(i, 5);
+        ctx.beginPath();
+        ctx.moveTo(cx, cy);
+        ctx.lineTo(end.x, end.y);
+        ctx.strokeStyle = '#dce8e6';
+        ctx.stroke();
+      }
+
+      function dataset(values, stroke, fill, dash = []) {
+        ctx.beginPath();
+        values.forEach((value, i) => {
+          const p = point(i, value);
+          if (i === 0) ctx.moveTo(p.x, p.y); else ctx.lineTo(p.x, p.y);
+        });
+        ctx.closePath();
+        ctx.fillStyle = fill;
+        ctx.fill();
+        ctx.lineWidth = compact ? 2 : 2.5;
+        ctx.strokeStyle = stroke;
+        ctx.setLineDash(dash);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        values.forEach((value, i) => {
+          const p = point(i, value);
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, compact ? 2.4 : 3, 0, Math.PI * 2);
+          ctx.fillStyle = stroke;
+          ctx.fill();
+        });
+      }
+
+      dataset(radarConfig.pre, '#3e6fdb', 'rgba(62, 111, 219, 0.10)', [7, 4]);
+      dataset(radarConfig.post, '#087b76', 'rgba(8, 123, 118, 0.16)');
+
+      ctx.fillStyle = '#506769';
+      ctx.font = `${compact ? 10 : 11}px Pretendard, sans-serif`;
+      ctx.textBaseline = 'middle';
+      radarConfig.labels.forEach((label, i) => {
+        const p = point(i, 5, compact ? 26 : 34);
+        const cosine = Math.cos(angleAt(i));
+        ctx.textAlign = cosine > 0.25 ? 'left' : cosine < -0.25 ? 'right' : 'center';
+        ctx.fillText(label, p.x, p.y);
+      });
+    }
+
+    function renderRadars() {
+      drawRadar(document.getElementById('heroRadar'), true);
+      drawRadar(document.getElementById('reportRadar'), false);
+    }
+    window.addEventListener('load', renderRadars);
+    let resizeTimer;
+    window.addEventListener('resize', () => {
+      window.clearTimeout(resizeTimer);
+      resizeTimer = window.setTimeout(renderRadars, 120);
+    });
+  </script>
+</body>
+</html>

@@ -355,7 +355,7 @@ class ReportingTests(unittest.TestCase):
         )
         html = printable_organization_report_html(model)
         self.assertIn("조직 교육 전·후 변화 리포트", html)
-        self.assertIn("짝지어진 N=7", html)
+        self.assertIn("전·후 유효응답 N=7", html)
         self.assertIn("인과효과로 확정", html)
         self.assertIn("사후 이탈률", html)
         fragment = organization_report_fragment(model)
@@ -444,7 +444,7 @@ class ReportingTests(unittest.TestCase):
         app.run()
         self.assertEqual([], [str(item.value) for item in app.exception])
         self.assertTrue(
-            any("교육 전·후 짝지어진 비교" in str(item.value) for item in app.markdown)
+            any("교육 전·후 비교" in str(item.value) for item in app.markdown)
         )
         self.assertTrue(any(item.label == "관찰 변화 평균" for item in app.metric))
         self.assertTrue(any("실제 교육 전·후 완료 응답" in str(item.value) for item in app.success))
@@ -547,7 +547,7 @@ class ReportingTests(unittest.TestCase):
             "현재 브라우저 결과에는 관리자용 소표본 미리보기를 열어서는 안 됩니다.",
         )
         self.assertEqual(
-            {"교육 전 완료", "교육 후 완료", "전·후 짝지음"},
+            {"교육 전 완료", "교육 후 완료", "전·후 모두 완료"},
             {item.label for item in app.metric},
             "N<5에서는 완료 건수만 보여주고 평균·변화량 조직 지표는 숨겨야 합니다.",
         )
@@ -618,7 +618,7 @@ class ReportingTests(unittest.TestCase):
 
             self.assertEqual([], [str(item.value) for item in app.exception])
             self.assertTrue(any(item.label == "교육 전 참여" for item in app.metric))
-            self.assertTrue(any(item.label == "짝지어진 참여" for item in app.metric))
+            self.assertTrue(any(item.label == "전·후 비교 참여자" for item in app.metric))
             self.assertTrue(
                 any("외부 공유·캡처·인쇄 금지" in str(item.value) for item in app.warning)
             )
@@ -891,7 +891,7 @@ class ReportingTests(unittest.TestCase):
             any("교육 전후 비교 포인트" in str(item.value) for item in app.markdown)
         )
         self.assertEqual(
-            {"교육 전 참여", "교육 후 참여", "짝지어진 참여", "사후 이탈률"},
+            {"교육 전 참여", "교육 후 참여", "전·후 비교 참여자", "사후 이탈률"},
             {item.label for item in app.metric},
         )
         self.assertTrue(
@@ -912,7 +912,7 @@ class ReportingTests(unittest.TestCase):
         app.run()
         self.assertEqual([], [str(item.value) for item in app.exception])
         self.assertTrue(any("모두 완료" in str(item.value) for item in app.warning))
-        self.assertFalse(any("교육 전·후 짝지어진 비교" in str(item.value) for item in app.markdown))
+        self.assertFalse(any("교육 전·후 비교" in str(item.value) for item in app.markdown))
         self.assertTrue(any("교육 전 완료 결과" in str(item.value) for item in app.markdown))
         saved = next(item for item in app.metric if item.label == "저장된 응답")
         self.assertEqual(f"3/{len(questions)}문항", saved.value)

@@ -223,7 +223,7 @@ class DashboardTests(unittest.TestCase):
 
         self.assertEqual(1, len(rows))
         self.assertEqual(
-            ["프로젝트", "검사 참여자", "사전·사후 짝지음률(%)", "최근 집계 갱신"],
+            ["프로젝트", "검사 참여자", "사전·사후 모두 완료율(%)", "최근 집계 갱신"],
             list(rows[0]),
         )
         self.assertEqual(len(rows[0]), len(set(rows[0])))
@@ -401,8 +401,10 @@ class DashboardTests(unittest.TestCase):
         self.assertEqual(0, dashboard["projects"][0]["completed"])
         self.assertEqual(1, dashboard["projects"][0]["invited"])
 
-    def test_home_page_renders_current_session_instead_of_company_mock(self) -> None:
-        app = AppTest.from_file(str(ROOT / "streamlit_app.py"), default_timeout=20).run()
+    def test_manager_dashboard_renders_current_session_instead_of_company_mock(self) -> None:
+        app = AppTest.from_file(
+            str(ROOT / "pages" / "9_manager_dashboard.py"), default_timeout=20
+        ).run()
         app.session_state["project_id"] = "TAP-REAL-001"
         app.session_state["project_name"] = "실제 세션 교육"
         app.session_state["selected_factors"] = ["CORE-CO"]
@@ -422,8 +424,10 @@ class DashboardTests(unittest.TestCase):
         self.assertNotIn("83.8%", rendered)
         self.assertNotIn("216명", rendered)
 
-    def test_entrypoint_guards_local_modules_without_runtime_reload(self) -> None:
-        source = (ROOT / "streamlit_app.py").read_text(encoding="utf-8")
+    def test_manager_entrypoint_guards_local_modules_without_runtime_reload(self) -> None:
+        source = (ROOT / "pages" / "9_manager_dashboard.py").read_text(
+            encoding="utf-8"
+        )
         symbol_import = source.index("from tap.dashboard import (")
         guard_call = source.index(
             'stop_on_stale(st, ("tap.dashboard", "tap.github_demo_store", "tap.ui"))'
@@ -431,6 +435,35 @@ class DashboardTests(unittest.TestCase):
 
         self.assertLess(guard_call, symbol_import)
         self.assertNotIn("reload(", source)
+
+    def test_root_entrypoint_renders_public_open_page_iframe(self) -> None:
+        app = AppTest.from_file(str(ROOT / "streamlit_app.py"), default_timeout=20).run()
+
+        self.assertFalse(app.exception)
+        iframes = app.get("iframe")
+        self.assertEqual(1, len(iframes))
+        source = str(iframes[0].proto.srcdoc)
+        self.assertIn("현업 행동의 변화", source)
+        self.assertNotIn("DATA TRANSPARENCY", source)
+        self.assertNotIn("현재 저장 방식", source)
+        self.assertNotIn("짝지은", source)
+        self.assertNotIn("소표본 보호", source)
+        self.assertIn('/pre_assessment?tap_role=participant', source)
+        self.assertIn('/project_setup?tap_role=company', source)
+        self.assertIn('target="_top"', source)
+
+    def test_public_deep_link_sets_the_destination_role(self) -> None:
+        app = AppTest.from_file(
+            str(ROOT / "pages" / "7_pre_assessment.py"), default_timeout=20
+        )
+        app.query_params["tap_role"] = "participant"
+        app.run()
+
+        self.assertFalse(app.exception)
+        self.assertEqual("participant", app.session_state.active_role)
+        self.assertTrue(
+            any("참여자 교육평가 화면" in str(item.value) for item in app.markdown)
+        )
 
     def test_demo_dashboard_contract(self) -> None:
         data = load_dashboard_demo()

@@ -97,7 +97,8 @@ class RuntimeGuardTests(unittest.TestCase):
 
     def test_every_streamlit_entrypoint_guards_before_symbol_imports(self) -> None:
         cases = {
-            "streamlit_app.py": {
+            "streamlit_app.py": {"tap.open_page"},
+            "pages/9_manager_dashboard.py": {
                 "tap.dashboard",
                 "tap.github_demo_store",
                 "tap.ui",
@@ -196,6 +197,7 @@ class RuntimeGuardTests(unittest.TestCase):
             "tap.baseline_transfer",
             "tap.github_demo_store",
             "tap.radar",
+            "tap.open_page",
         ):
             with self.subTest(module=module_name):
                 module = sys.modules.get(module_name)

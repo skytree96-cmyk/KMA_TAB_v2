@@ -93,7 +93,7 @@ class AggregationTests(unittest.TestCase):
         self.assertEqual(result["paired_n"], 1)
         self.assertEqual(result["attrition_n"], 1)
         self.assertIsNone(result["observed_change"])
-        self.assertEqual(result["status"], "비공개(짝지어진 N<2)")
+        self.assertEqual(result["status"], "비공개(전·후 유효응답 N<2)")
 
     def test_paired_duplicate_rows_do_not_inflate_n(self):
         rows = [

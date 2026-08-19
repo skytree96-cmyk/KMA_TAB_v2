@@ -23,6 +23,7 @@ PAGES = [
     "pages/6_kma_dashboard.py",
     "pages/7_pre_assessment.py",
     "pages/8_post_assessment.py",
+    "pages/9_manager_dashboard.py",
 ]
 
 
@@ -35,8 +36,20 @@ def _assert_clean(app: AppTest, label: str) -> None:
 def main() -> int:
     app = AppTest.from_file(str(ROOT / "streamlit_app.py"), default_timeout=20).run()
     _assert_clean(app, "streamlit_app.py")
-    if not any(button.label == "사용설명서" for button in app.download_button):
-        raise AssertionError("sidebar PDF guide download is missing")
+    iframes = app.get("iframe")
+    if len(iframes) != 1:
+        raise AssertionError("public open page must render exactly one iframe")
+    source = str(iframes[0].proto.srcdoc)
+    if "현업 행동의 변화" not in source:
+        raise AssertionError("public open-page hero is missing")
+    for forbidden in (
+        "DATA TRANSPARENCY",
+        "현재 저장 방식",
+        "짝지은",
+        "소표본 보호",
+    ):
+        if forbidden in source:
+            raise AssertionError(f"removed open-page content remains: {forbidden}")
     for page in PAGES:
         app.switch_page(page).run()
         _assert_clean(app, page)
@@ -54,6 +67,7 @@ def main() -> int:
         raise AssertionError("second job checkbox must be disabled")
 
     app = AppTest.from_file(str(ROOT / "streamlit_app.py"), default_timeout=20).run()
+    app.switch_page("pages/9_manager_dashboard.py").run()
     app.button(key="tap_role_participant").click().run()
     _assert_clean(app, "participant role switch")
     if not any(button.label == "교육평가 프로젝트 설정으로 이동" for button in app.button):
@@ -73,6 +87,7 @@ def main() -> int:
         raise AssertionError("participant sidebar was lost after opening a submenu")
 
     app = AppTest.from_file(str(ROOT / "streamlit_app.py"), default_timeout=20).run()
+    app.switch_page("pages/9_manager_dashboard.py").run()
     app.button(key="tap_role_kma").click().run()
     _assert_clean(app, "KMA role switch")
     if not any("회원사 진단 운영 현황" in item.value for item in app.markdown):
