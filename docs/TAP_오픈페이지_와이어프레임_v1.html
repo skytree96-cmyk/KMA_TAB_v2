@@ -462,6 +462,18 @@
     .change-item strong.up { color: var(--teal); }
     .report-copy h2 { margin: 0; font-size: clamp(34px, 4.2vw, 52px); line-height: 1.17; letter-spacing: -0.055em; }
     .report-copy > p { margin: 20px 0 0; color: #b8cdcb; font-size: 17px; }
+    .report-copy .report-action {
+      margin-top: 18px;
+      color: #fff;
+      border-color: #58c9c0;
+      background: var(--teal);
+      box-shadow: 0 12px 28px rgba(0, 0, 0, 0.2);
+    }
+    .report-copy .report-action:hover {
+      color: #fff;
+      border-color: #8be0d9;
+      background: #05625f;
+    }
     .feature-list { margin: 32px 0 0; padding: 0; list-style: none; }
     .feature-list li { position: relative; margin: 14px 0; padding-left: 30px; color: #e9f3f2; }
     .feature-list li::before {
@@ -813,7 +825,7 @@
             <li>교육과정 검토 우선순위 및 후속조치</li>
             <li>A4형 인쇄 리포트와 상세 CSV</li>
           </ul>
-          <a class="button button-ghost" href="/organization_report?tap_role=company" target="_top">리포트 기능 화면 열기</a>
+          <a class="button button-ghost report-action" href="/organization_report?tap_role=company" target="_top">리포트 기능 화면 열기</a>
         </div>
       </div>
     </section>

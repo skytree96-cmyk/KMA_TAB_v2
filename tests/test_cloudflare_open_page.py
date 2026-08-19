@@ -23,6 +23,10 @@ class CloudflareOpenPageTests(unittest.TestCase):
             '<div class="step-icon">중</div>',
             "교육 이수 후 8~10주간 실제 업무에 적용",
             "사용설명서 보기",
+            'class="button button-ghost report-action"',
+            ".report-copy .report-action",
+            "background: var(--teal);",
+            "color: #fff;",
         ):
             self.assertIn(phrase, source)
 
