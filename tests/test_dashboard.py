@@ -436,13 +436,15 @@ class DashboardTests(unittest.TestCase):
         self.assertLess(guard_call, symbol_import)
         self.assertNotIn("reload(", source)
 
-    def test_root_entrypoint_renders_public_open_page_iframe(self) -> None:
+    def test_root_entrypoint_renders_public_open_page_html(self) -> None:
         app = AppTest.from_file(str(ROOT / "streamlit_app.py"), default_timeout=20).run()
 
         self.assertFalse(app.exception)
-        iframes = app.get("iframe")
-        self.assertEqual(1, len(iframes))
-        source = str(iframes[0].proto.srcdoc)
+        html_nodes = app.get("html")
+        self.assertEqual(1, len(html_nodes))
+        self.assertEqual(0, len(app.get("iframe")))
+        self.assertTrue(html_nodes[0].proto.unsafe_allow_javascript)
+        source = str(html_nodes[0].proto.body)
         self.assertIn("현업 행동의 변화", source)
         self.assertNotIn("DATA TRANSPARENCY", source)
         self.assertNotIn("현재 저장 방식", source)
@@ -459,10 +461,10 @@ class DashboardTests(unittest.TestCase):
             "/kma_dashboard?tap_role=kma",
             "/user_guide?tap_role=company",
         ):
-            self.assertIn(
-                f'href="{route}" target="_blank" rel="noopener noreferrer"',
-                source,
-            )
+            self.assertIn(f'href="https://kmatap.streamlit.app{route}"', source)
+        self.assertNotIn(
+            'organization_report?tap_role=company" target="_blank"', source
+        )
 
     def test_public_deep_link_sets_the_destination_role(self) -> None:
         app = AppTest.from_file(

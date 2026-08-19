@@ -33,9 +33,11 @@ class CloudflareOpenPageTests(unittest.TestCase):
         self.assertNotIn("github.com/skytree96-cmyk/KMA_TAB_v2", source)
         self.assertNotIn('target="_top"', source)
         self.assertIn(
-            'href="/organization_report?tap_role=company" target="_blank" '
-            'rel="noopener noreferrer"',
+            'href="https://kmatap.streamlit.app/organization_report?tap_role=company"',
             source,
+        )
+        self.assertNotIn(
+            'organization_report?tap_role=company" target="_blank"', source
         )
 
     def test_cloudflare_build_rewrites_app_routes_and_bundles_guide(self) -> None:
@@ -44,6 +46,7 @@ class CloudflareOpenPageTests(unittest.TestCase):
         )
 
         self.assertIn("https://kmatap.streamlit.app", build_source)
+        self.assertIn("const appLinks", build_source)
         self.assertIn("tap-user-guide.pdf", build_source)
         self.assertIn("sourceGuide", build_source)
         self.assertIn("GitHub repository link", build_source)

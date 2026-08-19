@@ -14,21 +14,24 @@ if (dirname(outputDir) !== currentDir || !outputDir.endsWith(join("cloudflare", 
 }
 
 let html = await readFile(sourceHtml, "utf8");
-const replacements = new Map([
-  ['href="/organization_report?tap_role=company"', `href="${appBase}/organization_report?tap_role=company"`],
-  ['href="/project_setup?tap_role=company"', `href="${appBase}/project_setup?tap_role=company"`],
-  ['href="/pre_assessment?tap_role=participant"', `href="${appBase}/pre_assessment?tap_role=participant"`],
-  ['href="/post_assessment?tap_role=participant"', `href="${appBase}/post_assessment?tap_role=participant"`],
-  ['href="/kma_dashboard?tap_role=kma"', `href="${appBase}/kma_dashboard?tap_role=kma"`],
-  ['href="/user_guide?tap_role=company"', 'href="/tap-user-guide.pdf"'],
-]);
-
-for (const [from, to] of replacements) {
-  if (!html.includes(from)) {
-    throw new Error(`Expected link was not found: ${from}`);
+const appLinks = [
+  `${appBase}/organization_report?tap_role=company`,
+  `${appBase}/project_setup?tap_role=company`,
+  `${appBase}/pre_assessment?tap_role=participant`,
+  `${appBase}/post_assessment?tap_role=participant`,
+  `${appBase}/kma_dashboard?tap_role=kma`,
+];
+for (const url of appLinks) {
+  if (!html.includes(`href="${url}"`)) {
+    throw new Error(`Expected app link was not found: ${url}`);
   }
-  html = html.replaceAll(from, to);
 }
+
+const guideUrl = `${appBase}/user_guide?tap_role=company`;
+if (!html.includes(`href="${guideUrl}"`)) {
+  throw new Error(`Expected guide link was not found: ${guideUrl}`);
+}
+html = html.replaceAll(`href="${guideUrl}"`, 'href="/tap-user-guide.pdf"');
 
 if (/github\.com\/skytree96-cmyk\/KMA_TAB_v2/i.test(html)) {
   throw new Error("The public page must not expose the GitHub repository link.");

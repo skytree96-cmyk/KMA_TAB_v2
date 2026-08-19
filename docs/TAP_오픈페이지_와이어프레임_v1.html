@@ -825,7 +825,7 @@
             <li>교육과정 검토 우선순위 및 후속조치</li>
             <li>A4형 인쇄 리포트와 상세 CSV</li>
           </ul>
-          <a class="button button-ghost report-action" href="/organization_report?tap_role=company" target="_blank" rel="noopener noreferrer">리포트 기능 화면 열기</a>
+          <a class="button button-ghost report-action" href="https://kmatap.streamlit.app/organization_report?tap_role=company">리포트 기능 화면 열기</a>
         </div>
       </div>
     </section>
@@ -842,22 +842,22 @@
             <span class="role-kicker">HRD · L&amp;D</span><h3>교육담당자</h3>
             <p>프로젝트 운영과 조직의 교육 전후 변화를 확인합니다.</p>
             <ul class="role-list"><li>교육·검사 일정 및 역량 설정</li><li>참여·전후 완료 현황</li><li>조직 변화 및 교육추천</li></ul>
-            <a class="button button-secondary" href="/project_setup?tap_role=company" target="_blank" rel="noopener noreferrer">프로젝트 시작</a>
+            <a class="button button-secondary" href="https://kmatap.streamlit.app/project_setup?tap_role=company">프로젝트 시작</a>
           </article>
           <article class="role-card">
             <span class="role-kicker">LEARNER</span><h3>참여자</h3>
             <p>교육 전후 검사를 완료하고 개인의 관찰 변화를 확인합니다.</p>
             <ul class="role-list"><li>프로젝트 코드로 검사 참여</li><li>교육 전·후 행동빈도 응답</li><li>개인 변화 및 후속지원 확인</li></ul>
             <div class="role-actions">
-              <a class="button button-secondary" href="/pre_assessment?tap_role=participant" target="_blank" rel="noopener noreferrer">교육 전 검사</a>
-              <a class="button button-secondary" href="/post_assessment?tap_role=participant" target="_blank" rel="noopener noreferrer">교육 후 검사</a>
+              <a class="button button-secondary" href="https://kmatap.streamlit.app/pre_assessment?tap_role=participant">교육 전 검사</a>
+              <a class="button button-secondary" href="https://kmatap.streamlit.app/post_assessment?tap_role=participant">교육 후 검사</a>
             </div>
           </article>
           <article class="role-card">
             <span class="role-kicker">KMA OPERATOR</span><h3>KMA 관리자</h3>
             <p>평가도구와 문항, 교육과정 매핑의 품질을 관리합니다.</p>
             <ul class="role-list"><li>기획검증 프로젝트 현황</li><li>문항은행 및 검수 근거</li><li>역량·교육과정 매핑 확인</li></ul>
-            <a class="button button-secondary" href="/kma_dashboard?tap_role=kma" target="_blank" rel="noopener noreferrer">관리 화면</a>
+            <a class="button button-secondary" href="https://kmatap.streamlit.app/kma_dashboard?tap_role=kma">관리 화면</a>
           </article>
         </div>
       </div>
@@ -904,7 +904,7 @@
     <div class="container">
       <div class="footer-grid">
         <div class="footer-brand"><span class="brand-mark" aria-hidden="true">TAP</span><span><strong>KMA TAP</strong><br><small>교육 전·후 업무행동 변화점검 기획검증 MVP</small></span></div>
-        <div class="footer-links"><a class="button footer-guide-button" href="/user_guide?tap_role=company" target="_blank" rel="noopener noreferrer">사용설명서 보기</a><a href="https://www.kma.or.kr/kr/main.do" target="_blank" rel="noreferrer">KMA 홈페이지</a></div>
+        <div class="footer-links"><a class="button footer-guide-button" href="https://kmatap.streamlit.app/user_guide?tap_role=company">사용설명서 보기</a><a href="https://www.kma.or.kr/kr/main.do" target="_blank" rel="noreferrer">KMA 홈페이지</a></div>
       </div>
       <p class="footer-note">현재 버전은 합성 데이터를 사용하는 기획검증용 공개 데모입니다. 개인정보를 입력하지 마십시오. TAP 글자마크는 와이어프레임용이며 정식 공개 전 승인된 KMA BI 적용 여부를 확인해야 합니다. © KMA TAP.</p>
     </div>
@@ -1029,7 +1029,8 @@
       drawRadar(document.getElementById('heroRadar'), true);
       drawRadar(document.getElementById('reportRadar'), false);
     }
-    window.addEventListener('load', renderRadars);
+    if (document.readyState === 'complete') renderRadars();
+    else window.addEventListener('load', renderRadars, { once: true });
     let resizeTimer;
     window.addEventListener('resize', () => {
       window.clearTimeout(resizeTimer);

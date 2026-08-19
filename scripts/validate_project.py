@@ -243,7 +243,8 @@ def main() -> int:
         ROOT / "tap" / "open_page.py": (
             "__tap_source_sha256__ = source_fingerprint(__file__)",
             "TAP_오픈페이지_와이어프레임_v1.html",
-            "st.iframe(",
+            "st.html(",
+            "unsafe_allow_javascript=True",
         ),
         ROOT / "docs" / "TAP_오픈페이지_와이어프레임_v1.html": (
             "현업 행동의 변화",

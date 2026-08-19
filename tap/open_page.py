@@ -22,8 +22,9 @@ PUBLIC_PAGE_CSS = """
   [data-testid="stSidebar"],
   [data-testid="stHeader"],
   [data-testid="stToolbar"],
+  [data-testid="stFooter"],
   #MainMenu,
-  footer { display: none !important; }
+  [data-testid="stDecoration"] { display: none !important; }
 
   html, body, .stApp,
   [data-testid="stAppViewContainer"],
@@ -35,11 +36,9 @@ PUBLIC_PAGE_CSS = """
     padding: 0 !important;
   }
 
-  [data-testid="stIFrame"],
-  [data-testid="stIFrame"] iframe {
+  [data-testid="stHtml"] {
     display: block !important;
     width: 100% !important;
-    border: 0 !important;
   }
 </style>
 """
@@ -52,4 +51,6 @@ def render_open_page() -> None:
         st.error("오픈페이지 파일을 찾지 못했습니다. 잠시 후 다시 시도해 주세요.")
         return
     st.markdown(PUBLIC_PAGE_CSS, unsafe_allow_html=True)
-    st.iframe(OPEN_PAGE_PATH, width="stretch", height="content", tab_index=0)
+    # Render in the app document instead of a sandboxed iframe. Streamlit's iframe
+    # blocks top-level navigation, which makes landing-page links appear inert.
+    st.html(OPEN_PAGE_PATH, width="stretch", unsafe_allow_javascript=True)

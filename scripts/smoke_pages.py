@@ -36,10 +36,14 @@ def _assert_clean(app: AppTest, label: str) -> None:
 def main() -> int:
     app = AppTest.from_file(str(ROOT / "streamlit_app.py"), default_timeout=20).run()
     _assert_clean(app, "streamlit_app.py")
-    iframes = app.get("iframe")
-    if len(iframes) != 1:
-        raise AssertionError("public open page must render exactly one iframe")
-    source = str(iframes[0].proto.srcdoc)
+    html_nodes = app.get("html")
+    if len(html_nodes) != 1:
+        raise AssertionError("public open page must render exactly one HTML surface")
+    if len(app.get("iframe")) != 0:
+        raise AssertionError("public open page must not use a sandboxed iframe")
+    if not html_nodes[0].proto.unsafe_allow_javascript:
+        raise AssertionError("public open-page JavaScript must be enabled")
+    source = str(html_nodes[0].proto.body)
     if "현업 행동의 변화" not in source:
         raise AssertionError("public open-page hero is missing")
     for forbidden in (
@@ -50,6 +54,16 @@ def main() -> int:
     ):
         if forbidden in source:
             raise AssertionError(f"removed open-page content remains: {forbidden}")
+    for route in (
+        "/organization_report?tap_role=company",
+        "/project_setup?tap_role=company",
+        "/pre_assessment?tap_role=participant",
+        "/post_assessment?tap_role=participant",
+        "/kma_dashboard?tap_role=kma",
+        "/user_guide?tap_role=company",
+    ):
+        if f'href="https://kmatap.streamlit.app{route}"' not in source:
+            raise AssertionError(f"absolute open-page link is missing: {route}")
     for page in PAGES:
         app.switch_page(page).run()
         _assert_clean(app, page)
