@@ -31,6 +31,12 @@ class CloudflareOpenPageTests(unittest.TestCase):
             self.assertIn(phrase, source)
 
         self.assertNotIn("github.com/skytree96-cmyk/KMA_TAB_v2", source)
+        self.assertNotIn('target="_top"', source)
+        self.assertIn(
+            'href="/organization_report?tap_role=company" target="_blank" '
+            'rel="noopener noreferrer"',
+            source,
+        )
 
     def test_cloudflare_build_rewrites_app_routes_and_bundles_guide(self) -> None:
         build_source = (ROOT / "cloudflare" / "build.mjs").read_text(

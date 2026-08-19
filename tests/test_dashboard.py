@@ -450,7 +450,19 @@ class DashboardTests(unittest.TestCase):
         self.assertNotIn("소표본 보호", source)
         self.assertIn('/pre_assessment?tap_role=participant', source)
         self.assertIn('/project_setup?tap_role=company', source)
-        self.assertIn('target="_top"', source)
+        self.assertNotIn('target="_top"', source)
+        for route in (
+            "/organization_report?tap_role=company",
+            "/project_setup?tap_role=company",
+            "/pre_assessment?tap_role=participant",
+            "/post_assessment?tap_role=participant",
+            "/kma_dashboard?tap_role=kma",
+            "/user_guide?tap_role=company",
+        ):
+            self.assertIn(
+                f'href="{route}" target="_blank" rel="noopener noreferrer"',
+                source,
+            )
 
     def test_public_deep_link_sets_the_destination_role(self) -> None:
         app = AppTest.from_file(
