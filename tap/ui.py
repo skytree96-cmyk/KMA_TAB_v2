@@ -823,6 +823,11 @@ def _render_sidebar() -> str:
             ):
                 requested_role = role
 
+        st.caption(
+            "공개 데모의 역할 전환은 화면 미리보기용이며 로그인·권한 인증이 아닙니다. "
+            "실제 데이터 사용 전에는 RBAC 적용이 필요합니다."
+        )
+
         if requested_role is not None and requested_role != active_role:
             previous_role = active_role
             st.session_state.active_role = requested_role

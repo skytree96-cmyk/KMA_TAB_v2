@@ -9,11 +9,11 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class CloudflareOpenPageTests(unittest.TestCase):
-    def test_bundled_guide_keeps_searchable_embedded_pretendard(self) -> None:
+    def test_bundled_guide_keeps_searchable_embedded_paperlogy(self) -> None:
         payload = (ROOT / "docs" / "TAP_사용설명서_v3.pdf").read_bytes()
 
         self.assertTrue(payload.startswith(b"%PDF-"))
-        self.assertIn(b"Pretendard-Regular", payload)
+        self.assertIn(b"Paperlogy-4Regular", payload)
         self.assertIn(b"/FontFile2", payload)
         self.assertIn(b"/ToUnicode", payload)
         self.assertNotIn(b"/Subtype /Image", payload)

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import unittest
 from pathlib import Path
+from unittest.mock import MagicMock, patch
 
 from streamlit.testing.v1 import AppTest
 
@@ -18,6 +19,8 @@ from tap.dashboard import (
     validate_dashboard_demo,
 )
 from tap.data import questions_for_factors
+from tap.github_demo_store import DemoStoreConfig
+from tap.tenant import derive_company_identity, hash_company_access_code
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -402,25 +405,74 @@ class DashboardTests(unittest.TestCase):
         self.assertEqual(1, dashboard["projects"][0]["invited"])
 
     def test_manager_dashboard_renders_current_session_instead_of_company_mock(self) -> None:
-        app = AppTest.from_file(
-            str(ROOT / "pages" / "9_manager_dashboard.py"), default_timeout=20
-        ).run()
-        app.session_state["project_id"] = "TAP-REAL-001"
-        app.session_state["project_name"] = "실제 세션 교육"
-        app.session_state["selected_factors"] = ["CORE-CO"]
-        app.session_state["participant_id"] = "EDU-P001"
-        app.session_state["responses_by_phase"] = {
-            "pre": {"CORE-CO-01": 4},
-            "post": {},
+        admin_code = "dashboard-company-admin"
+        config = DemoStoreConfig(
+            enabled=True,
+            owner="example",
+            repo="tap-demo",
+            salt="dashboard-tenant-salt",
+        )
+        identity = derive_company_identity(
+            salt=config.salt,
+            company_name="대시보드 테스트 기업",
+            kma_assigned_code="KMADASH001",
+        )
+        store = MagicMock()
+        store.load_company.return_value = {
+            "company_id": identity.company_id,
+            "company_name": identity.company_name,
+            "company_identity_source": identity.identity_source,
+            "company_access_digest": hash_company_access_code(
+                identity.company_id, admin_code, config.salt
+            ),
         }
-        app.session_state["assessment_completed_by_phase"] = {"pre": True, "post": False}
-        app.run()
+        # Keep this assertion focused on the documented browser-session fallback.
+        # The company gate is still completed normally before any dashboard data
+        # becomes visible.
+        store.status.return_value = {"read_enabled": False}
+
+        with (
+            patch(
+                "tap.github_demo_store.DemoStoreConfig.from_sources",
+                return_value=config,
+            ),
+            patch("tap.github_demo_store.GitHubDemoStore", return_value=store),
+            patch("tap.company_scope_ui.GitHubDemoStore", return_value=store),
+        ):
+            app = AppTest.from_file(
+                str(ROOT / "pages" / "9_manager_dashboard.py"), default_timeout=20
+            ).run()
+            next(item for item in app.text_input if item.label == "회사명").set_value(
+                identity.company_name
+            )
+            next(
+                item for item in app.text_input if item.label == "KMA 부여 기업코드"
+            ).set_value("KMADASH001")
+            next(
+                item for item in app.text_input if item.label == "기업 관리자 확인코드"
+            ).set_value(admin_code)
+            next(item for item in app.button if item.label == "기업 범위 확인").click()
+            app.run()
+
+            app.session_state["project_id"] = "TAP-REAL-001"
+            app.session_state["project_name"] = "실제 세션 교육"
+            app.session_state["selected_factors"] = ["CORE-CO"]
+            app.session_state["participant_id"] = "EDU-P001"
+            app.session_state["responses_by_phase"] = {
+                "pre": {"CORE-CO-01": 4},
+                "post": {},
+            }
+            app.session_state["assessment_completed_by_phase"] = {
+                "pre": True,
+                "post": False,
+            }
+            app.run()
 
         self.assertFalse(app.exception)
         rendered = "\n".join(str(item.value) for item in app.markdown)
         notices = "\n".join(str(item.value) for item in app.info)
         self.assertIn("실제 세션 교육", rendered)
-        self.assertIn("이 브라우저 세션", notices)
+        self.assertIn("현재 브라우저 세션", notices)
         self.assertNotIn("83.8%", rendered)
         self.assertNotIn("216명", rendered)
 
@@ -429,11 +481,17 @@ class DashboardTests(unittest.TestCase):
             encoding="utf-8"
         )
         symbol_import = source.index("from tap.dashboard import (")
-        guard_call = source.index(
-            'stop_on_stale(st, ("tap.dashboard", "tap.github_demo_store", "tap.ui"))'
-        )
+        guard_call = source.index("stop_on_stale(")
 
         self.assertLess(guard_call, symbol_import)
+        for module_name in (
+            "tap.company_scope_ui",
+            "tap.dashboard",
+            "tap.github_demo_store",
+            "tap.tenant",
+            "tap.ui",
+        ):
+            self.assertIn(f'"{module_name}"', source[guard_call:symbol_import])
         self.assertNotIn("reload(", source)
 
     def test_root_entrypoint_renders_public_open_page_html(self) -> None:

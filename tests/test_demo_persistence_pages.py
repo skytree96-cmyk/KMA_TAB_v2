@@ -70,21 +70,28 @@ def project_state(project_id: str = "TAP-DEMO-PAGE-TEST") -> dict[str, object]:
 class DemoPersistencePageTests(unittest.TestCase):
     def setUp(self) -> None:
         self.access_code = "planning-test-access"
+        self.company_admin_code = "company-page-admin-code"
+        self.company_registration_code = "kma-company-registration-code"
         self.config = DemoStoreConfig(
             enabled=True,
             owner="example",
             repo="tap-demo",
             token="test-token",
             salt="test-participant-salt",
-            access_code=self.access_code,
+            participant_access_code=self.access_code,
+            company_access_code=self.company_registration_code,
         )
         self.store = MagicMock()
+        self.store.load_company.return_value = None
         self.patches = (
             patch(
                 "tap.github_demo_store.DemoStoreConfig.from_sources",
                 return_value=self.config,
             ),
             patch("tap.github_demo_store.GitHubDemoStore", return_value=self.store),
+            # ``tap.company_scope_ui`` may already be imported by an earlier
+            # AppTest in the full suite, so patch its bound store symbol too.
+            patch("tap.company_scope_ui.GitHubDemoStore", return_value=self.store),
         )
         for item in self.patches:
             item.start()
@@ -93,13 +100,33 @@ class DemoPersistencePageTests(unittest.TestCase):
         for item in reversed(self.patches):
             item.stop()
 
+    def _confirm_new_company_scope(self, app: AppTest) -> None:
+        next(item for item in app.text_input if item.label == "회사명").set_value(
+            "페이지 테스트 기업"
+        )
+        next(
+            item
+            for item in app.text_input
+            if item.label == "KMA 부여 기업코드"
+        ).set_value("KMAPAGE001")
+        next(
+            item
+            for item in app.text_input
+            if item.label == "기업 관리자 확인코드"
+        ).set_value(self.company_admin_code)
+        next(
+            item
+            for item in app.text_input
+            if item.label == "KMA 신규기업 등록 승인코드"
+        ).set_value(self.company_registration_code)
+        next(item for item in app.button if item.label == "기업 범위 확인").click()
+        app.run()
+
     def test_project_save_publishes_one_allowlisted_snapshot(self) -> None:
         app = AppTest.from_file(
             str(ROOT / "pages" / "1_project_setup.py"), default_timeout=30
         ).run()
-        next(
-            item for item in app.text_input if item.label == "기획검증 접속코드"
-        ).set_value(self.access_code)
+        self._confirm_new_company_scope(app)
         with patch("streamlit.switch_page"):
             next(
                 item
@@ -112,24 +139,25 @@ class DemoPersistencePageTests(unittest.TestCase):
         self.store.save_project.assert_called_once()
         payload = self.store.save_project.call_args.args[0]
         self.assertEqual("project", payload["record_type"])
+        self.assertTrue(str(payload["company_id"]).startswith("org_"))
+        self.assertEqual("페이지 테스트 기업", payload["company_name"])
+        self.assertNotIn(self.company_admin_code, repr(payload))
+        self.assertNotIn(self.company_registration_code, repr(payload))
         self.assertNotIn("participant_id", payload)
         self.assertTrue(app.session_state["project_id"].startswith("TAP-"))
 
-    def test_project_save_without_access_code_keeps_session_and_skips_github(self) -> None:
+    def test_project_save_is_blocked_until_company_scope_is_verified(self) -> None:
         app = AppTest.from_file(
             str(ROOT / "pages" / "1_project_setup.py"), default_timeout=30
         ).run()
-        with patch("streamlit.switch_page"):
-            next(
-                item
-                for item in app.button
-                if item.label == "설정 저장 후 교육 전 검사 시작"
-            ).click()
-            app.run()
-
+        save_button = next(
+            item
+            for item in app.button
+            if item.label == "설정 저장 후 교육 전 검사 시작"
+        )
+        self.assertTrue(save_button.disabled)
         self.store.save_project.assert_not_called()
-        self.assertTrue(app.session_state["demo_store_project_pending"])
-        self.assertTrue(app.session_state["project_id"].startswith("TAP-"))
+        self.assertEqual("", app.session_state["project_id"])
 
     def test_project_code_load_restores_only_valid_project_fields(self) -> None:
         payload = project_payload_from_state(project_state())
@@ -227,7 +255,7 @@ class DemoPersistencePageTests(unittest.TestCase):
         self.assertEqual(responses, app.session_state["responses_by_phase"]["pre"])
         expected_key = submission_payload["participant_key"]
         self.store.load_submission.assert_called_once_with(
-            project_payload["project_id"], expected_key
+            project_payload["project_id"], expected_key, company_id=None
         )
         locked_id = next(
             item for item in app.text_input if item.label == "교육 참여자 ID"

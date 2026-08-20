@@ -18,7 +18,10 @@
 - [ ] Fine-grained token의 대상 저장소를 `KMA_TAB_v2`로 한정
 - [ ] 토큰 권한을 `Contents: Read and write`로만 제한
 - [ ] Streamlit Secrets의 `[github_demo_store]` 설정 및 토큰 비공개 확인
-- [ ] 임의의 `access_code`를 Secrets에 설정하고 기획검증 참여자에게만 별도 전달
+- [ ] `participant_access_code`와 신규기업용 `company_access_code`를 서로 다르게 Secrets에 설정
+- [ ] 신규 기업마다 별도 기업 관리자 확인코드를 정하고 참여자 코드와 다름을 확인
+- [ ] 사업자등록번호·KMA 기업코드·관리자코드 원문이 프로젝트/제출 JSON에 없는지 확인
+- [ ] 서로 다른 두 기업에서 같은 프로젝트명을 사용해도 대시보드·리포트가 섞이지 않는지 확인
 - [ ] 기획검증 종료 후 `enabled=false` 전환 또는 토큰 폐기
 - [ ] 프로젝트 게시·다른 브라우저 프로젝트 코드 불러오기 확인
 - [ ] 교육 전/후 완료 후 누적 대시보드와 조직 리포트 반영 확인

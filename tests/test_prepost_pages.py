@@ -2,17 +2,72 @@ from __future__ import annotations
 
 import unittest
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 from streamlit.testing.v1 import AppTest
 
 from tap.data import questions_for_factors
+from tap.github_demo_store import DemoStoreConfig
+from tap.tenant import derive_company_identity, hash_company_access_code
 
 
 ROOT = Path(__file__).resolve().parents[1]
 
 
 class PrePostPageTests(unittest.TestCase):
+    def _authenticated_project_setup_app(self) -> AppTest:
+        """Enter project setup through the real company-admin gate."""
+
+        admin_code = "prepost-company-admin"
+        config = DemoStoreConfig(
+            enabled=True,
+            owner="example",
+            repo="tap-demo",
+            token="test-token",
+            salt="prepost-tenant-salt",
+        )
+        identity = derive_company_identity(
+            salt=config.salt,
+            company_name="전후검사 테스트 기업",
+            kma_assigned_code="KMAPREPOST001",
+        )
+        store = MagicMock()
+        store.load_company.return_value = {
+            "company_id": identity.company_id,
+            "company_name": identity.company_name,
+            "company_identity_source": identity.identity_source,
+            "company_access_digest": hash_company_access_code(
+                identity.company_id, admin_code, config.salt
+            ),
+        }
+        for patcher in (
+            patch(
+                "tap.github_demo_store.DemoStoreConfig.from_sources",
+                return_value=config,
+            ),
+            patch("tap.github_demo_store.GitHubDemoStore", return_value=store),
+            patch("tap.company_scope_ui.GitHubDemoStore", return_value=store),
+        ):
+            patcher.start()
+            self.addCleanup(patcher.stop)
+
+        app = AppTest.from_file(
+            str(ROOT / "pages" / "1_project_setup.py"), default_timeout=30
+        ).run()
+        next(item for item in app.text_input if item.label == "회사명").set_value(
+            identity.company_name
+        )
+        next(
+            item for item in app.text_input if item.label == "KMA 부여 기업코드"
+        ).set_value("KMAPREPOST001")
+        next(
+            item for item in app.text_input if item.label == "기업 관리자 확인코드"
+        ).set_value(admin_code)
+        next(item for item in app.button if item.label == "기업 범위 확인").click()
+        app.run()
+        self.assertTrue(app.session_state["company_scope_verified"])
+        return app
+
     def test_project_setup_collects_course_schedule_and_uses_split_phase_navigation(self) -> None:
         source = (ROOT / "pages" / "1_project_setup.py").read_text(encoding="utf-8")
         for label in (
@@ -37,7 +92,7 @@ class PrePostPageTests(unittest.TestCase):
         self.assertIn('st.session_state.project_id = "TAP-"', source)
 
     def test_project_identity_change_clears_previous_participant_pairing(self) -> None:
-        app = AppTest.from_file(str(ROOT / "pages" / "1_project_setup.py"), default_timeout=30)
+        app = self._authenticated_project_setup_app()
         app.session_state["project_id"] = "TAP-OLD"
         app.session_state["project_name"] = "기존 프로젝트"
         app.session_state["project_name_input"] = "새 프로젝트"
@@ -57,7 +112,7 @@ class PrePostPageTests(unittest.TestCase):
         self.assertNotIn("_participant_id_input", app.session_state)
 
     def test_resaving_same_project_keeps_participant_pairing(self) -> None:
-        app = AppTest.from_file(str(ROOT / "pages" / "1_project_setup.py"), default_timeout=30).run()
+        app = self._authenticated_project_setup_app()
         with patch("streamlit.switch_page"):
             next(
                 item for item in app.button if item.label == "설정 저장 후 교육 전 검사 시작"

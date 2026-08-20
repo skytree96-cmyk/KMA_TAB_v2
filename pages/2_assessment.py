@@ -11,7 +11,10 @@ import streamlit as st
 from tap.runtime_guard import stop_on_stale
 
 
-stop_on_stale(st, ("tap.baseline_transfer", "tap.github_demo_store", "tap.ui"))
+stop_on_stale(
+    st,
+    ("tap.baseline_transfer", "tap.github_demo_store", "tap.tenant", "tap.ui"),
+)
 
 from tap.baseline_transfer import BaselineValidationError, bootstrap_post_from_pre_baseline
 from tap.config import LIKERT_OPTIONS
@@ -24,6 +27,7 @@ from tap.github_demo_store import (
     submission_payload_from_state,
 )
 from tap.state import (
+    COMPANY_SCOPE_VERIFIED_KEY,
     DEMO_STORE_ACCESS_CODE_KEY,
     DEMO_STORE_ACCESS_CODE_WIDGET_KEY,
     PARTICIPANT_ID_WIDGET_KEY,
@@ -37,6 +41,7 @@ from tap.state import (
     save_participant_id_widget,
     sync_assessment_phase,
 )
+from tap.tenant import CompanyIdentity, TenantError
 from tap.ui import callout, page_header, safe_switch_page, setup_page
 
 
@@ -225,6 +230,40 @@ def _restore_demo_project(payload: Mapping[str, object], requested_code: str) ->
     if current_phase not in {"pre", "post"}:
         raise ValueError("검사 단계 설정이 올바르지 않습니다")
 
+    raw_company_id = str(payload.get("company_id", "")).strip()
+    company_values: dict[str, str]
+    if raw_company_id:
+        try:
+            company = CompanyIdentity(
+                company_id=raw_company_id,
+                company_name=str(payload.get("company_name", "")).strip(),
+                identity_source=str(
+                    payload.get("company_identity_source", "")
+                ).strip(),
+            )
+        except TenantError as exc:
+            raise ValueError("프로젝트의 기업 범위 정보가 올바르지 않습니다") from exc
+        if not company.company_name:
+            raise ValueError("프로젝트의 회사명이 없습니다")
+        company_values = {
+            "company_id": company.company_id,
+            "company_name": company.company_name,
+            "company_identity_source": company.identity_source,
+        }
+    else:
+        # Existing flat-path demo projects remain loadable, but may not inherit
+        # a company scope left over from an earlier project in this browser.
+        if any(
+            str(payload.get(key, "")).strip()
+            for key in ("company_name", "company_identity_source")
+        ):
+            raise ValueError("프로젝트의 기업 범위 정보가 불완전합니다")
+        company_values = {
+            "company_id": "",
+            "company_name": "",
+            "company_identity_source": "",
+        }
+
     # No arbitrary payload keys are copied into session state. Responses and
     # participant identity always start empty for a newly loaded project.
     safe_values: dict[str, object] = {
@@ -244,11 +283,16 @@ def _restore_demo_project(payload: Mapping[str, object], requested_code: str) ->
         "question_snapshot_codes": stored_codes,
         "assessment_version": f"TAP-1.0+{snapshot_hash[:12]}",
         "current_assessment_phase": current_phase,
+        **company_values,
+        # Loading a participant project is never equivalent to company-admin
+        # verification.  The digest is intentionally not restored here.
+        "company_access_digest": "",
     }
     reset_all_assessments(st.session_state)
     for key, value in safe_values.items():
         st.session_state[key] = value
     st.session_state["participant_id"] = ""
+    st.session_state[COMPANY_SCOPE_VERIFIED_KEY] = False
     st.session_state.pop(PARTICIPANT_ID_WIDGET_KEY, None)
     activate_assessment_phase(st.session_state, current_phase)
     return project_id
@@ -317,6 +361,10 @@ def _restore_stored_pre_submission(
         raise ValueError("프로젝트가 일치하지 않습니다")
     if str(payload.get("participant_key", "")) != expected_participant_key:
         raise ValueError("참여자 연결키가 일치하지 않습니다")
+    stored_company_id = str(payload.get("company_id", "")).strip()
+    current_company_id = str(st.session_state.get("company_id", "")).strip()
+    if stored_company_id != current_company_id:
+        raise ValueError("프로젝트의 기업 범위와 검사결과가 일치하지 않습니다")
 
     instrument = payload.get("instrument")
     if not isinstance(instrument, Mapping):
@@ -425,9 +473,12 @@ def _render_stored_pre_submission_entry() -> None:
             str(st.session_state.get("project_id", "")),
             participant_id,
             config.salt,
+            company_id=str(st.session_state.get("company_id", "")).strip() or None,
         )
         payload = store.load_submission(
-            str(st.session_state.get("project_id", "")), pseudonym
+            str(st.session_state.get("project_id", "")),
+            pseudonym,
+            company_id=str(st.session_state.get("company_id", "")).strip() or None,
         )
         if not isinstance(payload, Mapping):
             raise ValueError("해당 참여자의 완료된 교육 전 결과를 찾지 못했습니다")

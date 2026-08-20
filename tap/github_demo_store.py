@@ -22,6 +22,15 @@ from urllib.parse import quote
 from urllib.request import Request, urlopen
 
 from tap.runtime_guard import source_fingerprint
+from tap.tenant import (
+    TenantError,
+    access_codes_equal,
+    hash_company_access_code,
+    normalize_access_code,
+    validate_access_code,
+    validate_company_id,
+    verify_company_access_code,
+)
 
 
 __tap_source_sha256__ = source_fingerprint(__file__)
@@ -35,6 +44,7 @@ MAX_CONFLICT_RETRIES = 3
 
 _PROJECT_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")
 _PARTICIPANT_KEY_RE = re.compile(r"^p_[0-9a-f]{64}$")
+_COMPANY_ACCESS_DIGEST_RE = re.compile(r"^cac_[0-9a-f]{64}$")
 _REPOSITORY_PART_RE = re.compile(r"^[A-Za-z0-9_.-]+$")
 _FORBIDDEN_SUBMISSION_KEYS = {
     "participantid",
@@ -44,6 +54,20 @@ _FORBIDDEN_SUBMISSION_KEYS = {
     "email",
     "phone",
     "phonenumber",
+}
+_FORBIDDEN_TENANT_KEYS = {
+    "accesscode",
+    "admincode",
+    "businessnumber",
+    "businessregistration",
+    "businessregistrationnumber",
+    "businessregistrationno",
+    "corporateregistrationnumber",
+    "companyaccesscode",
+    "participantaccesscode",
+    "kmaassignedcode",
+    "kmacode",
+    "kmacompanycode",
 }
 _TRANSITION_SCORE_KEYS = {
     "application_opportunity",
@@ -83,6 +107,49 @@ _PROJECT_FIELDS = (
     "question_snapshot_hash",
     "question_snapshot_codes",
 )
+_PROJECT_ALLOWED_FIELDS = {
+    "schema_version",
+    "demo_only",
+    "record_type",
+    *_PROJECT_FIELDS,
+    "created_at",
+    "updated_at",
+    "company_id",
+    "company_name",
+    "company_identity_source",
+    "company_access_digest",
+}
+_SUBMISSION_ALLOWED_FIELDS = {
+    "schema_version",
+    "demo_only",
+    "record_type",
+    "company_id",
+    "project_id",
+    "participant_key",
+    "instrument",
+    "phases",
+    "transition_responses",
+    "updated_at",
+}
+_COMPANY_ALLOWED_FIELDS = {
+    "schema_version",
+    "demo_only",
+    "record_type",
+    "company_id",
+    "company_name",
+    "company_identity_source",
+    "company_access_digest",
+    "created_at",
+    "updated_at",
+}
+_PROJECT_INDEX_ALLOWED_FIELDS = {
+    "schema_version",
+    "demo_only",
+    "record_type",
+    "project_id",
+    "company_id",
+    "updated_at",
+}
 
 
 class DemoStoreError(RuntimeError):
@@ -154,6 +221,8 @@ class DemoStoreConfig:
     branch: str = DEFAULT_BRANCH
     salt: str = field(default="", repr=False)
     access_code: str = field(default="", repr=False)
+    participant_access_code: str = field(default="", repr=False)
+    company_access_code: str = field(default="", repr=False)
     report_preview_code: str = field(default="", repr=False)
     api_url: str = DEFAULT_API_URL
     root_path: str = ROOT_PATH
@@ -167,12 +236,36 @@ class DemoStoreConfig:
             "token",
             "branch",
             "salt",
-            "access_code",
-            "report_preview_code",
             "api_url",
             "root_path",
         ):
             object.__setattr__(self, text_field, _clean(getattr(self, text_field)))
+
+        code_labels = {
+            "access_code": "레거시 기획검증 접속코드",
+            "participant_access_code": "참여자 접속코드",
+            "company_access_code": "KMA 신규기업 등록 승인코드",
+            "report_preview_code": "리포트 미리보기 코드",
+        }
+        for code_field, label in code_labels.items():
+            try:
+                normalized = validate_access_code(
+                    getattr(self, code_field),
+                    label,
+                    required=False,
+                )
+            except TenantError as exc:
+                raise DemoStoreError(str(exc)) from exc
+            object.__setattr__(self, code_field, normalized)
+
+        if (
+            self.participant_code
+            and self.company_code
+            and access_codes_equal(self.participant_code, self.company_code)
+        ):
+            raise DemoStoreError(
+                "KMA 신규기업 등록 승인코드와 참여자 접속코드는 서로 달라야 합니다."
+            )
 
         if self.enabled and not (self.owner and self.repo):
             raise DemoStoreError(
@@ -201,8 +294,39 @@ class DemoStoreConfig:
             self.enabled
             and self.configured
             and self.token
-            and self.access_code
+            and self.participant_code
         )
+
+    @property
+    def project_write_enabled(self) -> bool:
+        return bool(
+            self.enabled
+            and self.configured
+            and self.token
+            and (self.legacy_project_code or self.salt)
+        )
+
+    @property
+    def participant_code(self) -> str:
+        """Configured participant code; ``access_code`` is a legacy fallback."""
+
+        return self.participant_access_code or self.access_code
+
+    @property
+    def company_code(self) -> str:
+        """Explicit KMA approval code for first-time company registration.
+
+        The legacy shared ``access_code`` must never authorize a new tenant.
+        It remains available only to the old flat-path project flow.
+        """
+
+        return self.company_access_code
+
+    @property
+    def legacy_project_code(self) -> str:
+        """Code accepted only by the pre-tenant flat-path project writer."""
+
+        return self.access_code or self.company_access_code
 
     @property
     def read_enabled(self) -> bool:
@@ -213,24 +337,44 @@ class DemoStoreConfig:
 
         return bool(
             self.write_enabled
-            and hmac.compare_digest(self.access_code, _clean(candidate))
+            and access_codes_equal(self.participant_code, candidate)
+        )
+
+    def company_access_granted(self, candidate: Any) -> bool:
+        """Constant-time KMA approval gate for a first company registration."""
+
+        return bool(
+            self.project_write_enabled
+            and self.company_code
+            and access_codes_equal(self.company_code, candidate)
+        )
+
+    def legacy_project_access_granted(self, candidate: Any) -> bool:
+        """Authorize only a legacy flat-path project write."""
+
+        return bool(
+            self.enabled
+            and self.configured
+            and self.token
+            and self.legacy_project_code
+            and access_codes_equal(self.legacy_project_code, candidate)
         )
 
     def report_preview_granted(self, candidate: Any) -> bool:
         """Constant-time check for the read-only small-sample report preview.
 
-        A separately configured preview code takes precedence. Falling back
-        to the legacy shared access code keeps existing planning-demo setups
-        working, but this gate is not a substitute for production RBAC.
-        Unlike the write gate, report preview does not require a GitHub token.
+        The preview code is deliberately explicit and role-specific. Neither
+        the legacy shared code nor the participant code may authorize access.
+        Unlike the write gate, this demo-only preview does not require a
+        GitHub token.
         """
 
-        configured_code = self.report_preview_code or self.access_code
+        configured_code = self.report_preview_code
         return bool(
             self.enabled
             and self.configured
             and configured_code
-            and hmac.compare_digest(configured_code, _clean(candidate))
+            and access_codes_equal(configured_code, candidate)
         )
 
     @classmethod
@@ -337,6 +481,22 @@ class DemoStoreConfig:
             )
             or secret("access_code", "test_access_code")
         )
+        participant_access_code = _clean(
+            _first(
+                env,
+                "GITHUB_DEMO_STORE_PARTICIPANT_ACCESS_CODE",
+                "TAP_DEMO_GITHUB_PARTICIPANT_ACCESS_CODE",
+            )
+            or secret("participant_access_code")
+        )
+        company_access_code = _clean(
+            _first(
+                env,
+                "GITHUB_DEMO_STORE_COMPANY_ACCESS_CODE",
+                "TAP_DEMO_GITHUB_COMPANY_ACCESS_CODE",
+            )
+            or secret("company_access_code")
+        )
         report_preview_code = _clean(
             _first(
                 env,
@@ -360,6 +520,8 @@ class DemoStoreConfig:
             branch=branch,
             salt=salt,
             access_code=access_code,
+            participant_access_code=participant_access_code,
+            company_access_code=company_access_code,
             report_preview_code=report_preview_code,
             api_url=api_url,
         )
@@ -388,7 +550,43 @@ def _project_id(value: Any) -> str:
     return cleaned
 
 
-def participant_key(project_id: str, participant_id: str, salt: str) -> str:
+def _company_id(value: Any, *, required: bool = False) -> str:
+    cleaned = _clean(value)
+    if not cleaned:
+        if required:
+            raise DemoStoreError("company_id가 필요합니다.")
+        return ""
+    try:
+        return validate_company_id(cleaned)
+    except TenantError as exc:
+        raise DemoStoreError(str(exc)) from exc
+
+
+def _company_access_digest(value: Any, *, required: bool = False) -> str:
+    cleaned = _clean(value).lower()
+    if not cleaned:
+        if required:
+            raise DemoStoreError("기업 관리자 접속코드 검증값이 필요합니다.")
+        return ""
+    if not _COMPANY_ACCESS_DIGEST_RE.fullmatch(cleaned):
+        raise DemoStoreError("company_access_digest 형식이 올바르지 않습니다.")
+    return cleaned
+
+
+def _company_name(value: Any) -> str:
+    cleaned = _clean(value)
+    if len(cleaned) > 120 or any(char in cleaned for char in "\r\n\t\x00"):
+        raise DemoStoreError("company_name은 줄바꿈 없이 120자 이하여야 합니다.")
+    return " ".join(cleaned.split())
+
+
+def participant_key(
+    project_id: str,
+    participant_id: str,
+    salt: str,
+    *,
+    company_id: str | None = None,
+) -> str:
     """Return a deterministic HMAC key without retaining the raw participant ID."""
 
     project = _project_id(project_id)
@@ -398,15 +596,21 @@ def participant_key(project_id: str, participant_id: str, salt: str) -> str:
         raise DemoStoreError("교육 참여자 ID 형식이 올바르지 않습니다.")
     if not secret:
         raise DemoStoreError("참여자 ID 가명처리를 위한 demo-store salt가 필요합니다.")
+    company = _company_id(company_id)
+    identity_scope = f"{company}\x00{project}" if company else project
     digest = hmac.new(
         secret.encode("utf-8"),
-        f"{project}\x00{participant}".encode("utf-8"),
+        f"{identity_scope}\x00{participant}".encode("utf-8"),
         hashlib.sha256,
     ).hexdigest()
     return f"p_{digest}"
 
 
-def project_payload_from_state(state: Mapping[str, Any]) -> dict[str, Any]:
+def project_payload_from_state(
+    state: Mapping[str, Any],
+    *,
+    tenant_salt: str | None = None,
+) -> dict[str, Any]:
     """Create an allow-listed project snapshot sufficient to restore the demo."""
 
     project = _project_id(state.get("project_id"))
@@ -427,6 +631,28 @@ def project_payload_from_state(state: Mapping[str, Any]) -> dict[str, Any]:
         _clean(payload.get("current_assessment_phase") or state.get("assessment_phase"))
         or "pre"
     ).lower()
+    company = _company_id(state.get("company_id"))
+    if company:
+        payload["company_id"] = company
+        payload["company_name"] = _company_name(state.get("company_name"))
+        source = _clean(state.get("company_identity_source"))
+        if source:
+            payload["company_identity_source"] = source
+        digest = _company_access_digest(state.get("company_access_digest"))
+        raw_company_code = _clean(state.get("company_access_code"))
+        if not digest and raw_company_code:
+            selected_salt = _clean(
+                tenant_salt
+                or state.get("tenant_identity_salt")
+                or state.get("demo_store_salt")
+                or state.get("github_demo_salt")
+                or state.get("participant_hash_salt")
+            )
+            try:
+                digest = hash_company_access_code(company, raw_company_code, selected_salt)
+            except TenantError as exc:
+                raise DemoStoreError(str(exc)) from exc
+        payload["company_access_digest"] = _company_access_digest(digest, required=True)
     created_at = _clean(state.get("project_created_at") or state.get("created_at")) or _now_iso()
     payload["created_at"] = created_at
     payload["updated_at"] = _now_iso()
@@ -483,7 +709,13 @@ def submission_payload_from_state(
         or state.get("github_demo_salt")
         or state.get("participant_hash_salt")
     )
-    pseudonym = participant_key(project, raw_participant_id, selected_salt)
+    company = _company_id(state.get("company_id"))
+    pseudonym = participant_key(
+        project,
+        raw_participant_id,
+        selected_salt,
+        company_id=company or None,
+    )
     payload = {
         "schema_version": SCHEMA_VERSION,
         "demo_only": True,
@@ -510,6 +742,8 @@ def submission_payload_from_state(
         ),
         "updated_at": _now_iso(),
     }
+    if company:
+        payload["company_id"] = company
     _validate_submission_payload(payload)
     return payload
 
@@ -527,6 +761,17 @@ def _reject_direct_identifiers(value: Any) -> None:
     elif isinstance(value, (list, tuple)):
         for item in value:
             _reject_direct_identifiers(item)
+
+
+def _reject_tenant_secrets(value: Any) -> None:
+    if isinstance(value, Mapping):
+        for key, item in value.items():
+            if _normalized_key(key) in _FORBIDDEN_TENANT_KEYS:
+                raise DemoStoreError(f"기업 식별 원문·접속코드는 저장할 수 없습니다: {key}")
+            _reject_tenant_secrets(item)
+    elif isinstance(value, (list, tuple)):
+        for item in value:
+            _reject_tenant_secrets(item)
 
 
 def _validate_response_map(value: Any, label: str) -> None:
@@ -547,10 +792,24 @@ def _validate_common(payload: Mapping[str, Any], record_type: str) -> None:
     if payload.get("record_type") != record_type:
         raise DemoStoreError(f"record_type은 {record_type!r}이어야 합니다.")
     _project_id(payload.get("project_id"))
+    _reject_tenant_secrets(payload)
+    _company_id(payload.get("company_id"))
 
 
 def _validate_project_payload(payload: Mapping[str, Any]) -> None:
     _validate_common(payload, "project")
+    unknown = set(payload) - _PROJECT_ALLOWED_FIELDS
+    if unknown:
+        raise DemoStoreError(
+            f"프로젝트 저장 허용목록 밖의 필드가 있습니다: {sorted(unknown)!r}"
+        )
+    company = _company_id(payload.get("company_id"))
+    if company:
+        _company_access_digest(payload.get("company_access_digest"), required=True)
+        _company_name(payload.get("company_name"))
+        source = _clean(payload.get("company_identity_source"))
+        if source and source not in {"business_registration", "kma_assigned"}:
+            raise DemoStoreError("company_identity_source 형식이 올바르지 않습니다.")
     if _clean(payload.get("current_assessment_phase") or "pre").lower() not in {
         "pre",
         "post",
@@ -574,6 +833,11 @@ def _validate_project_payload(payload: Mapping[str, Any]) -> None:
 def _validate_submission_payload(payload: Mapping[str, Any]) -> None:
     _validate_common(payload, "submission")
     _reject_direct_identifiers(payload)
+    unknown = set(payload) - _SUBMISSION_ALLOWED_FIELDS
+    if unknown:
+        raise DemoStoreError(
+            f"제출 저장 허용목록 밖의 필드가 있습니다: {sorted(unknown)!r}"
+        )
     if not _PARTICIPANT_KEY_RE.fullmatch(_clean(payload.get("participant_key"))):
         raise DemoStoreError("participant_key 형식이 올바르지 않습니다.")
     instrument = payload.get("instrument")
@@ -639,6 +903,7 @@ def _completed_phase_identity(payload: Mapping[str, Any], phase: str) -> dict[st
     snapshot = phases.get(phase) if isinstance(phases, Mapping) else None
     responses = snapshot.get("responses") if isinstance(snapshot, Mapping) else None
     identity: dict[str, Any] = {
+        "company_id": payload.get("company_id"),
         "project_id": payload.get("project_id"),
         "participant_key": payload.get("participant_key"),
         "instrument": _json_safe(payload.get("instrument")),
@@ -658,6 +923,40 @@ def _completed_phase_identity(payload: Mapping[str, Any], phase: str) -> dict[st
             "barriers": sorted(str(value) for value in transition_map.get("barriers", [])),
         }
     return identity
+
+
+def _validate_company_registry(payload: Mapping[str, Any]) -> None:
+    if payload.get("schema_version") != SCHEMA_VERSION:
+        raise DemoStoreError("지원하지 않는 기업 레지스트리 스키마입니다.")
+    if payload.get("demo_only") is not True or payload.get("record_type") != "company":
+        raise DemoStoreError("기업 레지스트리 형식이 올바르지 않습니다.")
+    _reject_tenant_secrets(payload)
+    unknown = set(payload) - _COMPANY_ALLOWED_FIELDS
+    if unknown:
+        raise DemoStoreError(
+            f"기업 레지스트리 허용목록 밖의 필드가 있습니다: {sorted(unknown)!r}"
+        )
+    _company_id(payload.get("company_id"), required=True)
+    _company_access_digest(payload.get("company_access_digest"), required=True)
+    _company_name(payload.get("company_name"))
+    source = _clean(payload.get("company_identity_source"))
+    if source and source not in {"business_registration", "kma_assigned"}:
+        raise DemoStoreError("company_identity_source 형식이 올바르지 않습니다.")
+
+
+def _validate_project_index(payload: Mapping[str, Any]) -> None:
+    if payload.get("schema_version") != SCHEMA_VERSION:
+        raise DemoStoreError("지원하지 않는 프로젝트 인덱스 스키마입니다.")
+    if payload.get("demo_only") is not True or payload.get("record_type") != "project_index":
+        raise DemoStoreError("프로젝트 인덱스 형식이 올바르지 않습니다.")
+    _reject_tenant_secrets(payload)
+    unknown = set(payload) - _PROJECT_INDEX_ALLOWED_FIELDS
+    if unknown:
+        raise DemoStoreError(
+            f"프로젝트 인덱스 허용목록 밖의 필드가 있습니다: {sorted(unknown)!r}"
+        )
+    _project_id(payload.get("project_id"))
+    _company_id(payload.get("company_id"), required=True)
 
 
 class _UrllibTransport:
@@ -716,19 +1015,43 @@ class GitHubDemoStore:
         transport: Any = None,
         *,
         access_code: str = "",
+        participant_access_code: str | None = None,
+        company_access_code: str | None = None,
+        company_registration_code: str | None = None,
     ) -> None:
         if not isinstance(config, DemoStoreConfig):
             raise DemoStoreError("GitHubDemoStore에는 DemoStoreConfig가 필요합니다.")
         self.config = config
         self.transport = transport or _UrllibTransport()
-        self._access_code = _clean(access_code)
+        self._access_code = normalize_access_code(access_code)
+        self._participant_access_code = normalize_access_code(
+            access_code if participant_access_code is None else participant_access_code
+        )
+        self._company_access_code = normalize_access_code(
+            access_code if company_access_code is None else company_access_code
+        )
+        self._company_registration_code = normalize_access_code(
+            company_registration_code
+        )
 
     def status(self) -> dict[str, Any]:
         return {
             "configured": self.config.configured,
             "enabled": self.config.enabled,
             "read_enabled": self.config.read_enabled,
-            "write_enabled": self.config.access_granted(self._access_code),
+            "write_enabled": self.config.access_granted(self._participant_access_code),
+            "submission_write_enabled": self.config.access_granted(
+                self._participant_access_code
+            ),
+            "project_write_enabled": bool(
+                self.config.enabled
+                and self.config.configured
+                and self.config.token
+                and (
+                    self.config.company_access_granted(self._company_access_code)
+                    or (self.config.salt and self._company_access_code)
+                )
+            ),
             "owner": self.config.owner,
             "repo": self.config.repo,
             "branch": self.config.branch,
@@ -742,14 +1065,36 @@ class GitHubDemoStore:
         if not self.config.configured:
             raise DemoStoreError("GitHub 데모 저장소 owner/repo가 설정되지 않았습니다.")
 
-    def _require_write(self) -> None:
+    def _require_token(self) -> None:
         self._require_read()
-        if not self.config.write_enabled:
+        if not self.config.token:
             raise DemoStoreError(
-                "GitHub 데모 저장소 쓰기에는 token과 테스트 접속코드 설정이 필요합니다."
+                "GitHub 데모 저장소 쓰기에는 token 설정이 필요합니다."
             )
-        if not self.config.access_granted(self._access_code):
-            raise DemoStoreError("GitHub 데모 저장소 테스트 접속코드가 일치하지 않습니다.")
+
+    def _require_write(self, scope: str = "participant") -> None:
+        self._require_token()
+        if scope == "participant":
+            if not self.config.participant_code:
+                raise DemoStoreError("GitHub 데모 저장소 쓰기에는 참여자 접속코드 설정이 필요합니다.")
+            if not self.config.access_granted(self._participant_access_code):
+                raise DemoStoreError("GitHub 데모 저장소 참여자 접속코드가 일치하지 않습니다.")
+            return
+        if scope == "company_legacy":
+            if not self.config.legacy_project_code:
+                raise DemoStoreError("레거시 프로젝트 쓰기에는 기업 관리자 접속코드 설정이 필요합니다.")
+            if not self.config.legacy_project_access_granted(
+                self._company_access_code
+            ):
+                raise DemoStoreError("GitHub 데모 저장소 기업 관리자 접속코드가 일치하지 않습니다.")
+            return
+        if scope == "tenant":
+            if not self.config.salt:
+                raise DemoStoreError("기업 관리자 접속코드 검증을 위한 salt 설정이 필요합니다.")
+            if not self._company_access_code:
+                raise DemoStoreError("기업 관리자 접속코드를 입력해 주세요.")
+            return
+        raise DemoStoreError("지원하지 않는 저장 권한 범위입니다.")
 
     def _url(self, path: str) -> str:
         owner = quote(self.config.owner, safe="")
@@ -835,8 +1180,10 @@ class GitHubDemoStore:
         incoming: Mapping[str, Any],
         merger: Any,
         message: str,
+        *,
+        write_scope: str = "participant",
     ) -> dict[str, Any]:
-        self._require_write()
+        self._require_write(write_scope)
         for retry in range(MAX_CONFLICT_RETRIES + 1):
             current, sha = self._load_file(path)
             merged = merger(current, incoming)
@@ -867,60 +1214,190 @@ class GitHubDemoStore:
             )
         raise DemoStoreError("GitHub 데모 파일을 저장하지 못했습니다.")
 
-    def load_project(self, project_id: str) -> dict[str, Any] | None:
+    @staticmethod
+    def _company_root(company_id: str) -> str:
+        return f"{ROOT_PATH}/companies/{_company_id(company_id, required=True)}"
+
+    @classmethod
+    def _company_path(cls, company_id: str) -> str:
+        return f"{cls._company_root(company_id)}/company.json"
+
+    @classmethod
+    def _project_path(cls, project_id: str, company_id: str = "") -> str:
         project = _project_id(project_id)
-        payload, _ = self._load_file(f"{ROOT_PATH}/projects/{project}.json")
+        company = _company_id(company_id)
+        if company:
+            return f"{cls._company_root(company)}/projects/{project}.json"
+        return f"{ROOT_PATH}/projects/{project}.json"
+
+    @classmethod
+    def _submission_path(
+        cls,
+        project_id: str,
+        participant_key_value: str,
+        company_id: str = "",
+    ) -> str:
+        project = _project_id(project_id)
+        pseudonym = _clean(participant_key_value)
+        if not _PARTICIPANT_KEY_RE.fullmatch(pseudonym):
+            raise DemoStoreError("participant_key 형식이 올바르지 않습니다.")
+        company = _company_id(company_id)
+        if company:
+            return f"{cls._company_root(company)}/submissions/{project}/{pseudonym}.json"
+        return f"{ROOT_PATH}/submissions/{project}/{pseudonym}.json"
+
+    @staticmethod
+    def _project_index_path(project_id: str) -> str:
+        return f"{ROOT_PATH}/project-index/{_project_id(project_id)}.json"
+
+    def load_company(self, company_id: str) -> dict[str, Any] | None:
+        company = _company_id(company_id, required=True)
+        payload, _ = self._load_file(self._company_path(company))
+        if payload is not None:
+            _validate_company_registry(payload)
+            if payload.get("company_id") != company:
+                raise DemoStoreError("기업 레지스트리 경로와 company_id가 일치하지 않습니다.")
+        return payload
+
+    def _load_project_index(self, project_id: str) -> dict[str, Any] | None:
+        project = _project_id(project_id)
+        payload, _ = self._load_file(self._project_index_path(project))
+        if payload is not None:
+            _validate_project_index(payload)
+            if payload.get("project_id") != project:
+                raise DemoStoreError("프로젝트 인덱스 경로와 project_id가 일치하지 않습니다.")
+        return payload
+
+    def load_project(
+        self,
+        project_id: str,
+        company_id: str | None = None,
+    ) -> dict[str, Any] | None:
+        project = _project_id(project_id)
+        company = _company_id(company_id)
+        if not company:
+            index = self._load_project_index(project)
+            if index is not None:
+                company = _company_id(index.get("company_id"), required=True)
+        payload, _ = self._load_file(self._project_path(project, company))
         if payload is not None:
             _validate_project_payload(payload)
+            if _company_id(payload.get("company_id")) != company:
+                raise DemoStoreError("프로젝트 경로와 company_id가 일치하지 않습니다.")
         return payload
 
     def load_submission(
         self,
         project_id: str,
         participant_key_value: str,
+        company_id: str | None = None,
     ) -> dict[str, Any] | None:
         project = _project_id(project_id)
         pseudonym = _clean(participant_key_value)
         if not _PARTICIPANT_KEY_RE.fullmatch(pseudonym):
             raise DemoStoreError("participant_key 형식이 올바르지 않습니다.")
-        payload, _ = self._load_file(
-            f"{ROOT_PATH}/submissions/{project}/{pseudonym}.json"
-        )
+        company = _company_id(company_id)
+        if not company:
+            index = self._load_project_index(project)
+            if index is not None:
+                company = _company_id(index.get("company_id"), required=True)
+        payload, _ = self._load_file(self._submission_path(project, pseudonym, company))
         if payload is not None:
             _validate_submission_payload(payload)
+            if _company_id(payload.get("company_id")) != company:
+                raise DemoStoreError("제출 경로와 company_id가 일치하지 않습니다.")
         return payload
 
-    def list_projects(self) -> list[dict[str, Any]]:
+    def list_projects(self, company_id: str | None = None) -> list[dict[str, Any]]:
+        company = _company_id(company_id)
+        directories = (
+            [f"{self._company_root(company)}/projects"]
+            if company
+            else [f"{ROOT_PATH}/projects"]
+        )
+        if not company:
+            for item in self._list_directory(f"{ROOT_PATH}/companies"):
+                candidate = _clean(item.get("name"))
+                if item.get("type") != "dir":
+                    continue
+                try:
+                    candidate = _company_id(candidate, required=True)
+                except DemoStoreError:
+                    continue
+                directories.append(f"{self._company_root(candidate)}/projects")
+
         records: list[dict[str, Any]] = []
-        for item in sorted(
-            self._list_directory(f"{ROOT_PATH}/projects"),
-            key=lambda row: _clean(row.get("path") or row.get("name")),
-        ):
-            if item.get("type") != "file" or not _clean(item.get("name")).endswith(".json"):
-                continue
-            path = _clean(item.get("path"))
-            if not path:
-                continue
-            payload, _ = self._load_file(path)
-            if payload is not None:
-                _validate_project_payload(payload)
-                records.append(payload)
+        for directory in sorted(set(directories)):
+            for item in sorted(
+                self._list_directory(directory),
+                key=lambda row: _clean(row.get("path") or row.get("name")),
+            ):
+                if item.get("type") != "file" or not _clean(item.get("name")).endswith(".json"):
+                    continue
+                path = _clean(item.get("path"))
+                if not path:
+                    continue
+                payload, _ = self._load_file(path)
+                if payload is not None:
+                    _validate_project_payload(payload)
+                    if company and _company_id(payload.get("company_id")) != company:
+                        raise DemoStoreError("프로젝트 목록 경로와 company_id가 일치하지 않습니다.")
+                    records.append(payload)
         return records
 
-    def list_submissions(self, project_id: str | None = None) -> list[dict[str, Any]]:
+    def list_submissions(
+        self,
+        project_id: str | None = None,
+        company_id: str | None = None,
+    ) -> list[dict[str, Any]]:
+        company = _company_id(company_id)
         project_paths: list[str]
-        if project_id is not None:
+        if company and project_id is not None:
+            project = _project_id(project_id)
+            project_paths = [f"{self._company_root(company)}/submissions/{project}"]
+        elif company:
+            project_paths = [
+                _clean(item.get("path"))
+                for item in self._list_directory(f"{self._company_root(company)}/submissions")
+                if item.get("type") == "dir" and _clean(item.get("path"))
+            ]
+        elif project_id is not None:
             project = _project_id(project_id)
             project_paths = [f"{ROOT_PATH}/submissions/{project}"]
+            for item in self._list_directory(f"{ROOT_PATH}/companies"):
+                candidate = _clean(item.get("name"))
+                if item.get("type") != "dir":
+                    continue
+                try:
+                    candidate = _company_id(candidate, required=True)
+                except DemoStoreError:
+                    continue
+                project_paths.append(
+                    f"{self._company_root(candidate)}/submissions/{project}"
+                )
         else:
             project_paths = [
                 _clean(item.get("path"))
                 for item in self._list_directory(f"{ROOT_PATH}/submissions")
                 if item.get("type") == "dir" and _clean(item.get("path"))
             ]
+            for item in self._list_directory(f"{ROOT_PATH}/companies"):
+                candidate = _clean(item.get("name"))
+                if item.get("type") != "dir":
+                    continue
+                try:
+                    candidate = _company_id(candidate, required=True)
+                except DemoStoreError:
+                    continue
+                submission_root = f"{self._company_root(candidate)}/submissions"
+                project_paths.extend(
+                    _clean(child.get("path"))
+                    for child in self._list_directory(submission_root)
+                    if child.get("type") == "dir" and _clean(child.get("path"))
+                )
 
         records: list[dict[str, Any]] = []
-        for directory in sorted(project_paths):
+        for directory in sorted(set(project_paths)):
             for item in sorted(
                 self._list_directory(directory),
                 key=lambda row: _clean(row.get("path") or row.get("name")),
@@ -933,6 +1410,8 @@ class GitHubDemoStore:
                 payload, _ = self._load_file(path)
                 if payload is not None:
                     _validate_submission_payload(payload)
+                    if company and _company_id(payload.get("company_id")) != company:
+                        raise DemoStoreError("제출 목록 경로와 company_id가 일치하지 않습니다.")
                     records.append(payload)
         return records
 
@@ -940,8 +1419,144 @@ class GitHubDemoStore:
         incoming = dict(_json_safe(payload))
         _validate_project_payload(incoming)
         project = _project_id(incoming["project_id"])
+        company = _company_id(incoming.get("company_id"))
+
+        if company:
+            incoming_digest = _company_access_digest(
+                incoming.get("company_access_digest"),
+                required=True,
+            )
+            try:
+                candidate_matches = verify_company_access_code(
+                    company,
+                    self._company_access_code,
+                    incoming_digest,
+                    self.config.salt,
+                )
+            except TenantError as exc:
+                raise DemoStoreError(str(exc)) from exc
+            if not candidate_matches:
+                raise DemoStoreError("기업 관리자 접속코드가 일치하지 않습니다.")
+
+            legacy, _ = self._load_file(self._project_path(project))
+            if legacy is not None:
+                raise DemoStoreError(
+                    "동일 프로젝트 코드의 레거시 프로젝트가 있어 기업 범위로 저장할 수 없습니다."
+                )
+
+            existing_registry = self.load_company(company)
+            if existing_registry is None and not self.config.company_access_granted(
+                self._company_registration_code
+            ):
+                raise DemoStoreError(
+                    "신규 기업 등록에는 KMA가 전달한 등록 승인코드가 필요합니다."
+                )
+
+            registry_incoming: dict[str, Any] = {
+                "schema_version": SCHEMA_VERSION,
+                "demo_only": True,
+                "record_type": "company",
+                "company_id": company,
+                "company_name": _clean(incoming.get("company_name")),
+                "company_identity_source": _clean(
+                    incoming.get("company_identity_source")
+                ),
+                "company_access_digest": incoming_digest,
+                "updated_at": _now_iso(),
+            }
+
+            def merge_registry(
+                current: Mapping[str, Any] | None,
+                new: Mapping[str, Any],
+            ) -> dict[str, Any]:
+                if current is not None:
+                    _validate_company_registry(current)
+                    if current.get("company_id") != company:
+                        raise DemoStoreError("기업 레지스트리 company_id가 일치하지 않습니다.")
+                    current_digest = _company_access_digest(
+                        current.get("company_access_digest"),
+                        required=True,
+                    )
+                    if not verify_company_access_code(
+                        company,
+                        self._company_access_code,
+                        current_digest,
+                        self.config.salt,
+                    ):
+                        raise DemoStoreError("기업 관리자 접속코드가 일치하지 않습니다.")
+                    if not hmac.compare_digest(current_digest, incoming_digest):
+                        raise DemoStoreError("기업 관리자 접속코드 검증값을 변경할 수 없습니다.")
+                    current_source = _clean(current.get("company_identity_source"))
+                    incoming_source = _clean(new.get("company_identity_source"))
+                    if (
+                        current_source
+                        and incoming_source
+                        and current_source != incoming_source
+                    ):
+                        raise DemoStoreError("기업 식별 방식을 변경할 수 없습니다.")
+                merged = dict(current or {})
+                merged.update(new)
+                merged["created_at"] = _clean((current or {}).get("created_at")) or _now_iso()
+                merged["updated_at"] = _now_iso()
+                _validate_company_registry(merged)
+                return merged
+
+            self._upsert(
+                self._company_path(company),
+                registry_incoming,
+                merge_registry,
+                f"TAP demo company registry: {company}",
+                write_scope="tenant",
+            )
+
+            index_incoming: dict[str, Any] = {
+                "schema_version": SCHEMA_VERSION,
+                "demo_only": True,
+                "record_type": "project_index",
+                "project_id": project,
+                "company_id": company,
+                "updated_at": _now_iso(),
+            }
+
+            def merge_index(
+                current: Mapping[str, Any] | None,
+                new: Mapping[str, Any],
+            ) -> dict[str, Any]:
+                if current is not None:
+                    _validate_project_index(current)
+                    if current.get("company_id") != company:
+                        raise DemoStoreError(
+                            "프로젝트 코드가 다른 기업에서 이미 사용 중입니다."
+                        )
+                merged = dict(current or {})
+                merged.update(new)
+                merged["updated_at"] = _now_iso()
+                _validate_project_index(merged)
+                return merged
+
+            self._upsert(
+                self._project_index_path(project),
+                index_incoming,
+                merge_index,
+                f"TAP demo project index: {project}",
+                write_scope="tenant",
+            )
 
         def merge(current: Mapping[str, Any] | None, new: Mapping[str, Any]) -> dict[str, Any]:
+            if current is not None and _company_id(current.get("company_id")) != company:
+                raise DemoStoreError("기존 프로젝트의 company_id가 일치하지 않습니다.")
+            if company and current is not None:
+                current_digest = _company_access_digest(
+                    current.get("company_access_digest"),
+                    required=True,
+                )
+                if not verify_company_access_code(
+                    company,
+                    self._company_access_code,
+                    current_digest,
+                    self.config.salt,
+                ):
+                    raise DemoStoreError("기업 관리자 접속코드가 일치하지 않습니다.")
             merged = dict(current or {})
             merged.update(new)
             merged["schema_version"] = SCHEMA_VERSION
@@ -955,10 +1570,11 @@ class GitHubDemoStore:
             return merged
 
         return self._upsert(
-            f"{ROOT_PATH}/projects/{project}.json",
+            self._project_path(project, company),
             incoming,
             merge,
             f"TAP demo project snapshot: {project}",
+            write_scope="tenant" if company else "company_legacy",
         )
 
     def save_submission(self, payload: Mapping[str, Any]) -> dict[str, Any]:
@@ -969,6 +1585,11 @@ class GitHubDemoStore:
             raise DemoStoreError("문항별 저장은 지원하지 않습니다. 검사 완료 시점에만 저장해 주세요.")
         project = _project_id(incoming["project_id"])
         pseudonym = _clean(incoming["participant_key"])
+        company = _company_id(incoming.get("company_id"))
+        if company:
+            index = self._load_project_index(project)
+            if index is None or _company_id(index.get("company_id")) != company:
+                raise DemoStoreError("프로젝트 코드와 company_id 연결을 확인할 수 없습니다.")
 
         def merge(current: Mapping[str, Any] | None, new: Mapping[str, Any]) -> dict[str, Any]:
             if current is not None:
@@ -977,6 +1598,8 @@ class GitHubDemoStore:
                     "participant_key"
                 ) != new.get("participant_key"):
                     raise DemoStoreError("기존 submission의 프로젝트/참여자 키가 일치하지 않습니다.")
+                if _company_id(current.get("company_id")) != company:
+                    raise DemoStoreError("기존 submission의 company_id가 일치하지 않습니다.")
                 if current.get("instrument") != new.get("instrument"):
                     raise DemoStoreError(
                         "기존 교육 전·후 결과와 검사 버전·문항 스냅샷이 달라 병합할 수 없습니다."
@@ -1037,10 +1660,11 @@ class GitHubDemoStore:
             return merged
 
         return self._upsert(
-            f"{ROOT_PATH}/submissions/{project}/{pseudonym}.json",
+            self._submission_path(project, pseudonym, company),
             incoming,
             merge,
             f"TAP demo submission snapshot: {project}/{pseudonym}",
+            write_scope="participant",
         )
 
     # Page-level names that make the completion-triggered operation explicit.

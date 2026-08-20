@@ -10,10 +10,19 @@ DEMO_STORE_ACCESS_CODE_KEY = "demo_store_access_code"
 DEMO_STORE_ACCESS_CODE_WIDGET_KEY = "_demo_store_access_code_input"
 DEMO_STORE_REPORT_PREVIEW_CODE_KEY = "demo_store_report_preview_code"
 DEMO_STORE_REPORT_PREVIEW_CODE_WIDGET_KEY = "_demo_store_report_preview_code_input"
+COMPANY_SCOPE_VERIFIED_KEY = "company_scope_verified"
 
 
 DEFAULTS: dict[str, Any] = {
     "active_role": "company",
+    # Tenant-safe identifiers only. Raw business-registration numbers and
+    # company administrator codes are page-widget inputs and must never be
+    # copied into canonical session state or persisted project payloads.
+    "company_id": "",
+    "company_name": "",
+    "company_identity_source": "",
+    "company_access_digest": "",
+    "company_scope_verified": False,
     "project_name": "2026 하반기 공통역량 진단",
     "project_id": "",
     "project_start_date": "2026-08-17",
@@ -120,6 +129,57 @@ def save_demo_store_report_preview_code_widget(state: MutableMapping[str, Any]) 
     ).strip()
     state[DEMO_STORE_REPORT_PREVIEW_CODE_KEY] = preview_code
     return preview_code
+
+
+def activate_company_scope(
+    state: MutableMapping[str, Any],
+    *,
+    company_id: str,
+    company_name: str,
+    identity_source: str,
+    access_digest: str = "",
+) -> None:
+    """Activate one verified company scope without retaining raw credentials.
+
+    A browser may move between companies, but a project and its participant
+    progress may not. Switching the verified scope therefore clears every
+    project-bound identifier and response snapshot before the new scope is
+    exposed through canonical state.
+    """
+
+    selected_company_id = str(company_id or "").strip()
+    selected_company_name = str(company_name or "").strip()
+    selected_source = str(identity_source or "").strip()
+    selected_digest = str(access_digest or "").strip()
+    if not selected_company_id or not selected_company_name or not selected_source:
+        raise ValueError("기업 범위를 활성화하려면 기업 ID·회사명·식별 방식이 필요합니다.")
+
+    previous_company_id = str(state.get("company_id") or "").strip()
+    has_bound_project = bool(str(state.get("project_id") or "").strip())
+    if selected_company_id != previous_company_id and (previous_company_id or has_bound_project):
+        # Ensure the new tenant cannot inherit a project code, participant
+        # pseudonym, instrument snapshot, or assessment result from the old
+        # tenant. Descriptive defaults remain available for a fresh project.
+        state["project_id"] = ""
+        state["participant_id"] = ""
+        state.pop(PARTICIPANT_ID_WIDGET_KEY, None)
+        state["selected_factors"] = []
+        state["target_means"] = {}
+        state["organization_priorities"] = []
+        state["learner_interests"] = []
+        state["question_snapshot_hash"] = ""
+        state["question_snapshot_codes"] = []
+        state["assessment_version"] = "TAP-1.0"
+        reset_all_assessments(state)
+        # Project/report selectors are widget-owned and otherwise can retain a
+        # choice from the previous company after the scope change.
+        state.pop("organization_report_project_choice", None)
+
+    state["company_id"] = selected_company_id
+    state["company_name"] = selected_company_name
+    state["company_identity_source"] = selected_source
+    state["company_access_digest"] = selected_digest
+    state[COMPANY_SCOPE_VERIFIED_KEY] = True
 
 
 def _ensure_phase_mapping(

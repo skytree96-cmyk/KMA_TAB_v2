@@ -11,15 +11,22 @@ from tap.runtime_guard import stop_on_stale
 
 stop_on_stale(
     st,
-    ("tap.dashboard", "tap.github_demo_store", "tap.radar", "tap.ui"),
+    (
+        "tap.company_scope_ui",
+        "tap.dashboard",
+        "tap.github_demo_store",
+        "tap.radar",
+        "tap.tenant",
+        "tap.ui",
+    ),
 )
 
 from tap.aggregation import aggregate_factor_results
+from tap.company_scope_ui import render_company_scope_gate
 from tap.config import DATA_DIR, MIN_GROUP_N
 from tap.dashboard import (
     build_persistent_dashboard,
     completed_store_submission_factor_rows,
-    fetch_store_snapshot,
     normalize_target_means,
 )
 from tap.data import load_competencies, questions_for_factors
@@ -35,7 +42,6 @@ from tap.reporting import (
     read_group_results_csv,
 )
 from tap.state import (
-    DEMO_STORE_ACCESS_CODE_KEY,
     DEMO_STORE_REPORT_PREVIEW_CODE_KEY,
     DEMO_STORE_REPORT_PREVIEW_CODE_WIDGET_KEY,
     ensure_state,
@@ -50,7 +56,9 @@ ensure_state(st.session_state)
 
 
 @st.cache_data(ttl=30, show_spinner=False)
-def _read_store_snapshot(_secrets: object) -> dict[str, object]:
+def _read_store_snapshot(
+    _secrets: object, company_id: str
+) -> dict[str, object]:
     config = DemoStoreConfig.from_sources(secrets=_secrets)
     store = GitHubDemoStore(config)
     status = store.status()
@@ -58,7 +66,9 @@ def _read_store_snapshot(_secrets: object) -> dict[str, object]:
         return {"status": status, "projects": [], "submissions": []}
     return {
         "status": status,
-        **fetch_store_snapshot(store),
+        # Company-manager pages never use an unscoped store listing.
+        "projects": store.list_projects(company_id=company_id),
+        "submissions": store.list_submissions(company_id=company_id),
     }
 
 
@@ -73,6 +83,36 @@ callout(
     "전후 비교는 동일 교육 참여자 ID의 사전·사후 자기보고 변화이며, 비교집단이 없으면 교육의 인과효과로 확정하지 않습니다.",
     icon="5+",
 )
+
+try:
+    demo_store_secrets: object = dict(st.secrets)
+except Exception:  # No secrets file is the normal local-development state.
+    demo_store_secrets = {}
+try:
+    report_store_config = DemoStoreConfig.from_sources(secrets=demo_store_secrets)
+except DemoStoreError as exc:
+    st.error(f"기업 범위 설정을 읽지 못했습니다: {exc}")
+    st.stop()
+
+if not report_store_config.read_enabled:
+    st.warning(
+        "기업별 데이터 저장소가 연결되지 않아 실시 프로젝트 리포트를 열람할 수 없습니다."
+    )
+    st.stop()
+
+company_scope = render_company_scope_gate(
+    st,
+    report_store_config,
+    key_prefix="organization_report",
+    heading="리포트를 열람할 회사 확인",
+)
+if not (company_scope.verified and company_scope.company_id):
+    st.info(
+        "기업 관리자 확인 전에는 프로젝트 목록·완료 인원·리포트 수치를 표시하지 않습니다."
+    )
+    st.stop()
+
+active_company_id = company_scope.company_id
 
 template_csv = """participant_id,factor_code,score_1_to_5,project_id,assessment_version,target_level,assessment_date,session_type,valid_items,na_items,missing_items,opportunity_1_to_5,manager_support_1_to_5,resource_support_1_to_5,time_process_support_1_to_5
 P001,CORE-CO,3.0,PROJECT-001,TAP-1.0,manager,2026-08-01,pre,4,0,0,,,,
@@ -105,15 +145,10 @@ session_rows = completed_session_factor_rows(
     post_transfer_responses=dict(st.session_state.get("post_transfer_responses") or {}),
 )
 
-try:
-    demo_store_secrets: object = dict(st.secrets)
-except Exception:  # No secrets file is the normal local-development state.
-    demo_store_secrets = {}
-
 stored: dict[str, object] = {"status": {}, "projects": [], "submissions": []}
 store_error = ""
 try:
-    stored = _read_store_snapshot(demo_store_secrets)
+    stored = _read_store_snapshot(demo_store_secrets, active_company_id)
 except DemoStoreError as exc:
     store_error = str(exc)
 
@@ -126,7 +161,7 @@ stored_overviews = {
 
 st.markdown("### 실시 프로젝트에서 리포트 열기")
 st.caption(
-    "GitHub 기획검증 저장소에 누적된 프로젝트를 선택하면 완료 결과를 바로 불러옵니다. "
+    f"{company_scope.company_name} 기업 범위에 누적된 프로젝트만 선택할 수 있습니다. "
     "개별 참여자 원문 ID와 개인점수는 표시하지 않습니다."
 )
 
@@ -516,17 +551,6 @@ if source_kind in {"session", "store"} and participant_count_for_privacy < MIN_G
                 "테스트·기획 검토를 위한 화면 전용 기능입니다. 운영 리포트의 "
                 f"N≥{MIN_GROUP_N} 공개 기준은 그대로 유지됩니다."
             )
-            if (
-                not preview_config.report_preview_code
-                and not st.session_state.get(DEMO_STORE_REPORT_PREVIEW_CODE_KEY)
-                and st.session_state.get(DEMO_STORE_ACCESS_CODE_KEY)
-                and not st.session_state.get(SMALL_N_PREVIEW_LOCK_KEY)
-            ):
-                # 기존 배포 설정은 저장용 access_code 하나만 사용했습니다.
-                # 별도 리포트 코드가 없는 경우에만 같은 세션의 확인값을 재사용합니다.
-                st.session_state[DEMO_STORE_REPORT_PREVIEW_CODE_KEY] = str(
-                    st.session_state[DEMO_STORE_ACCESS_CODE_KEY]
-                )
             load_demo_store_report_preview_code_widget(st.session_state)
             st.text_input(
                 "리포트 미리보기 코드",
@@ -534,10 +558,7 @@ if source_kind in {"session", "store"} and participant_count_for_privacy < MIN_G
                 key=DEMO_STORE_REPORT_PREVIEW_CODE_WIDGET_KEY,
                 on_change=_save_report_preview_code_and_unlock,
                 args=(st.session_state,),
-                help=(
-                    "별도 리포트 미리보기 코드가 설정되면 그 코드를 사용하고, "
-                    "미설정 시 기존 기획검증 접속코드를 사용합니다."
-                ),
+                help="서버에 별도로 설정된 리포트 미리보기 코드만 확인합니다.",
             )
             preview_granted = (
                 not st.session_state.get(SMALL_N_PREVIEW_LOCK_KEY)

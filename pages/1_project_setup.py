@@ -10,9 +10,17 @@ import streamlit as st
 from tap.runtime_guard import stop_on_stale
 
 
-stop_on_stale(st, ("tap.github_demo_store", "tap.ui"))
+stop_on_stale(
+    st,
+    ("tap.company_scope_ui", "tap.github_demo_store", "tap.tenant", "tap.ui"),
+)
 
 from tap.data import load_competencies, questions_for_factors
+from tap.company_scope_ui import (
+    company_admin_code_from_page,
+    company_registration_code_from_page,
+    render_company_scope_gate,
+)
 from tap.github_demo_store import (
     DemoStoreConfig,
     GitHubDemoStore,
@@ -27,15 +35,12 @@ from tap.selection import (
     selection_errors,
 )
 from tap.state import (
-    DEMO_STORE_ACCESS_CODE_KEY,
-    DEMO_STORE_ACCESS_CODE_WIDGET_KEY,
     PARTICIPANT_ID_WIDGET_KEY,
     activate_assessment_phase,
     ensure_state,
-    load_demo_store_access_code_widget,
     reset_all_assessments,
-    save_demo_store_access_code_widget,
 )
+from tap.tenant import verify_company_access_code
 from tap.ui import callout, domain_header, page_header, setup_page, summary_strip
 
 
@@ -45,43 +50,8 @@ competencies = load_competencies()
 row_by_code = {row["factor_code"]: row for row in competencies}
 
 level_labels = {"staff": "실무자", "manager": "관리자·리더", "executive": "임원"}
-
-
-def _demo_access_code() -> str:
-    return str(st.session_state.get(DEMO_STORE_ACCESS_CODE_KEY, "")).strip()
-
-
-def _render_demo_store_access_gate() -> None:
-    """Render the shared-code gate only when the synthetic store is enabled."""
-
-    try:
-        config = DemoStoreConfig.from_sources(st.secrets)
-    except Exception:
-        return
-    if not config.enabled:
-        return
-
-    with st.container(border=True):
-        st.markdown("#### GitHub 기획검증 저장")
-        load_demo_store_access_code_widget(st.session_state)
-        st.text_input(
-            "기획검증 접속코드",
-            type="password",
-            key=DEMO_STORE_ACCESS_CODE_WIDGET_KEY,
-            on_change=save_demo_store_access_code_widget,
-            args=(st.session_state,),
-            help="합성 테스트 프로젝트와 완료 결과를 GitHub에 저장할 때만 사용합니다.",
-        )
-        if not config.write_enabled:
-            st.caption(
-                "GitHub 쓰기 토큰 또는 서버 접속코드가 미설정되어 현 세션·JSON 방식으로만 진행됩니다."
-            )
-        elif config.access_granted(_demo_access_code()):
-            st.caption("접속코드 확인 완료 · 저장 시 완료 스냅샷만 GitHub 테스트 저장소에 누적됩니다.")
-        elif _demo_access_code():
-            st.warning("기획검증 접속코드가 일치하지 않습니다. 현 세션·JSON 데이터는 그대로 유지됩니다.")
-        else:
-            st.caption("GitHub에 합성 테스트 데이터를 저장하려면 교육담당자가 전달한 접속코드를 입력하세요.")
+COMPANY_SCOPE_KEY = "project_setup"
+PROJECT_WRITE_ACCESS_CODE_WIDGET_KEY = "_project_setup_company_write_access_code"
 
 
 def _save_project_to_demo_store() -> None:
@@ -104,25 +74,52 @@ def _save_project_to_demo_store() -> None:
             "message": "GitHub 테스트 저장소가 미설정되어 현재 브라우저 세션과 JSON 파일 방식으로 진행합니다.",
         }
         return
-    access_code = _demo_access_code()
-    if not config.write_enabled:
+    company_access_code = str(
+        st.session_state.get(PROJECT_WRITE_ACCESS_CODE_WIDGET_KEY)
+        or company_admin_code_from_page(st.session_state, COMPANY_SCOPE_KEY)
+        or ""
+    ).strip()
+    company_registration_code = company_registration_code_from_page(
+        st.session_state, COMPANY_SCOPE_KEY
+    )
+    company_id = str(st.session_state.get("company_id") or "").strip()
+    company_digest = str(
+        st.session_state.get("company_access_digest") or ""
+    ).strip()
+    if not config.project_write_enabled:
         st.session_state["demo_store_project_pending"] = True
         st.session_state["demo_store_notice"] = {
             "level": "warning",
-            "message": "GitHub 쓰기 토큰 또는 서버 접속코드가 미설정되어 테스트 프로젝트를 게시하지 못했습니다. 현 세션·JSON 방식은 유지됩니다.",
+            "message": "GitHub 쓰기 토큰 또는 기업 관리자 확인코드가 미설정되어 테스트 프로젝트를 게시하지 못했습니다.",
         }
         return
-    if not config.access_granted(access_code):
+    if not (
+        company_id
+        and company_digest
+        and verify_company_access_code(
+            company_id,
+            company_access_code,
+            company_digest,
+            config.salt,
+        )
+    ):
         st.session_state["demo_store_project_pending"] = True
         st.session_state["demo_store_notice"] = {
             "level": "warning",
-            "message": "기획검증 접속코드를 입력하거나 다시 확인해 주세요. 프로젝트는 현 세션에 유지되며 JSON 방식으로도 진행할 수 있습니다.",
+            "message": "현재 회사의 기업 관리자 확인코드를 다시 입력해 주세요. 참여자 접속코드와는 별도입니다.",
         }
         return
 
     try:
-        GitHubDemoStore(config, access_code=access_code).save_project(
-            project_payload_from_state(st.session_state)
+        GitHubDemoStore(
+            config,
+            company_access_code=company_access_code,
+            company_registration_code=company_registration_code,
+        ).save_project(
+            project_payload_from_state(
+                st.session_state,
+                tenant_salt=config.salt,
+            )
         )
     except Exception as exc:  # network/API failure must not discard the project
         st.session_state["demo_store_project_pending"] = True
@@ -135,7 +132,10 @@ def _save_project_to_demo_store() -> None:
     st.session_state["demo_store_project_pending"] = False
     st.session_state["demo_store_notice"] = {
         "level": "success",
-        "message": f"테스트 프로젝트를 GitHub에 저장했습니다. 프로젝트 코드: {st.session_state.get('project_id', '')}",
+        "message": (
+            f"{st.session_state.get('company_name', '현재 회사')} 범위에 테스트 프로젝트를 저장했습니다. "
+            f"기업 ID: {company_id} · 프로젝트 코드: {st.session_state.get('project_id', '')}"
+        ),
     }
 
 
@@ -228,10 +228,63 @@ page_header(
     badge="사전·사후 비교",
 )
 
-_render_demo_store_access_gate()
+try:
+    project_store_config = DemoStoreConfig.from_sources(st.secrets)
+except Exception as exc:
+    project_store_config = None
+    st.error(
+        f"기업 범위 설정을 확인하지 못했습니다({type(exc).__name__}). "
+        "KMA 관리자에게 저장소 설정을 확인해 주세요."
+    )
+
+company_scope_ready = False
+if project_store_config is not None and project_store_config.enabled:
+    company_scope = render_company_scope_gate(
+        st,
+        project_store_config,
+        key_prefix=COMPANY_SCOPE_KEY,
+        heading="1. 프로젝트를 관리할 회사 확인",
+    )
+    company_scope_ready = bool(company_scope.verified and company_scope.company_id)
+else:
+    st.warning(
+        "기업 분리 저장소가 활성화되지 않아 새 프로젝트를 저장할 수 없습니다. "
+        "기획검증 배포 설정을 확인해 주세요."
+    )
+
+if not company_scope_ready:
+    st.info("기업 범위를 확인하면 해당 회사에 속한 프로젝트만 생성·저장됩니다.")
+
+project_write_ready = False
+if company_scope_ready and project_store_config is not None:
+    if PROJECT_WRITE_ACCESS_CODE_WIDGET_KEY not in st.session_state:
+        # Copy only between disposable page widgets; the raw code never enters
+        # canonical state or a project payload.
+        st.session_state[PROJECT_WRITE_ACCESS_CODE_WIDGET_KEY] = (
+            company_admin_code_from_page(st.session_state, COMPANY_SCOPE_KEY)
+        )
+    project_write_code = st.text_input(
+        "프로젝트 저장용 기업 관리자 확인코드",
+        type="password",
+        key=PROJECT_WRITE_ACCESS_CODE_WIDGET_KEY,
+        help="현재 회사에 새 프로젝트를 쓰기 전에 다시 확인합니다. 원문은 저장하지 않습니다.",
+    )
+    project_write_ready = bool(
+        project_store_config.project_write_enabled
+        and verify_company_access_code(
+            company_scope.company_id,
+            project_write_code,
+            company_scope.access_digest,
+            project_store_config.salt,
+        )
+    )
+    if project_write_code and not project_write_ready:
+        st.warning("현재 회사의 기업 관리자 확인코드가 일치하지 않습니다.")
+    elif project_write_ready:
+        st.caption("기업 관리자 확인 완료 · 이 회사 범위에만 프로젝트가 저장됩니다.")
 
 with st.container(border=True):
-    st.markdown('<h3 class="tap-card-title">1. 교육과 검사 일정</h3>', unsafe_allow_html=True)
+    st.markdown('<h3 class="tap-card-title">2. 교육과 검사 일정</h3>', unsafe_allow_html=True)
     st.markdown(
         '<p class="tap-card-sub">교육과정·교육일·사전/사후 검사 기간을 먼저 고정합니다. 최근 8주 회상기간이 교육 전을 포함하지 않도록 사후검사는 교육 8~10주 후를 권장합니다.</p>',
         unsafe_allow_html=True,
@@ -308,7 +361,7 @@ applicable_base = [row for row in base_rows if applicable_to_level(row, target_l
 base_codes = [row["factor_code"] for row in applicable_base]
 
 with st.container(border=True):
-    st.markdown('<h3 class="tap-card-title">2. 기본역량</h3>', unsafe_allow_html=True)
+    st.markdown('<h3 class="tap-card-title">3. 기본역량</h3>', unsafe_allow_html=True)
     st.markdown(
         '<p class="tap-card-sub">대상 수준에 적용되는 기본역량은 체크된 상태로 고정됩니다.</p>',
         unsafe_allow_html=True,
@@ -378,7 +431,7 @@ for row in optional_rows:
         disabled_optional.add(code)
 
 with st.container(border=True):
-    st.markdown('<h3 class="tap-card-title">3. 선택역량</h3>', unsafe_allow_html=True)
+    st.markdown('<h3 class="tap-card-title">4. 선택역량</h3>', unsafe_allow_html=True)
     st.markdown(
         '<p class="tap-card-sub">목적에 필요한 역량만 선택합니다. 최대치에 도달하면 나머지 체크박스가 자동으로 잠깁니다.</p>',
         unsafe_allow_html=True,
@@ -430,7 +483,7 @@ if overlap_warnings:
     st.warning("내용이 겹칠 수 있는 동시 선택: " + " / ".join(", ".join(names) for names in overlap_warnings))
 
 with st.container(border=True):
-    st.markdown('<h3 class="tap-card-title">4. 목표와 추천 입력</h3>', unsafe_allow_html=True)
+    st.markdown('<h3 class="tap-card-title">5. 목표와 추천 입력</h3>', unsafe_allow_html=True)
     st.markdown(
         '<p class="tap-card-sub">낮은 점수만으로 추천하지 않도록 조직 중요도와 학습희망을 체크합니다.</p>',
         unsafe_allow_html=True,
@@ -508,7 +561,13 @@ if not date_errors and not 56 <= post_delay_days <= 70:
 if st.button(
     "설정 저장 후 교육 전 검사 시작",
     type="primary",
-    disabled=item_count == 0 or bool(selection_issues) or bool(date_errors),
+    disabled=(
+        not company_scope_ready
+        or not project_write_ready
+        or item_count == 0
+        or bool(selection_issues)
+        or bool(date_errors)
+    ),
     width="stretch",
 ):
     next_project_name = project_name.strip() or "이름 없는 교육평가 프로젝트"

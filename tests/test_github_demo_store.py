@@ -14,6 +14,7 @@ from tap.github_demo_store import (
     project_payload_from_state,
     submission_payload_from_state,
 )
+from tap.tenant import derive_company_identity, hash_company_access_code
 
 
 class FakeTransport:
@@ -175,6 +176,7 @@ class GitHubDemoStoreTests(unittest.TestCase):
             token="fake-token",
             salt="test-only-salt",
             access_code="test-access-code",
+            company_access_code="test-company-registration-code",
         )
         self.store = GitHubDemoStore(
             self.config,
@@ -314,16 +316,16 @@ class GitHubDemoStoreTests(unittest.TestCase):
         allowed.save_project(project)
         self.assertEqual(1, len([row for row in self.transport.requests if row["method"] == "PUT"]))
 
-    def test_report_preview_code_fallback_and_read_only_gate(self) -> None:
-        fallback = DemoStoreConfig(
+    def test_report_preview_requires_explicit_role_specific_code(self) -> None:
+        legacy_only = DemoStoreConfig(
             enabled=True,
             owner="public",
             repo="demo",
             access_code="legacy-code",
         )
-        self.assertFalse(fallback.write_enabled)
-        self.assertTrue(fallback.report_preview_granted("legacy-code"))
-        self.assertFalse(fallback.report_preview_granted("wrong-code"))
+        self.assertFalse(legacy_only.write_enabled)
+        self.assertFalse(legacy_only.report_preview_granted("legacy-code"))
+        self.assertFalse(legacy_only.report_preview_granted("wrong-code"))
 
         separate = DemoStoreConfig(
             enabled=True,
@@ -605,6 +607,272 @@ class GitHubDemoStoreTests(unittest.TestCase):
         changed["instrument"]["assessment_version"] = "TAP-CHANGED"
         with self.assertRaisesRegex(DemoStoreError, "검사 버전"):
             self.store.save_submission(changed)
+
+    def test_tenant_paths_payloads_index_and_participant_project_lookup(self) -> None:
+        identity = derive_company_identity(
+            salt=self.config.salt,
+            company_name="테스트 기업",
+            business_registration_number="123-45-67890",
+        )
+        admin_code = "company-admin-code"
+        state = project_state()
+        state.update(identity.to_payload())
+        state["company_access_digest"] = hash_company_access_code(
+            identity.company_id,
+            admin_code,
+            self.config.salt,
+        )
+        state["business_registration_number"] = "123-45-67890"
+        state["company_access_code"] = admin_code
+        payload = project_payload_from_state(state)
+        encoded = json.dumps(payload, ensure_ascii=False)
+        self.assertNotIn("123-45-67890", encoded)
+        self.assertNotIn(admin_code, encoded)
+        self.assertEqual(identity.company_id, payload["company_id"])
+
+        unapproved_store = GitHubDemoStore(
+            self.config,
+            transport=self.transport,
+            access_code="test-access-code",
+            company_access_code=admin_code,
+        )
+        with self.assertRaisesRegex(DemoStoreError, "등록 승인코드"):
+            unapproved_store.save_project(payload)
+        self.assertEqual({}, self.transport.files)
+
+        tenant_store = GitHubDemoStore(
+            self.config,
+            transport=self.transport,
+            access_code="test-access-code",
+            company_access_code=admin_code,
+            company_registration_code="test-company-registration-code",
+        )
+        tenant_store.save_project(payload)
+        self.assertIn(
+            f"tap-demo/v1/companies/{identity.company_id}/company.json",
+            self.transport.files,
+        )
+        self.assertIn(
+            "tap-demo/v1/project-index/TAP-DEMO-001.json",
+            self.transport.files,
+        )
+        scoped_project_path = (
+            f"tap-demo/v1/companies/{identity.company_id}/projects/TAP-DEMO-001.json"
+        )
+        self.assertIn(scoped_project_path, self.transport.files)
+
+        existing_company_store = GitHubDemoStore(
+            self.config,
+            transport=self.transport,
+            access_code="test-access-code",
+            company_access_code=admin_code,
+        )
+        updated_payload = deepcopy(payload)
+        updated_payload["project_name"] = "등록 후 수정된 프로젝트"
+        updated = existing_company_store.save_project(updated_payload)
+        self.assertEqual("등록 후 수정된 프로젝트", updated["project_name"])
+
+        # Participant UX remains project-code-only; the non-identifying index
+        # resolves the company-scoped path internally.
+        loaded = tenant_store.load_project("TAP-DEMO-001")
+        self.assertEqual(identity.company_id, loaded["company_id"])
+
+        submission_state_value = submission_state(post_complete=False)
+        submission_state_value.update(identity.to_payload())
+        submission = submission_payload_from_state(
+            submission_state_value,
+            salt=self.config.salt,
+        )
+        tenant_store.save_submission(submission)
+        scoped_submission_path = (
+            f"tap-demo/v1/companies/{identity.company_id}/submissions/TAP-DEMO-001/"
+            f"{submission['participant_key']}.json"
+        )
+        self.assertIn(scoped_submission_path, self.transport.files)
+        loaded_submission = tenant_store.load_submission(
+            "TAP-DEMO-001",
+            submission["participant_key"],
+        )
+        self.assertEqual(identity.company_id, loaded_submission["company_id"])
+
+        registry_text = json.dumps(tenant_store.load_company(identity.company_id), ensure_ascii=False)
+        all_saved = json.dumps(
+            [record["payload"] for record in self.transport.files.values()],
+            ensure_ascii=False,
+        )
+        self.assertNotIn("123-45-67890", registry_text)
+        self.assertNotIn(admin_code, registry_text)
+        self.assertNotIn("123-45-67890", all_saved)
+        self.assertNotIn(admin_code, all_saved)
+
+    def test_tenant_filter_prevents_cross_company_project_collision(self) -> None:
+        first = derive_company_identity(
+            salt=self.config.salt,
+            company_name="첫 기업",
+            kma_assigned_code="KMA0001",
+        )
+        second = derive_company_identity(
+            salt=self.config.salt,
+            company_name="둘째 기업",
+            kma_assigned_code="KMA0002",
+        )
+        first_code = "first-admin"
+        second_code = "second-admin"
+
+        first_state = project_state()
+        first_state.update(first.to_payload())
+        first_state["company_access_digest"] = hash_company_access_code(
+            first.company_id, first_code, self.config.salt
+        )
+        first_store = GitHubDemoStore(
+            self.config,
+            transport=self.transport,
+            access_code="test-access-code",
+            company_access_code=first_code,
+            company_registration_code="test-company-registration-code",
+        )
+        first_store.save_project(project_payload_from_state(first_state))
+
+        second_state = project_state()
+        second_state.update(second.to_payload())
+        second_state["company_access_digest"] = hash_company_access_code(
+            second.company_id, second_code, self.config.salt
+        )
+        second_store = GitHubDemoStore(
+            self.config,
+            transport=self.transport,
+            access_code="test-access-code",
+            company_access_code=second_code,
+            company_registration_code="test-company-registration-code",
+        )
+        with self.assertRaisesRegex(DemoStoreError, "다른 기업"):
+            second_store.save_project(project_payload_from_state(second_state))
+
+        self.assertEqual(
+            [first.company_id],
+            [row["company_id"] for row in first_store.list_projects(first.company_id)],
+        )
+        self.assertEqual([], first_store.list_projects(second.company_id))
+
+    def test_explicit_company_and_participant_config_codes_must_differ(self) -> None:
+        with self.assertRaisesRegex(DemoStoreError, "서로 달라야"):
+            DemoStoreConfig(
+                enabled=True,
+                owner="owner",
+                repo="repo",
+                token="token",
+                salt="salt",
+                participant_access_code="same-code",
+                company_access_code="same-code",
+            )
+
+        separated = DemoStoreConfig(
+            enabled=True,
+            owner="owner",
+            repo="repo",
+            token="private-token",
+            salt="private-salt",
+            participant_access_code="participant-secret",
+            company_access_code="company-secret",
+        )
+        rendered = repr(separated)
+        self.assertNotIn("private-token", rendered)
+        self.assertNotIn("private-salt", rendered)
+        self.assertNotIn("participant-secret", rendered)
+        self.assertNotIn("company-secret", rendered)
+
+    def test_unicode_codes_are_normalized_and_compared_without_type_error(self) -> None:
+        config = DemoStoreConfig(
+            enabled=True,
+            owner="owner",
+            repo="repo",
+            token="token",
+            salt="salt",
+            participant_access_code=" 참여자코드 ",
+            company_access_code=" 승인코드 ",
+            report_preview_code=" 미리보기코드 ",
+        )
+        self.assertTrue(config.access_granted("참여자코드"))
+        self.assertTrue(config.company_access_granted("승인코드"))
+        self.assertTrue(config.report_preview_granted("미리보기코드"))
+        self.assertFalse(config.access_granted("다른코드"))
+
+        with self.assertRaisesRegex(DemoStoreError, "서로 달라야"):
+            DemoStoreConfig(
+                enabled=True,
+                owner="owner",
+                repo="repo",
+                token="token",
+                salt="salt",
+                participant_access_code="ABC",
+                company_access_code="ＡＢＣ",
+            )
+
+    def test_legacy_shared_code_cannot_approve_new_company_registration(self) -> None:
+        legacy_code = "legacy-shared-code"
+        admin_code = "tenant-admin-code"
+        config = DemoStoreConfig(
+            enabled=True,
+            owner="owner",
+            repo="repo",
+            token="token",
+            salt="salt",
+            access_code=legacy_code,
+        )
+        self.assertTrue(config.access_granted(legacy_code))
+        self.assertFalse(config.company_access_granted(legacy_code))
+        self.assertEqual("", config.company_code)
+
+        identity = derive_company_identity(
+            salt=config.salt,
+            company_name="신규 기업",
+            kma_assigned_code="KMANEW1",
+        )
+        state = project_state()
+        state.update(identity.to_payload())
+        state["company_access_digest"] = hash_company_access_code(
+            identity.company_id,
+            admin_code,
+            config.salt,
+        )
+        store = GitHubDemoStore(
+            config,
+            transport=self.transport,
+            company_access_code=admin_code,
+            company_registration_code=legacy_code,
+        )
+        with self.assertRaisesRegex(DemoStoreError, "등록 승인코드"):
+            store.save_project(project_payload_from_state(state))
+        self.assertEqual({}, self.transport.files)
+
+    def test_malicious_tenant_raw_values_are_rejected_before_storage(self) -> None:
+        raw_values = {
+            "business_registration_number": "1234567890",
+            "business_registration": "1234567890",
+            "business_number": "1234567890",
+            "company_access_code": "raw-admin-code",
+            "admin_code": "raw-admin-code",
+            "access_code": "raw-admin-code",
+            "kma_assigned_code": "KMA0001",
+            "kma_code": "KMA0001",
+        }
+        for field, value in raw_values.items():
+            with self.subTest(field=field):
+                payload = project_payload_from_state(project_state())
+                payload[field] = value
+                with self.assertRaisesRegex(DemoStoreError, "저장할 수 없습니다"):
+                    self.store.save_project(payload)
+
+        unknown = project_payload_from_state(project_state())
+        unknown["harmless_but_unapproved"] = "must-not-persist"
+        with self.assertRaisesRegex(DemoStoreError, "허용목록"):
+            self.store.save_project(unknown)
+        self.assertFalse(
+            any(
+                "must-not-persist" in json.dumps(record["payload"], ensure_ascii=False)
+                for record in self.transport.files.values()
+            )
+        )
 
 
 if __name__ == "__main__":

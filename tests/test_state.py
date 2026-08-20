@@ -6,6 +6,7 @@ from tap.state import (
     DEMO_STORE_REPORT_PREVIEW_CODE_KEY,
     DEMO_STORE_REPORT_PREVIEW_CODE_WIDGET_KEY,
     PARTICIPANT_ID_WIDGET_KEY,
+    activate_company_scope,
     activate_assessment_phase,
     ensure_state,
     load_demo_store_access_code_widget,
@@ -26,6 +27,53 @@ class StateTests(unittest.TestCase):
         ensure_state(state)
         self.assertEqual("", state["participant_id"])
         self.assertEqual("mixed_or_unknown", state["training_cause"])
+        self.assertEqual("", state["company_id"])
+        self.assertFalse(state["company_scope_verified"])
+
+    def test_company_scope_keeps_only_safe_identity_fields(self):
+        state = {}
+        ensure_state(state)
+        activate_company_scope(
+            state,
+            company_id="co_" + "a" * 64,
+            company_name="한국능률협회",
+            identity_source="kma_assigned_code",
+            access_digest="cad_" + "b" * 64,
+        )
+
+        self.assertEqual("co_" + "a" * 64, state["company_id"])
+        self.assertEqual("한국능률협회", state["company_name"])
+        self.assertTrue(state["company_scope_verified"])
+        self.assertNotIn("business_registration_number", state)
+        self.assertNotIn("company_admin_access_code", state)
+
+    def test_company_switch_clears_project_and_assessment_scope(self):
+        state = {
+            "company_id": "co_" + "a" * 64,
+            "company_name": "A사",
+            "company_identity_source": "kma_assigned_code",
+            "company_scope_verified": True,
+            "project_id": "TAP-OLD",
+            "participant_id": "P001",
+            "selected_factors": ["CORE-CO"],
+            "responses_by_phase": {"pre": {"Q1": 4}, "post": {"Q1": 5}},
+            "assessment_completed_by_phase": {"pre": True, "post": True},
+            "organization_report_project_choice": "store:TAP-OLD",
+        }
+        ensure_state(state)
+        activate_company_scope(
+            state,
+            company_id="co_" + "c" * 64,
+            company_name="B사",
+            identity_source="business_registration_number",
+            access_digest="cad_" + "d" * 64,
+        )
+
+        self.assertEqual("", state["project_id"])
+        self.assertEqual("", state["participant_id"])
+        self.assertEqual([], state["selected_factors"])
+        self.assertEqual({"pre": {}, "post": {}}, state["responses_by_phase"])
+        self.assertNotIn("organization_report_project_choice", state)
 
     def test_legacy_flat_responses_migrate_to_pre(self):
         state = {

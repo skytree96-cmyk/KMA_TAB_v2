@@ -61,6 +61,11 @@ page_header(
     badge_tone="amber",
 )
 
+st.warning(
+    "현재 KMA 역할 전환은 공개 데모의 화면 미리보기이며 로그인·권한 인증이 아닙니다. "
+    "실제 회원사 데이터를 운영하기 전 계정 인증·RBAC·감사로그를 적용해야 합니다."
+)
+
 if dashboard_source == "store":
     refresh_col, source_col = st.columns([1, 3])
     with refresh_col:

@@ -13,6 +13,22 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class UiRegressionTests(unittest.TestCase):
+    def test_public_role_switch_and_kma_preview_are_not_described_as_auth(self) -> None:
+        sidebar_source = (ROOT / "tap" / "ui.py").read_text(encoding="utf-8")
+        kma_source = (ROOT / "pages" / "6_kma_dashboard.py").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn(
+            "역할 전환은 화면 미리보기용이며 로그인·권한 인증이 아닙니다",
+            sidebar_source,
+        )
+        self.assertIn("실제 데이터 사용 전에는 RBAC", sidebar_source)
+        self.assertIn(
+            "KMA 역할 전환은 공개 데모의 화면 미리보기이며 로그인·권한 인증이 아닙니다",
+            kma_source,
+        )
+        self.assertIn("계정 인증·RBAC·감사로그", kma_source)
+
     def test_material_icon_font_is_not_overridden(self) -> None:
         source = (ROOT / "tap" / "ui.py").read_text(encoding="utf-8")
         self.assertNotIn('[class*="st-"]', source)

@@ -99,22 +99,32 @@ class RuntimeGuardTests(unittest.TestCase):
         cases = {
             "streamlit_app.py": {"tap.open_page"},
             "pages/9_manager_dashboard.py": {
+                "tap.company_scope_ui",
                 "tap.dashboard",
                 "tap.github_demo_store",
+                "tap.tenant",
                 "tap.ui",
             },
             "pages/0_user_guide.py": {"tap.ui"},
-            "pages/1_project_setup.py": {"tap.github_demo_store", "tap.ui"},
+            "pages/1_project_setup.py": {
+                "tap.company_scope_ui",
+                "tap.github_demo_store",
+                "tap.tenant",
+                "tap.ui",
+            },
             "pages/2_assessment.py": {
                 "tap.baseline_transfer",
                 "tap.github_demo_store",
+                "tap.tenant",
                 "tap.ui",
             },
             "pages/3_individual_report.py": {"tap.baseline_transfer", "tap.ui"},
             "pages/4_organization_report.py": {
+                "tap.company_scope_ui",
                 "tap.dashboard",
                 "tap.github_demo_store",
                 "tap.radar",
+                "tap.tenant",
                 "tap.ui",
             },
             "pages/5_question_bank.py": {"tap.ui"},
@@ -175,7 +185,15 @@ class RuntimeGuardTests(unittest.TestCase):
                     self.assertLess(guard.lineno, run_path_calls[0].lineno)
                     self.assertEqual([], protected_imports)
                 else:
-                    self.assertEqual(expected_modules, {node.module for node in protected_imports})
+                    # A guard may also cover an indirect state/security helper
+                    # imported by a protected facade (for example tenant
+                    # validation behind company_scope_ui). Every direct import
+                    # must still occur after the guard, while the tuple itself
+                    # remains exact through the assertion above.
+                    self.assertTrue(
+                        {node.module for node in protected_imports}
+                        <= expected_modules
+                    )
                     self.assertTrue(all(guard.lineno < node.lineno for node in protected_imports))
                 self.assertFalse(
                     any(
@@ -196,6 +214,8 @@ class RuntimeGuardTests(unittest.TestCase):
             "tap.dashboard",
             "tap.baseline_transfer",
             "tap.github_demo_store",
+            "tap.tenant",
+            "tap.company_scope_ui",
             "tap.radar",
             "tap.open_page",
         ):

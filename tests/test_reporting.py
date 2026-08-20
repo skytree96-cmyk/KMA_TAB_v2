@@ -21,6 +21,7 @@ from tap.reporting import (
     printable_organization_report_html,
     read_group_results_csv,
 )
+from tap.tenant import derive_company_identity, hash_company_access_code
 
 
 COMPETENCIES = [
@@ -90,6 +91,46 @@ def _small_n_store_snapshot() -> tuple[dict[str, object], dict[str, object]]:
 
 
 class ReportingTests(unittest.TestCase):
+    def _authenticate_report_company(
+        self,
+        app: AppTest,
+        store: MagicMock,
+        config: DemoStoreConfig,
+    ) -> None:
+        """Complete the actual company gate before asserting report content."""
+
+        st.cache_data.clear()
+        self.addCleanup(st.cache_data.clear)
+        admin_code = "report-company-admin"
+        company_code = "KMAREPORT001"
+        identity = derive_company_identity(
+            salt=config.salt,
+            company_name="리포트 테스트 기업",
+            kma_assigned_code=company_code,
+        )
+        store.load_company.return_value = {
+            "company_id": identity.company_id,
+            "company_name": identity.company_name,
+            "company_identity_source": identity.identity_source,
+            "company_access_digest": hash_company_access_code(
+                identity.company_id, admin_code, config.salt
+            ),
+        }
+        next(item for item in app.text_input if item.label == "회사명").set_value(
+            identity.company_name
+        )
+        next(
+            item for item in app.text_input if item.label == "KMA 부여 기업코드"
+        ).set_value(company_code)
+        next(
+            item for item in app.text_input if item.label == "기업 관리자 확인코드"
+        ).set_value(admin_code)
+        with patch("tap.company_scope_ui.GitHubDemoStore", return_value=store):
+            next(item for item in app.button if item.label == "기업 범위 확인").click()
+            app.run()
+        self.assertTrue(app.session_state["company_scope_verified"])
+        self.assertEqual(identity.company_id, app.session_state["company_id"])
+
     def test_organization_report_uses_cloud_safe_svg_iframe(self) -> None:
         source = (ROOT / "pages" / "4_organization_report.py").read_text(
             encoding="utf-8"
@@ -521,14 +562,38 @@ class ReportingTests(unittest.TestCase):
         questions = questions_for_factors(["CORE-CO"])
         pre = {str(row["question_code"]): 2 for row in questions}
         post = {str(row["question_code"]): 4 for row in questions}
-        app = AppTest.from_file(str(ROOT / "pages" / "4_organization_report.py"), default_timeout=30).run()
-        app.session_state["selected_factors"] = ["CORE-CO"]
-        app.session_state["participant_id"] = "REAL-P001"
-        app.session_state["responses_by_phase"] = {"pre": pre, "post": post}
-        app.session_state["assessment_completed_by_phase"] = {"pre": True, "post": True}
-        app.session_state["pre_end_date"] = "2026-08-01"
-        app.session_state["post_end_date"] = "2026-10-01"
-        app.run()
+        config = DemoStoreConfig(
+            enabled=True,
+            owner="example",
+            repo="tap-demo",
+            salt="report-tenant-salt",
+        )
+        store = MagicMock()
+        store.status.return_value = {"read_enabled": True}
+        store.list_projects.return_value = []
+        store.list_submissions.return_value = []
+        with (
+            patch(
+                "tap.github_demo_store.DemoStoreConfig.from_sources",
+                return_value=config,
+            ),
+            patch("tap.github_demo_store.GitHubDemoStore", return_value=store),
+        ):
+            app = AppTest.from_file(
+                str(ROOT / "pages" / "4_organization_report.py"),
+                default_timeout=30,
+            ).run()
+            self._authenticate_report_company(app, store, config)
+            app.session_state["selected_factors"] = ["CORE-CO"]
+            app.session_state["participant_id"] = "REAL-P001"
+            app.session_state["responses_by_phase"] = {"pre": pre, "post": post}
+            app.session_state["assessment_completed_by_phase"] = {
+                "pre": True,
+                "post": True,
+            }
+            app.session_state["pre_end_date"] = "2026-08-01"
+            app.session_state["post_end_date"] = "2026-10-01"
+            app.run()
 
         self.assertEqual([], [str(item.value) for item in app.exception])
         self.assertTrue(any(item.label == "프로젝트 선택" for item in app.selectbox))
@@ -558,6 +623,7 @@ class ReportingTests(unittest.TestCase):
             enabled=True,
             owner="example",
             repo="tap-demo",
+            salt="report-tenant-salt",
             report_preview_code=preview_code,
         )
         project, submission = _small_n_store_snapshot()
@@ -579,6 +645,7 @@ class ReportingTests(unittest.TestCase):
                 str(ROOT / "pages" / "4_organization_report.py"),
                 default_timeout=30,
             ).run()
+            self._authenticate_report_company(app, store, config)
 
             self.assertEqual([], [str(item.value) for item in app.exception])
             code_input = next(
@@ -646,12 +713,13 @@ class ReportingTests(unittest.TestCase):
             ).value)
             self.assertFalse(any(item.label == "교육 전 참여" for item in app.metric))
 
-    def test_small_n_preview_reuses_legacy_access_code_in_same_session(self) -> None:
+    def test_small_n_preview_does_not_reuse_legacy_access_code(self) -> None:
         legacy_code = "legacy-planning-code"
         config = DemoStoreConfig(
             enabled=True,
             owner="example",
             repo="tap-demo",
+            salt="report-tenant-salt",
             access_code=legacy_code,
         )
         project, submission = _small_n_store_snapshot()
@@ -673,6 +741,7 @@ class ReportingTests(unittest.TestCase):
                 str(ROOT / "pages" / "4_organization_report.py"),
                 default_timeout=30,
             ).run()
+            self._authenticate_report_company(app, store, config)
             app.session_state["demo_store_access_code"] = legacy_code
             app.run()
 
@@ -684,8 +753,9 @@ class ReportingTests(unittest.TestCase):
             for item in app.toggle
             if item.label == "소표본 실제값을 화면에서만 미리보기"
         )
-        self.assertEqual(legacy_code, preview_input.value)
-        self.assertFalse(preview_toggle.disabled)
+        self.assertEqual("", preview_input.value)
+        self.assertTrue(preview_toggle.disabled)
+        self.assertFalse(any(item.label == "교육 전 참여" for item in app.metric))
 
     def test_small_n_preview_lock_survives_project_switches(self) -> None:
         legacy_code = "legacy-planning-code"
@@ -693,7 +763,8 @@ class ReportingTests(unittest.TestCase):
             enabled=True,
             owner="example",
             repo="tap-demo",
-            access_code=legacy_code,
+            salt="report-tenant-salt",
+            report_preview_code=legacy_code,
         )
         project_a, submission_a = _small_n_store_snapshot()
         project_b = deepcopy(project_a)
@@ -720,7 +791,8 @@ class ReportingTests(unittest.TestCase):
                 str(ROOT / "pages" / "4_organization_report.py"),
                 default_timeout=30,
             ).run()
-            app.session_state["demo_store_access_code"] = legacy_code
+            self._authenticate_report_company(app, store, config)
+            app.session_state["demo_store_report_preview_code"] = legacy_code
             app.run()
             next(item for item in app.button if item.label == "미리보기 잠금").click()
             app.run()
@@ -771,6 +843,7 @@ class ReportingTests(unittest.TestCase):
             enabled=True,
             owner="example",
             repo="tap-demo",
+            salt="report-tenant-salt",
             report_preview_code="report-preview-secret",
         )
         project, submission = _small_n_store_snapshot()
@@ -793,6 +866,7 @@ class ReportingTests(unittest.TestCase):
                 str(ROOT / "pages" / "4_organization_report.py"),
                 default_timeout=30,
             ).run()
+            self._authenticate_report_company(app, store, config)
 
         self.assertEqual([], [str(item.value) for item in app.exception])
         self.assertFalse(
@@ -810,6 +884,7 @@ class ReportingTests(unittest.TestCase):
             enabled=True,
             owner="example",
             repo="tap-demo",
+            salt="report-tenant-salt",
             report_preview_code="report-preview-secret",
         )
         project, submission = _small_n_store_snapshot()
@@ -837,6 +912,7 @@ class ReportingTests(unittest.TestCase):
                 str(ROOT / "pages" / "4_organization_report.py"),
                 default_timeout=30,
             ).run()
+            self._authenticate_report_company(app, store, config)
 
         self.assertEqual([], [str(item.value) for item in app.exception])
         self.assertFalse(
@@ -859,7 +935,28 @@ class ReportingTests(unittest.TestCase):
         self.assertEqual(0, frame.proto.tab_index)
 
     def test_organization_report_does_not_auto_show_sample(self) -> None:
-        app = AppTest.from_file(str(ROOT / "pages" / "4_organization_report.py"), default_timeout=30).run()
+        config = DemoStoreConfig(
+            enabled=True,
+            owner="example",
+            repo="tap-demo",
+            salt="report-tenant-salt",
+        )
+        store = MagicMock()
+        store.status.return_value = {"read_enabled": True}
+        store.list_projects.return_value = []
+        store.list_submissions.return_value = []
+        with (
+            patch(
+                "tap.github_demo_store.DemoStoreConfig.from_sources",
+                return_value=config,
+            ),
+            patch("tap.github_demo_store.GitHubDemoStore", return_value=store),
+        ):
+            app = AppTest.from_file(
+                str(ROOT / "pages" / "4_organization_report.py"),
+                default_timeout=30,
+            ).run()
+            self._authenticate_report_company(app, store, config)
 
         self.assertEqual([], [str(item.value) for item in app.exception])
         self.assertTrue(any(item.label == "예시 리포트 보기" and not item.value for item in app.checkbox))
@@ -873,15 +970,34 @@ class ReportingTests(unittest.TestCase):
         self.assertFalse(any("예시 데이터를 표시" in str(item.value) for item in app.info))
 
     def test_organization_report_sample_option_renders_without_widget_errors(self) -> None:
-        app = AppTest.from_file(
-            str(ROOT / "pages" / "4_organization_report.py"), default_timeout=30
-        ).run()
-        sample_toggle = next(
-            item for item in app.checkbox if item.label == "예시 리포트 보기"
+        config = DemoStoreConfig(
+            enabled=True,
+            owner="example",
+            repo="tap-demo",
+            salt="report-tenant-salt",
         )
+        store = MagicMock()
+        store.status.return_value = {"read_enabled": True}
+        store.list_projects.return_value = []
+        store.list_submissions.return_value = []
+        with (
+            patch(
+                "tap.github_demo_store.DemoStoreConfig.from_sources",
+                return_value=config,
+            ),
+            patch("tap.github_demo_store.GitHubDemoStore", return_value=store),
+        ):
+            app = AppTest.from_file(
+                str(ROOT / "pages" / "4_organization_report.py"),
+                default_timeout=30,
+            ).run()
+            self._authenticate_report_company(app, store, config)
+            sample_toggle = next(
+                item for item in app.checkbox if item.label == "예시 리포트 보기"
+            )
 
-        sample_toggle.set_value(True)
-        app.run()
+            sample_toggle.set_value(True)
+            app.run()
 
         self.assertEqual([], [str(item.value) for item in app.exception])
         self.assertTrue(

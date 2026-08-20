@@ -5,12 +5,21 @@ import streamlit as st
 from tap.runtime_guard import stop_on_stale
 
 
-stop_on_stale(st, ("tap.dashboard", "tap.github_demo_store", "tap.ui"))
+stop_on_stale(
+    st,
+    (
+        "tap.company_scope_ui",
+        "tap.dashboard",
+        "tap.github_demo_store",
+        "tap.tenant",
+        "tap.ui",
+    ),
+)
 
+from tap.company_scope_ui import render_company_scope_gate
 from tap.dashboard import (
     build_persistent_dashboard,
     build_session_dashboard,
-    fetch_store_snapshot,
 )
 from tap.github_demo_store import DemoStoreConfig, DemoStoreError, GitHubDemoStore
 from tap.state import ensure_state
@@ -30,34 +39,21 @@ ensure_state(st.session_state)
 
 
 @st.cache_data(ttl=30, show_spinner=False)
-def _read_github_demo_snapshot(_secrets: object) -> dict[str, object]:
+def _read_github_demo_snapshot(
+    _secrets: object, company_id: str
+) -> dict[str, object]:
     config = DemoStoreConfig.from_sources(secrets=_secrets)
     store = GitHubDemoStore(config)
     status = store.status()
     if not status["read_enabled"]:
         return {"status": status, "projects": [], "submissions": []}
-    return {"status": status, **fetch_store_snapshot(store)}
-
-
-session_dashboard = build_session_dashboard(st.session_state)
-dashboard = session_dashboard
-dashboard_source = "session"
-store_error = ""
-try:
-    demo_store_secrets: object = dict(st.secrets)
-except Exception:  # No secrets file is the normal local-development state.
-    demo_store_secrets = {}
-try:
-    stored = _read_github_demo_snapshot(demo_store_secrets)
-    store_status = dict(stored["status"])
-    if store_status.get("read_enabled"):
-        dashboard = build_persistent_dashboard(
-            stored["submissions"], stored["projects"]
-        )
-        dashboard_source = "store"
-except DemoStoreError as exc:
-    store_status = {}
-    store_error = str(exc)
+    return {
+        "status": status,
+        # Never issue an unscoped company-manager query. KMA's cross-company
+        # page is separate and is the only place allowed to pass None.
+        "projects": store.list_projects(company_id=company_id),
+        "submissions": store.list_submissions(company_id=company_id),
+    }
 
 page_header(
     "KMA 교육효과 평가",
@@ -67,6 +63,51 @@ page_header(
 )
 
 dashboard_hero()
+
+try:
+    demo_store_secrets: object = dict(st.secrets)
+except Exception:  # No secrets file is the normal local-development state.
+    demo_store_secrets = {}
+try:
+    manager_store_config = DemoStoreConfig.from_sources(secrets=demo_store_secrets)
+except DemoStoreError as exc:
+    st.error(f"기업 범위 설정을 읽지 못했습니다: {exc}")
+    st.stop()
+
+if not manager_store_config.read_enabled:
+    st.warning(
+        "기업별 데이터 저장소가 연결되지 않아 관리자 현황을 열람할 수 없습니다."
+    )
+    st.stop()
+
+company_scope = render_company_scope_gate(
+    st,
+    manager_store_config,
+    key_prefix="manager_dashboard",
+    heading="관리할 회사 확인",
+)
+if not (company_scope.verified and company_scope.company_id):
+    st.info(
+        "기업 관리자 확인 전에는 프로젝트명·완료 인원·리포트 수치를 표시하지 않습니다."
+    )
+    st.stop()
+
+active_company_id = company_scope.company_id
+session_dashboard = build_session_dashboard(st.session_state)
+dashboard = session_dashboard
+dashboard_source = "session"
+store_error = ""
+try:
+    stored = _read_github_demo_snapshot(demo_store_secrets, active_company_id)
+    store_status = dict(stored["status"])
+    if store_status.get("read_enabled"):
+        dashboard = build_persistent_dashboard(
+            stored["submissions"], stored["projects"]
+        )
+        dashboard_source = "store"
+except DemoStoreError as exc:
+    store_status = {}
+    store_error = str(exc)
 
 actions = st.columns(3)
 with actions[0]:
@@ -86,7 +127,7 @@ if dashboard_source == "store":
             st.rerun()
     with source_col:
         st.info(
-            "GitHub 기획검증 저장소에 저장된 완료 제출을 30초 단위로 누적 집계합니다. "
+            f"{company_scope.company_name} 기업 범위의 완료 제출만 30초 단위로 누적 집계합니다. "
             "참여자 수는 원문 ID가 아닌 프로젝트별 가명키를 기준으로 계산합니다."
         )
 elif store_error:
@@ -98,8 +139,7 @@ elif store_error:
         st.rerun()
 else:
     st.info(
-        "GitHub 기획검증 저장소가 설정되지 않아 이 브라우저 세션의 실제 프로젝트와 검사 상태를 보여줍니다. "
-        "저장소를 설정하면 다른 테스트 브라우저의 완료 제출도 누적됩니다."
+        f"{company_scope.company_name} 범위에 저장된 프로젝트가 없어 현재 브라우저 세션을 표시합니다."
     )
 
 metric_grid(dashboard["metrics"])
