@@ -15,7 +15,7 @@ class CloudflareOpenPageTests(unittest.TestCase):
         ).read_text(encoding="utf-8")
 
         for phrase in (
-            "교육개발 전용 · 채용·승진·보상·성과평가에는 사용하지 않습니다.",
+            "교육 전/후,",
             "최근 8주 업무행동",
             "실제 업무에서 한 행동을 기준으로 응답",
             "조직 결과 공개 기준",
@@ -23,13 +23,31 @@ class CloudflareOpenPageTests(unittest.TestCase):
             '<div class="step-icon">중</div>',
             "교육 이수 후 8~10주간 실제 업무에 적용",
             "사용설명서 보기",
+            'class="button button-secondary header-guide-button"',
             'class="button button-ghost report-action"',
+            "scrollIntoView",
+            "window.location.assign(link.href)",
             ".report-copy .report-action",
             "background: var(--teal);",
             "color: #fff;",
         ):
             self.assertIn(phrase, source)
 
+        for removed in (
+            "교육개발 전용 · 채용·승진·보상·성과평가에는 사용하지 않습니다.",
+            "교육 전과 후",
+            "교육 전후",
+            "교육 전·후",
+        ):
+            self.assertNotIn(removed, source)
+        self.assertEqual(
+            3,
+            source.count(
+                'href="https://kmatap.streamlit.app/user_guide?tap_role=company"'
+            ),
+        )
+        self.assertIn('<a href="#method">측정 원칙</a>', source)
+        self.assertIn('<section class="section section-soft" id="method">', source)
         self.assertNotIn("github.com/skytree96-cmyk/KMA_TAB_v2", source)
         self.assertNotIn('target="_top"', source)
         self.assertIn(

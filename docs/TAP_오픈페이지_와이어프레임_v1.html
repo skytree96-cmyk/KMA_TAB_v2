@@ -4,8 +4,8 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="robots" content="noindex, nofollow">
-  <meta name="description" content="KMA TAP 교육 전·후 업무행동 변화점검 공개 안내">
-  <title>KMA TAP | 교육 전·후 업무행동 변화점검</title>
+  <meta name="description" content="KMA TAP 교육 전/후 업무행동 변화점검 공개 안내">
+  <title>KMA TAP | 교육 전/후 업무행동 변화점검</title>
   <style>
     @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css');
 
@@ -150,6 +150,8 @@
       font-weight: 700;
     }
     .nav-list a:hover { color: var(--teal); }
+    .nav-guide-mobile { display: none; }
+    .header-guide-button { min-height: 42px; padding-inline: 16px; }
     .menu-button {
       display: none;
       width: 46px;
@@ -278,18 +280,6 @@
       font-size: clamp(17px, 1.8vw, 21px);
     }
     .hero-actions { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 34px; }
-    .hero-note {
-      width: max-content;
-      max-width: 100%;
-      margin-top: 22px;
-      color: #6c7f80;
-      font-size: 13px;
-      font-weight: 700;
-      line-height: 1.55;
-      text-align: center;
-      text-wrap: balance;
-    }
-
     .product-window {
       position: relative;
       padding: 20px;
@@ -601,6 +591,7 @@
         box-shadow: var(--shadow);
       }
       .nav-wrap.open .nav-list a { display: block; padding: 14px; }
+      .nav-wrap.open .nav-guide-mobile { display: block; }
       .hero-grid { grid-template-columns: 1fr; }
       .hero-copy { max-width: 780px; }
       .product-window { max-width: 760px; }
@@ -673,7 +664,7 @@
         <span class="brand-mark" aria-hidden="true">TAP</span>
         <span class="brand-copy">
           <strong>KMA TAP</strong>
-          <small>교육 전·후 업무행동 변화점검</small>
+          <small>교육 전/후 업무행동 변화점검</small>
         </span>
       </a>
       <div class="nav-wrap" id="navWrap">
@@ -684,8 +675,10 @@
             <li><a href="#report">리포트 예시</a></li>
             <li><a href="#method">측정 원칙</a></li>
             <li><a href="#faq">FAQ</a></li>
+            <li class="nav-guide-mobile"><a data-app-link href="https://kmatap.streamlit.app/user_guide?tap_role=company">사용설명서</a></li>
           </ul>
         </nav>
+        <a class="button button-secondary header-guide-button" data-app-link href="https://kmatap.streamlit.app/user_guide?tap_role=company">사용설명서</a>
         <a class="button button-primary" href="#roles">검사 참여</a>
         <button class="menu-button" id="menuButton" type="button" aria-expanded="false" aria-controls="navList" aria-label="메뉴 열기">☰</button>
       </div>
@@ -698,25 +691,24 @@
         <div class="hero-grid">
           <div class="hero-copy">
             <span class="eyebrow">Training Assessment Platform</span>
-            <h1>교육 전과 후,<br><span>현업 행동의 변화</span>를<br>확인합니다.</h1>
-            <p>동일 참여자·동일 문항의 교육 전후 결과를 비교하고, 자기보고 업무행동 지표의 관찰 변화와 교육전이 환경을 다음 교육 설계로 연결합니다.</p>
+            <h1>교육 전/후,<br><span>현업 행동의 변화</span>를<br>확인합니다.</h1>
+            <p>동일 참여자·동일 문항의 교육 전/후 결과를 비교하고, 자기보고 업무행동 지표의 관찰 변화와 교육전이 환경을 다음 교육 설계로 연결합니다.</p>
             <div class="hero-actions">
               <a class="button button-primary" href="#report">샘플 리포트 보기 <span aria-hidden="true">↓</span></a>
               <a class="button button-secondary" href="#roles">프로젝트 코드로 검사 참여</a>
             </div>
-            <p class="hero-note">교육개발 전용 · 채용·승진·보상·성과평가에는 사용하지 않습니다.</p>
           </div>
 
-          <div class="product-window" aria-label="합성 데이터 기반 전후 비교 리포트 미리보기">
+          <div class="product-window" aria-label="합성 데이터 기반 전/후 비교 리포트 미리보기">
             <div class="window-top">
               <span class="window-dots" aria-hidden="true"><i></i><i></i><i></i></span>
-              <span class="window-title">교육 전후 비교 리포트</span>
+              <span class="window-title">교육 전/후 비교 리포트</span>
               <span class="demo-badge">합성 예시 데이터</span>
             </div>
             <div class="preview-card">
               <div class="preview-head">
                 <div>
-                  <h3>공통역량 교육 · 전후 변화</h3>
+                  <h3>공통역량 교육 · 전/후 변화</h3>
                   <p>동일 참여자 10명 · 역량별 유효 N≥5</p>
                 </div>
                 <span class="demo-badge">교육 후</span>
@@ -727,14 +719,14 @@
                 <div class="mini-metric"><span>관찰 변화</span><strong>+0.65</strong><em>1–5점</em></div>
               </div>
               <div class="radar-frame">
-                <canvas id="heroRadar" role="img" aria-label="8개 역량의 교육 전후 점수를 비교한 레이더 그래프">교육 전후 역량 비교 그래프</canvas>
+                <canvas id="heroRadar" role="img" aria-label="8개 역량의 교육 전/후 점수를 비교한 레이더 그래프">교육 전/후 역량 비교 그래프</canvas>
               </div>
               <div class="chart-legend">
                 <span class="legend-item"><i class="legend-swatch"></i>교육 전</span>
                 <span class="legend-item"><i class="legend-swatch post"></i>교육 후</span>
               </div>
               <table class="sr-only">
-                <caption>합성 예시 8개 업무행동 지표의 교육 전후 값</caption>
+                <caption>합성 예시 8개 업무행동 지표의 교육 전/후 값</caption>
                 <thead><tr><th>지표</th><th>교육 전</th><th>교육 후</th></tr></thead>
                 <tbody><tr><td>문제해결</td><td>2.70</td><td>3.62</td></tr><tr><td>협업</td><td>3.10</td><td>3.81</td></tr><tr><td>실행력</td><td>3.00</td><td>3.66</td></tr><tr><td>소통</td><td>3.40</td><td>3.92</td></tr><tr><td>고객지향</td><td>3.20</td><td>3.74</td></tr><tr><td>디지털</td><td>2.60</td><td>3.38</td></tr><tr><td>학습민첩</td><td>3.00</td><td>3.61</td></tr><tr><td>자기관리</td><td>3.50</td><td>3.97</td></tr></tbody>
               </table>
@@ -744,7 +736,7 @@
         </div>
 
         <div class="principle-strip" aria-label="TAP 핵심 측정 원칙">
-          <div class="principle"><span class="principle-number">01</span><span><strong>동일 문항 비교</strong><small>같은 기준의 전후 변화</small></span></div>
+          <div class="principle"><span class="principle-number">01</span><span><strong>동일 문항 비교</strong><small>같은 기준의 전/후 변화</small></span></div>
           <div class="principle"><span class="principle-number">02</span><span><strong>최근 8주 업무행동</strong><small>실제 업무에서 한 행동을 기준으로 응답</small></span></div>
           <div class="principle"><span class="principle-number">03</span><span><strong>조직 결과 공개 기준</strong><small>각 역량의 전·후 응답자가 5명 이상일 때 공개</small></span></div>
           <div class="principle"><span class="principle-number">04</span><span><strong>원문 ID 미저장</strong><small>프로젝트별 가명 연결</small></span></div>
@@ -766,7 +758,7 @@
           </div>
           <div class="contrast-row">
             <div class="contrast-label after">TAP 확인</div>
-            <div><strong>현업 행동은 어떻게 달라졌나요?</strong><p>동일 참여자의 교육 전후 변화와 적용환경을 함께 확인</p></div>
+            <div><strong>현업 행동은 어떻게 달라졌나요?</strong><p>동일 참여자의 교육 전/후 변화와 적용환경을 함께 확인</p></div>
           </div>
           <div class="contrast-row">
             <div class="contrast-label after">다음 활용</div>
@@ -780,8 +772,8 @@
       <div class="container">
         <div class="section-heading center">
           <span class="eyebrow">How it works</span>
-          <h2>한 번의 진단이 아니라,<br>교육 전후의 흐름을 연결합니다.</h2>
-          <p>교육담당자가 프로젝트를 설정하고 참여자가 같은 ID와 같은 문항으로 교육 전후 검사를 완료합니다.</p>
+          <h2>한 번의 진단이 아니라,<br>교육 전/후 흐름을 연결합니다.</h2>
+          <p>교육담당자가 프로젝트를 설정하고 참여자가 같은 ID와 같은 문항으로 교육 전/후 검사를 완료합니다.</p>
         </div>
         <div class="step-grid">
           <article class="step-card"><span class="step-index">STEP 01</span><div class="step-icon">설정</div><h3>프로젝트 구성</h3><p>교육명·일정·대상·공통 측정역량 설정</p></article>
@@ -799,9 +791,9 @@
           <div class="report-toolbar"><strong>조직 교육수요 리포트</strong><small>합성 예시 · N=10</small></div>
           <div class="report-body">
             <div class="report-radar">
-              <canvas id="reportRadar" role="img" aria-label="8개 업무행동 지표의 교육 전후 관찰 변화를 나타낸 합성 예시 그래프">교육 전후 관찰 변화 그래프</canvas>
+              <canvas id="reportRadar" role="img" aria-label="8개 업무행동 지표의 교육 전/후 관찰 변화를 나타낸 합성 예시 그래프">교육 전/후 관찰 변화 그래프</canvas>
               <table class="sr-only">
-                <caption>합성 예시 8개 업무행동 지표의 교육 전후 값</caption>
+                <caption>합성 예시 8개 업무행동 지표의 교육 전/후 값</caption>
                 <thead><tr><th>지표</th><th>교육 전</th><th>교육 후</th></tr></thead>
                 <tbody><tr><td>문제해결</td><td>2.70</td><td>3.62</td></tr><tr><td>협업</td><td>3.10</td><td>3.81</td></tr><tr><td>실행력</td><td>3.00</td><td>3.66</td></tr><tr><td>소통</td><td>3.40</td><td>3.92</td></tr><tr><td>고객지향</td><td>3.20</td><td>3.74</td></tr><tr><td>디지털</td><td>2.60</td><td>3.38</td></tr><tr><td>학습민첩</td><td>3.00</td><td>3.61</td></tr><tr><td>자기관리</td><td>3.50</td><td>3.97</td></tr></tbody>
               </table>
@@ -817,15 +809,15 @@
         <div class="report-copy">
           <span class="eyebrow">Report preview</span>
           <h2>변화와 함께,<br>현업 적용환경까지 봅니다.</h2>
-          <p>역량별 교육 전후 변화와 업무 적용기회, 상사지원, 도구·권한, 시간·프로세스를 함께 해석합니다.</p>
+          <p>역량별 교육 전/후 변화와 업무 적용기회, 상사지원, 도구·권한, 시간·프로세스를 함께 해석합니다.</p>
           <ul class="feature-list">
-            <li>선택 역량 최대 8축 전후 레이더</li>
+            <li>선택 역량 최대 8축 전/후 레이더</li>
             <li>역량별 사전·사후 유효 참여자 수</li>
             <li>현업 전이요인과 적용 장애요인</li>
             <li>교육과정 검토 우선순위 및 후속조치</li>
             <li>A4형 인쇄 리포트와 상세 CSV</li>
           </ul>
-          <a class="button button-ghost report-action" href="https://kmatap.streamlit.app/organization_report?tap_role=company">리포트 기능 화면 열기</a>
+          <a class="button button-ghost report-action" data-app-link href="https://kmatap.streamlit.app/organization_report?tap_role=company">리포트 기능 화면 열기</a>
         </div>
       </div>
     </section>
@@ -840,24 +832,24 @@
         <div class="role-grid">
           <article class="role-card featured">
             <span class="role-kicker">HRD · L&amp;D</span><h3>교육담당자</h3>
-            <p>프로젝트 운영과 조직의 교육 전후 변화를 확인합니다.</p>
-            <ul class="role-list"><li>교육·검사 일정 및 역량 설정</li><li>참여·전후 완료 현황</li><li>조직 변화 및 교육추천</li></ul>
-            <a class="button button-secondary" href="https://kmatap.streamlit.app/project_setup?tap_role=company">프로젝트 시작</a>
+            <p>프로젝트 운영과 조직의 교육 전/후 변화를 확인합니다.</p>
+            <ul class="role-list"><li>교육·검사 일정 및 역량 설정</li><li>참여·전/후 완료 현황</li><li>조직 변화 및 교육추천</li></ul>
+            <a class="button button-secondary" data-app-link href="https://kmatap.streamlit.app/project_setup?tap_role=company">프로젝트 시작</a>
           </article>
           <article class="role-card">
             <span class="role-kicker">LEARNER</span><h3>참여자</h3>
-            <p>교육 전후 검사를 완료하고 개인의 관찰 변화를 확인합니다.</p>
-            <ul class="role-list"><li>프로젝트 코드로 검사 참여</li><li>교육 전·후 행동빈도 응답</li><li>개인 변화 및 후속지원 확인</li></ul>
+            <p>교육 전/후 검사를 완료하고 개인의 관찰 변화를 확인합니다.</p>
+            <ul class="role-list"><li>프로젝트 코드로 검사 참여</li><li>교육 전/후 행동빈도 응답</li><li>개인 변화 및 후속지원 확인</li></ul>
             <div class="role-actions">
-              <a class="button button-secondary" href="https://kmatap.streamlit.app/pre_assessment?tap_role=participant">교육 전 검사</a>
-              <a class="button button-secondary" href="https://kmatap.streamlit.app/post_assessment?tap_role=participant">교육 후 검사</a>
+              <a class="button button-secondary" data-app-link href="https://kmatap.streamlit.app/pre_assessment?tap_role=participant">교육 전 검사</a>
+              <a class="button button-secondary" data-app-link href="https://kmatap.streamlit.app/post_assessment?tap_role=participant">교육 후 검사</a>
             </div>
           </article>
           <article class="role-card">
             <span class="role-kicker">KMA OPERATOR</span><h3>KMA 관리자</h3>
             <p>평가도구와 문항, 교육과정 매핑의 품질을 관리합니다.</p>
             <ul class="role-list"><li>기획검증 프로젝트 현황</li><li>문항은행 및 검수 근거</li><li>역량·교육과정 매핑 확인</li></ul>
-            <a class="button button-secondary" href="https://kmatap.streamlit.app/kma_dashboard?tap_role=kma">관리 화면</a>
+            <a class="button button-secondary" data-app-link href="https://kmatap.streamlit.app/kma_dashboard?tap_role=kma">관리 화면</a>
           </article>
         </div>
       </div>
@@ -874,9 +866,9 @@
           <article class="method-card"><span class="method-number">01 · PRE/POST MEASUREMENT</span><h3>사전·사후 비교</h3><p>동일 참여자·동일 역량·동일 문항버전의 유효응답만 변화량으로 계산합니다.</p></article>
           <article class="method-card"><span class="method-number">02 · BEHAVIOR LEVEL</span><h3>업무행동 중심 측정</h3><p>Kirkpatrick 행동 수준을 참고하여 최근 8주의 자기보고 업무행동에서 관찰되는 변화를 탐색합니다.</p></article>
           <article class="method-card"><span class="method-number">03 · TRANSFER CONTEXT</span><h3>교육전이 환경 확인</h3><p>적용기회, 상사지원, 도구·권한, 시간·프로세스를 함께 확인하여 변화의 조건을 해석합니다.</p></article>
-          <article class="method-card"><span class="method-number">04 · RESPONSE QUALITY</span><h3>응답품질과 표본 보호</h3><p>수행 기회 없음과 미응답을 분리하고, 각 역량에서 교육 전·후에 모두 응답한 참여자가 5명 이상일 때만 조직 평균과 변화량을 표시합니다.</p></article>
+          <article class="method-card"><span class="method-number">04 · RESPONSE QUALITY</span><h3>응답품질과 표본 보호</h3><p>수행 기회 없음과 미응답을 분리하고, 각 역량에서 교육 전/후에 모두 응답한 참여자가 5명 이상일 때만 조직 평균과 변화량을 표시합니다.</p></article>
         </div>
-        <div class="caution" role="note"><strong aria-hidden="true">!</strong><div><strong>관찰 변화와 교육의 인과효과는 다릅니다.</strong><p>비교집단이 없는 자기보고형 사전·사후 결과는 교육의 단독 인과효과가 아니라 교육 전후 관찰된 변화로 해석합니다.</p></div></div>
+        <div class="caution" role="note"><strong aria-hidden="true">!</strong><div><strong>관찰 변화와 교육의 인과효과는 다릅니다.</strong><p>비교집단이 없는 자기보고형 사전·사후 결과는 교육의 단독 인과효과가 아니라 교육 전/후 관찰된 변화로 해석합니다.</p></div></div>
       </div>
     </section>
 
@@ -885,8 +877,8 @@
         <div class="faq-copy"><span class="eyebrow">FAQ</span><h2>시작 전 확인해 주세요.</h2><p>검사 운영과 결과 해석에 자주 묻는 내용을 정리했습니다.</p></div>
         <div class="faq-list">
           <details open><summary>교육 후 검사는 언제 진행하나요?</summary><p>동일한 최근 8주 행동기준을 유지하기 위해 교육 후 8–10주 시점의 검사를 권장합니다.</p></details>
-          <details><summary>교육 전과 후에 같은 ID를 사용하는 이유는 무엇인가요?</summary><p>동일 참여자의 결과를 연결하기 위해서입니다. 실명이나 사번 대신 기관에서 정한 가명 교육 참여자 ID를 사용해야 합니다.</p></details>
-          <details><summary>조직 리포트는 언제 공개되나요?</summary><p>각 역량에서 교육 전·후에 모두 응답한 참여자가 5명 이상일 때만 조직 평균과 변화량을 표시합니다. 5명은 개인정보 보호를 위한 최소 기준이며, 전체 조직을 대표한다는 뜻은 아닙니다.</p></details>
+          <details><summary>교육 전/후에 같은 ID를 사용하는 이유는 무엇인가요?</summary><p>동일 참여자의 결과를 연결하기 위해서입니다. 실명이나 사번 대신 기관에서 정한 가명 교육 참여자 ID를 사용해야 합니다.</p></details>
+          <details><summary>조직 리포트는 언제 공개되나요?</summary><p>각 역량에서 교육 전/후에 모두 응답한 참여자가 5명 이상일 때만 조직 평균과 변화량을 표시합니다. 5명은 개인정보 보호를 위한 최소 기준이며, 전체 조직을 대표한다는 뜻은 아닙니다.</p></details>
           <details><summary>결과를 인사평가에 사용할 수 있나요?</summary><p>아니요. TAP은 교육개발 목적의 자기보고형 변화검사이며 채용·승진·보상·성과평가의 단독 판단자료로 사용할 수 없습니다.</p></details>
         </div>
       </div>
@@ -894,7 +886,7 @@
 
     <section class="final-cta">
       <div class="container final-inner">
-        <div><h2>교육 전후의 관찰 변화를<br>직접 확인해 보세요.</h2><p>합성 샘플 리포트를 먼저 보거나 교육 전·후 검사 단계로 이동할 수 있습니다.</p></div>
+        <div><h2>교육 전/후 관찰 변화를<br>직접 확인해 보세요.</h2><p>합성 샘플 리포트를 먼저 보거나 교육 전/후 검사 단계로 이동할 수 있습니다.</p></div>
         <div class="final-actions"><a class="button button-primary" href="#report">샘플 리포트</a><a class="button button-ghost" href="#roles">검사 참여</a></div>
       </div>
     </section>
@@ -903,8 +895,8 @@
   <footer class="site-footer">
     <div class="container">
       <div class="footer-grid">
-        <div class="footer-brand"><span class="brand-mark" aria-hidden="true">TAP</span><span><strong>KMA TAP</strong><br><small>교육 전·후 업무행동 변화점검 기획검증 MVP</small></span></div>
-        <div class="footer-links"><a class="button footer-guide-button" href="https://kmatap.streamlit.app/user_guide?tap_role=company">사용설명서 보기</a><a href="https://www.kma.or.kr/kr/main.do" target="_blank" rel="noreferrer">KMA 홈페이지</a></div>
+        <div class="footer-brand"><span class="brand-mark" aria-hidden="true">TAP</span><span><strong>KMA TAP</strong><br><small>교육 전/후 업무행동 변화점검 기획검증 MVP</small></span></div>
+        <div class="footer-links"><a class="button footer-guide-button" data-app-link href="https://kmatap.streamlit.app/user_guide?tap_role=company">사용설명서 보기</a><a href="https://www.kma.or.kr/kr/main.do" target="_blank" rel="noreferrer">KMA 홈페이지</a></div>
       </div>
       <p class="footer-note">현재 버전은 합성 데이터를 사용하는 기획검증용 공개 데모입니다. 개인정보를 입력하지 마십시오. TAP 글자마크는 와이어프레임용이며 정식 공개 전 승인된 KMA BI 적용 여부를 확인해야 합니다. © KMA TAP.</p>
     </div>
@@ -926,6 +918,23 @@
         menuButton.setAttribute('aria-expanded', 'false');
         menuButton.setAttribute('aria-label', '메뉴 열기');
         menuButton.textContent = '☰';
+      });
+    });
+    document.querySelectorAll('a[href^="#"]').forEach((link) => {
+      link.addEventListener('click', (event) => {
+        const id = link.getAttribute('href')?.slice(1);
+        const target = id ? document.getElementById(id) : null;
+        if (!target) return;
+        event.preventDefault();
+        const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        target.scrollIntoView({ behavior: reducedMotion ? 'auto' : 'smooth', block: 'start' });
+        if (window.history?.replaceState) window.history.replaceState(null, '', `#${id}`);
+      });
+    });
+    document.querySelectorAll('a[data-app-link]').forEach((link) => {
+      link.addEventListener('click', (event) => {
+        event.preventDefault();
+        window.location.assign(link.href);
       });
     });
     document.addEventListener('keydown', (event) => {

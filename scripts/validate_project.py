@@ -248,8 +248,12 @@ def main() -> int:
         ),
         ROOT / "docs" / "TAP_오픈페이지_와이어프레임_v1.html": (
             "현업 행동의 변화",
+            "교육 전/후",
             "사전·사후 비교",
             "표본 보호",
+            "header-guide-button",
+            "scrollIntoView",
+            "window.location.assign(link.href)",
         ),
     }
     for path, markers in open_page_contract.items():
@@ -288,7 +292,16 @@ def main() -> int:
     open_page_html = ROOT / "docs" / "TAP_오픈페이지_와이어프레임_v1.html"
     if open_page_html.is_file():
         source = open_page_html.read_text(encoding="utf-8")
-        for forbidden in ("DATA TRANSPARENCY", "현재 저장 방식", "짝지은", "소표본 보호"):
+        for forbidden in (
+            "DATA TRANSPARENCY",
+            "현재 저장 방식",
+            "짝지은",
+            "소표본 보호",
+            "교육개발 전용 · 채용·승진·보상·성과평가에는 사용하지 않습니다.",
+            "교육 전과 후",
+            "교육 전후",
+            "교육 전·후",
+        ):
             if forbidden in source:
                 errors.append(f"removed open-page content remains: {forbidden}")
 
