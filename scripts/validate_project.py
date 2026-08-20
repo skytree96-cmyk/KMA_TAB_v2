@@ -42,6 +42,7 @@ MANIFEST_EXCLUDED_TOP_LEVEL = {
     ".pytest_cache",
     ".tmp",
     "output",
+    "tmp",
 }
 MANIFEST_EXCLUDED_DIRECTORY_NAMES = {
     ".wrangler",
@@ -257,7 +258,9 @@ def main() -> int:
             "header-guide-button",
             "data-guide-download",
             "__TAP_GUIDE_PDF_BASE64__",
-            "scrollHostFor",
+            "landingDocument.addEventListener('click'",
+            "target.scrollIntoView",
+            "streamlitMain.scrollBy",
             "scrollToSection",
             "window.location.assign(link.href)",
         ),

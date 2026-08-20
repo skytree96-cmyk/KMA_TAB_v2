@@ -460,8 +460,19 @@ class DashboardTests(unittest.TestCase):
         self.assertEqual(3, source.count('download="TAP_사용설명서_v3.pdf"'))
         self.assertIn("JVBERi0", source)
         self.assertNotIn("__TAP_GUIDE_PDF_BASE64__", source)
-        self.assertIn("scrollHostFor", source)
+        self.assertIn("landingDocument.addEventListener('click'", source)
+        self.assertIn("target.scrollIntoView", source)
+        self.assertIn("streamlitMain.scrollBy", source)
         self.assertIn("scrollToSection", source)
+        self.assertNotIn('href="#roles">검사 참여</a>', source)
+        self.assertNotIn('href="#roles">프로젝트 코드로 검사 참여</a>', source)
+        self.assertGreaterEqual(
+            source.count(
+                'data-app-link href="https://kmatap.streamlit.app/'
+                'pre_assessment?tap_role=participant"'
+            ),
+            4,
+        )
         for route in (
             "/organization_report?tap_role=company",
             "/project_setup?tap_role=company",

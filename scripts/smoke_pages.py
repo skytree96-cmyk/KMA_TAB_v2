@@ -73,9 +73,22 @@ def main() -> int:
         raise AssertionError("all guide buttons must use the direct PDF path")
     if "JVBERi0" not in source or "__TAP_GUIDE_PDF_BASE64__" in source:
         raise AssertionError("Streamlit must embed the guide PDF payload exactly at render time")
-    for marker in ('href="#method"', "scrollHostFor", "scrollToSection", "window.location.assign(link.href)"):
+    for marker in (
+        'href="#method"',
+        "landingDocument.addEventListener('click'",
+        "target.scrollIntoView",
+        "streamlitMain.scrollBy",
+        "scrollToSection",
+        "window.location.assign(link.href)",
+    ):
         if marker not in source:
             raise AssertionError(f"open-page navigation marker is missing: {marker}")
+    for removed_link in (
+        'href="#roles">검사 참여</a>',
+        'href="#roles">프로젝트 코드로 검사 참여</a>',
+    ):
+        if removed_link in source:
+            raise AssertionError(f"open-page CTA must enter the pre-assessment: {removed_link}")
     for page in PAGES:
         app.switch_page(page).run()
         _assert_clean(app, page)

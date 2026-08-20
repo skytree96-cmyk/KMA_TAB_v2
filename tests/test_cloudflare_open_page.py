@@ -9,6 +9,15 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class CloudflareOpenPageTests(unittest.TestCase):
+    def test_bundled_guide_keeps_searchable_embedded_pretendard(self) -> None:
+        payload = (ROOT / "docs" / "TAP_사용설명서_v3.pdf").read_bytes()
+
+        self.assertTrue(payload.startswith(b"%PDF-"))
+        self.assertIn(b"Pretendard-Regular", payload)
+        self.assertIn(b"/FontFile2", payload)
+        self.assertIn(b"/ToUnicode", payload)
+        self.assertNotIn(b"/Subtype /Image", payload)
+
     def test_approved_public_copy_and_links_remain_in_source(self) -> None:
         source = (
             ROOT / "docs" / "TAP_오픈페이지_와이어프레임_v1.html"
@@ -25,7 +34,9 @@ class CloudflareOpenPageTests(unittest.TestCase):
             "사용설명서 보기",
             'class="button button-secondary header-guide-button"',
             'class="button button-ghost report-action"',
-            "scrollHostFor",
+            "landingDocument.addEventListener('click'",
+            "target.scrollIntoView",
+            "streamlitMain.scrollBy",
             "scrollToSection",
             'data-guide-download href="/tap-user-guide.pdf"',
             'download="TAP_사용설명서_v3.pdf"',
@@ -52,6 +63,15 @@ class CloudflareOpenPageTests(unittest.TestCase):
         self.assertNotIn("/user_guide?tap_role=company", source)
         self.assertIn('<a href="#method">측정 원칙</a>', source)
         self.assertIn('<section class="section section-soft" id="method">', source)
+        pre_assessment_url = (
+            "https://kmatap.streamlit.app/pre_assessment?tap_role=participant"
+        )
+        for label in ("검사 참여", "프로젝트 코드로 검사 참여"):
+            self.assertIn(
+                f'data-app-link href="{pre_assessment_url}">{label}</a>', source
+            )
+        self.assertNotIn('href="#roles">검사 참여</a>', source)
+        self.assertNotIn('href="#roles">프로젝트 코드로 검사 참여</a>', source)
         self.assertNotIn("github.com/skytree96-cmyk/KMA_TAB_v2", source)
         self.assertNotIn('target="_top"', source)
         self.assertIn(
