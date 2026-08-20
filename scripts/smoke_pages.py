@@ -64,13 +64,16 @@ def main() -> int:
         "/pre_assessment?tap_role=participant",
         "/post_assessment?tap_role=participant",
         "/kma_dashboard?tap_role=kma",
-        "/user_guide?tap_role=company",
     ):
         if f'href="https://kmatap.streamlit.app{route}"' not in source:
             raise AssertionError(f"absolute open-page link is missing: {route}")
-    if source.count('href="https://kmatap.streamlit.app/user_guide?tap_role=company"') != 3:
-        raise AssertionError("top/mobile/footer guide links must all exist")
-    for marker in ('href="#method"', "scrollIntoView", "window.location.assign(link.href)"):
+    if source.count(' data-guide-download href="/tap-user-guide.pdf"') != 3:
+        raise AssertionError("top/mobile/footer guide download links must all exist")
+    if source.count('href="/tap-user-guide.pdf"') != 3:
+        raise AssertionError("all guide buttons must use the direct PDF path")
+    if "JVBERi0" not in source or "__TAP_GUIDE_PDF_BASE64__" in source:
+        raise AssertionError("Streamlit must embed the guide PDF payload exactly at render time")
+    for marker in ('href="#method"', "scrollHostFor", "scrollToSection", "window.location.assign(link.href)"):
         if marker not in source:
             raise AssertionError(f"open-page navigation marker is missing: {marker}")
     for page in PAGES:

@@ -25,7 +25,10 @@ class CloudflareOpenPageTests(unittest.TestCase):
             "사용설명서 보기",
             'class="button button-secondary header-guide-button"',
             'class="button button-ghost report-action"',
-            "scrollIntoView",
+            "scrollHostFor",
+            "scrollToSection",
+            'data-guide-download href="/tap-user-guide.pdf"',
+            'download="TAP_사용설명서_v3.pdf"',
             "window.location.assign(link.href)",
             ".report-copy .report-action",
             "background: var(--teal);",
@@ -41,11 +44,12 @@ class CloudflareOpenPageTests(unittest.TestCase):
         ):
             self.assertNotIn(removed, source)
         self.assertEqual(
-            3,
-            source.count(
-                'href="https://kmatap.streamlit.app/user_guide?tap_role=company"'
-            ),
+            3, source.count(' data-guide-download href="/tap-user-guide.pdf"')
         )
+        self.assertEqual(3, source.count('href="/tap-user-guide.pdf"'))
+        self.assertEqual(3, source.count('download="TAP_사용설명서_v3.pdf"'))
+        self.assertEqual(1, source.count("__TAP_GUIDE_PDF_BASE64__"))
+        self.assertNotIn("/user_guide?tap_role=company", source)
         self.assertIn('<a href="#method">측정 원칙</a>', source)
         self.assertIn('<section class="section section-soft" id="method">', source)
         self.assertNotIn("github.com/skytree96-cmyk/KMA_TAB_v2", source)
@@ -67,6 +71,8 @@ class CloudflareOpenPageTests(unittest.TestCase):
         self.assertIn("const appLinks", build_source)
         self.assertIn("tap-user-guide.pdf", build_source)
         self.assertIn("sourceGuide", build_source)
+        self.assertIn("guidePdfBase64Token", build_source)
+        self.assertIn("Content-Disposition: attachment", build_source)
         self.assertIn("GitHub repository link", build_source)
 
     def test_wrangler_serves_generated_static_assets(self) -> None:

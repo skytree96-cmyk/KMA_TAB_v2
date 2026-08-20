@@ -243,6 +243,9 @@ def main() -> int:
         ROOT / "tap" / "open_page.py": (
             "__tap_source_sha256__ = source_fingerprint(__file__)",
             "TAP_오픈페이지_와이어프레임_v1.html",
+            "TAP_사용설명서_v3.pdf",
+            "GUIDE_PDF_BASE64_TOKEN",
+            "base64.b64encode",
             "st.html(",
             "unsafe_allow_javascript=True",
         ),
@@ -252,7 +255,10 @@ def main() -> int:
             "사전·사후 비교",
             "표본 보호",
             "header-guide-button",
-            "scrollIntoView",
+            "data-guide-download",
+            "__TAP_GUIDE_PDF_BASE64__",
+            "scrollHostFor",
+            "scrollToSection",
             "window.location.assign(link.href)",
         ),
     }
@@ -269,6 +275,8 @@ def main() -> int:
         ROOT / "cloudflare" / "build.mjs": (
             "https://kmatap.streamlit.app",
             "tap-user-guide.pdf",
+            "guidePdfBase64Token",
+            "Content-Disposition: attachment",
             "GitHub repository link",
         ),
         ROOT / "cloudflare" / "wrangler.jsonc": (

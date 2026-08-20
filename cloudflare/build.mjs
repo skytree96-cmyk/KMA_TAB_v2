@@ -8,6 +8,7 @@ const outputDir = join(currentDir, "dist");
 const sourceHtml = join(projectRoot, "docs", "TAP_오픈페이지_와이어프레임_v1.html");
 const sourceGuide = join(projectRoot, "docs", "TAP_사용설명서_v3.pdf");
 const appBase = "https://kmatap.streamlit.app";
+const guidePdfBase64Token = "__TAP_GUIDE_PDF_BASE64__";
 
 if (dirname(outputDir) !== currentDir || !outputDir.endsWith(join("cloudflare", "dist"))) {
   throw new Error("Unexpected Cloudflare output directory.");
@@ -27,11 +28,14 @@ for (const url of appLinks) {
   }
 }
 
-const guideUrl = `${appBase}/user_guide?tap_role=company`;
-if (!html.includes(`href="${guideUrl}"`)) {
-  throw new Error(`Expected guide link was not found: ${guideUrl}`);
+const guideLinks = html.match(/<a\b[^>]*\bdata-guide-download\b/g) || [];
+if (guideLinks.length !== 3) {
+  throw new Error(`Expected 3 guide download links, found ${guideLinks.length}.`);
 }
-html = html.replaceAll(`href="${guideUrl}"`, 'href="/tap-user-guide.pdf"');
+if ((html.match(new RegExp(guidePdfBase64Token, "g")) || []).length !== 1) {
+  throw new Error("Expected exactly one guide PDF payload token.");
+}
+html = html.replace(guidePdfBase64Token, "");
 
 if (/github\.com\/skytree96-cmyk\/KMA_TAB_v2/i.test(html)) {
   throw new Error("The public page must not expose the GitHub repository link.");
@@ -48,6 +52,10 @@ await writeFile(
     "  X-Content-Type-Options: nosniff",
     "  Referrer-Policy: strict-origin-when-cross-origin",
     "  Permissions-Policy: camera=(), microphone=(), geolocation=()",
+    "",
+    "/tap-user-guide.pdf",
+    '  Content-Disposition: attachment; filename="TAP_user_guide_v3.pdf"',
+    "  Content-Type: application/pdf",
     "",
   ].join("\n"),
   "utf8",

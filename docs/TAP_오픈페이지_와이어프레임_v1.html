@@ -675,10 +675,10 @@
             <li><a href="#report">리포트 예시</a></li>
             <li><a href="#method">측정 원칙</a></li>
             <li><a href="#faq">FAQ</a></li>
-            <li class="nav-guide-mobile"><a data-app-link href="https://kmatap.streamlit.app/user_guide?tap_role=company">사용설명서</a></li>
+            <li class="nav-guide-mobile"><a data-guide-download href="/tap-user-guide.pdf" download="TAP_사용설명서_v3.pdf">사용설명서</a></li>
           </ul>
         </nav>
-        <a class="button button-secondary header-guide-button" data-app-link href="https://kmatap.streamlit.app/user_guide?tap_role=company">사용설명서</a>
+        <a class="button button-secondary header-guide-button" data-guide-download href="/tap-user-guide.pdf" download="TAP_사용설명서_v3.pdf">사용설명서</a>
         <a class="button button-primary" href="#roles">검사 참여</a>
         <button class="menu-button" id="menuButton" type="button" aria-expanded="false" aria-controls="navList" aria-label="메뉴 열기">☰</button>
       </div>
@@ -896,13 +896,22 @@
     <div class="container">
       <div class="footer-grid">
         <div class="footer-brand"><span class="brand-mark" aria-hidden="true">TAP</span><span><strong>KMA TAP</strong><br><small>교육 전/후 업무행동 변화점검 기획검증 MVP</small></span></div>
-        <div class="footer-links"><a class="button footer-guide-button" data-app-link href="https://kmatap.streamlit.app/user_guide?tap_role=company">사용설명서 보기</a><a href="https://www.kma.or.kr/kr/main.do" target="_blank" rel="noreferrer">KMA 홈페이지</a></div>
+        <div class="footer-links"><a class="button footer-guide-button" data-guide-download href="/tap-user-guide.pdf" download="TAP_사용설명서_v3.pdf">사용설명서 보기</a><a href="https://www.kma.or.kr/kr/main.do" target="_blank" rel="noreferrer">KMA 홈페이지</a></div>
       </div>
       <p class="footer-note">현재 버전은 합성 데이터를 사용하는 기획검증용 공개 데모입니다. 개인정보를 입력하지 마십시오. TAP 글자마크는 와이어프레임용이며 정식 공개 전 승인된 KMA BI 적용 여부를 확인해야 합니다. © KMA TAP.</p>
     </div>
   </footer>
 
   <script>
+    const landingScript = document.currentScript;
+    const landingRoot = landingScript?.closest('[data-testid="stHtml"]') || document;
+    landingRoot.__tapOpenPageController?.abort();
+    const landingController = new AbortController();
+    landingRoot.__tapOpenPageController = landingController;
+    const landingSignal = landingController.signal;
+    const guidePdfBase64 = "__TAP_GUIDE_PDF_BASE64__";
+    let guidePdfObjectUrl = null;
+
     const menuButton = document.getElementById('menuButton');
     const navWrap = document.getElementById('navWrap');
     menuButton.addEventListener('click', () => {
@@ -920,23 +929,80 @@
         menuButton.textContent = '☰';
       });
     });
-    document.querySelectorAll('a[href^="#"]').forEach((link) => {
-      link.addEventListener('click', (event) => {
-        const id = link.getAttribute('href')?.slice(1);
-        const target = id ? document.getElementById(id) : null;
-        if (!target) return;
-        event.preventDefault();
-        const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-        target.scrollIntoView({ behavior: reducedMotion ? 'auto' : 'smooth', block: 'start' });
-        if (window.history?.replaceState) window.history.replaceState(null, '', `#${id}`);
-      });
-    });
+    function scrollHostFor(target) {
+      const streamlitMain = document.querySelector('[data-testid="stMain"]');
+      if (streamlitMain?.contains(target)) return streamlitMain;
+      for (let node = target.parentElement; node; node = node.parentElement) {
+        const overflowY = window.getComputedStyle(node).overflowY;
+        if (/(auto|scroll|overlay)/.test(overflowY) && node.scrollHeight > node.clientHeight) {
+          return node;
+        }
+      }
+      return document.scrollingElement || document.documentElement;
+    }
+
+    function scrollToSection(id) {
+      const target = document.getElementById(id);
+      if (!target) return;
+      const scrollHost = scrollHostFor(target);
+      const headerHeight = landingRoot.querySelector?.('.site-header')?.getBoundingClientRect().height || 0;
+      const gap = headerHeight + 16;
+      const behavior = window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth';
+      const targetRect = target.getBoundingClientRect();
+      const documentScroll = scrollHost === document.scrollingElement
+        || scrollHost === document.documentElement
+        || scrollHost === document.body;
+      if (documentScroll) {
+        window.scrollTo({
+          top: Math.max(0, window.scrollY + targetRect.top - gap),
+          behavior,
+        });
+      } else {
+        const hostRect = scrollHost.getBoundingClientRect();
+        scrollHost.scrollTo({
+          top: Math.max(0, scrollHost.scrollTop + targetRect.top - hostRect.top - gap),
+          behavior,
+        });
+      }
+      if (window.history?.replaceState) window.history.replaceState(null, '', `#${id}`);
+    }
+
+    landingRoot.addEventListener('click', (event) => {
+      const link = event.target.closest?.('a[href^="#"]');
+      if (!link || !landingRoot.contains(link)) return;
+      const id = link.getAttribute('href')?.slice(1);
+      if (!id || !document.getElementById(id)) return;
+      event.preventDefault();
+      window.requestAnimationFrame(() => scrollToSection(id));
+    }, { capture: true, signal: landingSignal });
+
+    landingRoot.addEventListener('click', (event) => {
+      const link = event.target.closest?.('a[data-guide-download]');
+      if (!link || !landingRoot.contains(link) || guidePdfBase64.length < 100) return;
+      event.preventDefault();
+      if (!guidePdfObjectUrl) {
+        const binary = window.atob(guidePdfBase64);
+        const bytes = new Uint8Array(binary.length);
+        for (let index = 0; index < binary.length; index += 1) bytes[index] = binary.charCodeAt(index);
+        guidePdfObjectUrl = URL.createObjectURL(new Blob([bytes], { type: 'application/pdf' }));
+      }
+      const downloadLink = document.createElement('a');
+      downloadLink.href = guidePdfObjectUrl;
+      downloadLink.download = link.getAttribute('download') || 'TAP_사용설명서_v3.pdf';
+      downloadLink.hidden = true;
+      document.body.appendChild(downloadLink);
+      downloadLink.click();
+      downloadLink.remove();
+    }, { capture: true, signal: landingSignal });
     document.querySelectorAll('a[data-app-link]').forEach((link) => {
       link.addEventListener('click', (event) => {
         event.preventDefault();
         window.location.assign(link.href);
       });
     });
+    window.addEventListener('pagehide', () => {
+      if (guidePdfObjectUrl) URL.revokeObjectURL(guidePdfObjectUrl);
+    }, { once: true, signal: landingSignal });
     document.addEventListener('keydown', (event) => {
       if (event.key === 'Escape' && navWrap.classList.contains('open')) {
         navWrap.classList.remove('open');

@@ -453,13 +453,21 @@ class DashboardTests(unittest.TestCase):
         self.assertIn('/pre_assessment?tap_role=participant', source)
         self.assertIn('/project_setup?tap_role=company', source)
         self.assertNotIn('target="_top"', source)
+        self.assertEqual(
+            3, source.count(' data-guide-download href="/tap-user-guide.pdf"')
+        )
+        self.assertEqual(3, source.count('href="/tap-user-guide.pdf"'))
+        self.assertEqual(3, source.count('download="TAP_사용설명서_v3.pdf"'))
+        self.assertIn("JVBERi0", source)
+        self.assertNotIn("__TAP_GUIDE_PDF_BASE64__", source)
+        self.assertIn("scrollHostFor", source)
+        self.assertIn("scrollToSection", source)
         for route in (
             "/organization_report?tap_role=company",
             "/project_setup?tap_role=company",
             "/pre_assessment?tap_role=participant",
             "/post_assessment?tap_role=participant",
             "/kma_dashboard?tap_role=kma",
-            "/user_guide?tap_role=company",
         ):
             self.assertIn(f'href="https://kmatap.streamlit.app{route}"', source)
         self.assertNotIn(
