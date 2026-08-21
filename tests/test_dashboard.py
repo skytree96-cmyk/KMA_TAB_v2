@@ -4,6 +4,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
+import streamlit as st
 from streamlit.testing.v1 import AppTest
 
 from tap.dashboard import (
@@ -243,6 +244,109 @@ class DashboardTests(unittest.TestCase):
         )
         self.assertEqual(len(rows[0]), len(set(rows[0])))
 
+    def test_kma_dashboard_lists_company_registry_and_reviews_pending_company(self) -> None:
+        company_id = "org_" + "a" * 64
+        management_code = "kma-review-code"
+        config = DemoStoreConfig(
+            enabled=True,
+            owner="example",
+            repo="tap-demo",
+            token="github-test-token",
+            salt="dashboard-company-list-salt",
+            company_access_code=management_code,
+        )
+        stored_submission = _stored_submission("pk-company", post_complete=True)
+        stored_submission["company_id"] = company_id
+        store = MagicMock()
+        store.status.return_value = {"read_enabled": True}
+        store.list_companies.return_value = [
+            {
+                "company_id": company_id,
+                "company_name": "승인 대기 테스트 기업",
+                "company_identity_source": "business_registration",
+                "approval_status": "pending",
+                "requested_at": "2026-08-21T08:00:00+09:00",
+            }
+        ]
+        store.list_projects.return_value = [
+            {
+                "record_type": "project",
+                "company_id": company_id,
+                "project_id": "PROJECT-REAL-001",
+                "project_name": "승인 흐름 테스트",
+                "updated_at": "2026-08-21T08:30:00+09:00",
+            },
+            {
+                "record_type": "project",
+                "project_id": "PROJECT-LEGACY-001",
+                "project_name": "기업 범위 도입 전 프로젝트",
+                "updated_at": "2026-08-01T08:30:00+09:00",
+            },
+        ]
+        legacy_submission = _stored_submission("pk-legacy", post_complete=False)
+        store.list_submissions.return_value = [stored_submission, legacy_submission]
+
+        st.cache_data.clear()
+        with (
+            patch(
+                "tap.github_demo_store.DemoStoreConfig.from_sources",
+                return_value=config,
+            ),
+            patch("tap.github_demo_store.GitHubDemoStore", return_value=store),
+        ):
+            app = AppTest.from_file(
+                str(ROOT / "pages" / "6_kma_dashboard.py"), default_timeout=30
+            ).run()
+
+            self.assertFalse(app.exception)
+            company_frame = next(
+                item.value
+                for item in app.dataframe
+                if "승인 상태" in item.value.columns
+            )
+            self.assertEqual("승인 대기 테스트 기업", company_frame.iloc[0]["회사명"])
+            self.assertEqual("승인 대기", company_frame.iloc[0]["승인 상태"])
+            self.assertEqual("1개 회사", company_frame.iloc[0]["관리자 범위"])
+            self.assertEqual(1, company_frame.iloc[0]["프로젝트"])
+            self.assertEqual(1, company_frame.iloc[0]["교육 전 완료"])
+            self.assertEqual(1, company_frame.iloc[0]["교육 후 완료"])
+            self.assertEqual("기존 미분류 데이터", company_frame.iloc[1]["회사명"])
+            self.assertEqual("회사 연결 필요", company_frame.iloc[1]["승인 상태"])
+            self.assertEqual("기업 정보 없음", company_frame.iloc[1]["관리자 범위"])
+            self.assertEqual(1, company_frame.iloc[1]["프로젝트"])
+            self.assertEqual(1, company_frame.iloc[1]["교육 전 완료"])
+            self.assertEqual(0, company_frame.iloc[1]["교육 후 완료"])
+
+            next(
+                item
+                for item in app.text_input
+                if item.label == "KMA 승인관리 코드"
+            ).set_value(management_code)
+            next(item for item in app.button if item.label == "기업 승인").click()
+            app.run()
+
+        store.list_companies.assert_called()
+        store.review_company_registration.assert_called_once_with(
+            company_id,
+            "approved",
+            reviewer_note="",
+        )
+
+    def test_kma_company_registry_ui_does_not_request_or_display_raw_business_number(self) -> None:
+        source = (ROOT / "pages" / "6_kma_dashboard.py").read_text(
+            encoding="utf-8"
+        )
+
+        self.assertIn('"companies": store.list_companies()', source)
+        self.assertIn("review_company_registration(", source)
+        self.assertIn("company_registration_code=management_code", source)
+        self.assertIn("사업자등록번호 원문과 개인 관리자 정보는", source)
+        self.assertNotIn('st.text_input("사업자등록번호"', source)
+        self.assertLess(
+            source.index("review_config.company_access_granted(management_code)"),
+            source.index("review_store.review_company_registration("),
+        )
+
     def test_store_item_responses_convert_to_group_factor_rows(self) -> None:
         questions = questions_for_factors(["CORE-CO"])
         rows = completed_store_submission_factor_rows(
@@ -405,7 +509,10 @@ class DashboardTests(unittest.TestCase):
         self.assertEqual(1, dashboard["projects"][0]["invited"])
 
     def test_manager_dashboard_renders_current_session_instead_of_company_mock(self) -> None:
-        admin_code = "dashboard-company-admin"
+        st.cache_data.clear()
+        self.addCleanup(st.cache_data.clear)
+        business_number = "101-81-12345"
+        business_proof = "1018112345"
         config = DemoStoreConfig(
             enabled=True,
             owner="example",
@@ -415,7 +522,7 @@ class DashboardTests(unittest.TestCase):
         identity = derive_company_identity(
             salt=config.salt,
             company_name="대시보드 테스트 기업",
-            kma_assigned_code="KMADASH001",
+            business_registration_number=business_number,
         )
         store = MagicMock()
         store.load_company.return_value = {
@@ -423,8 +530,9 @@ class DashboardTests(unittest.TestCase):
             "company_name": identity.company_name,
             "company_identity_source": identity.identity_source,
             "company_access_digest": hash_company_access_code(
-                identity.company_id, admin_code, config.salt
+                identity.company_id, business_proof, config.salt
             ),
+            "approval_status": "approved",
         }
         # Keep this assertion focused on the documented browser-session fallback.
         # The company gate is still completed normally before any dashboard data
@@ -446,12 +554,11 @@ class DashboardTests(unittest.TestCase):
                 identity.company_name
             )
             next(
-                item for item in app.text_input if item.label == "KMA 부여 기업코드"
-            ).set_value("KMADASH001")
+                item for item in app.text_input if item.label == "사업자등록번호"
+            ).set_value(business_number)
             next(
-                item for item in app.text_input if item.label == "기업 관리자 확인코드"
-            ).set_value(admin_code)
-            next(item for item in app.button if item.label == "기업 범위 확인").click()
+                item for item in app.button if item.label == "회사 확인·참여 요청"
+            ).click()
             app.run()
 
             app.session_state["project_id"] = "TAP-REAL-001"

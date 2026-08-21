@@ -107,6 +107,16 @@ def _business_number(value: Any) -> str:
     return cleaned
 
 
+def normalize_business_registration_number(value: Any) -> str:
+    """Return the canonical 10-digit business number used as an HMAC input.
+
+    The value is intentionally returned only to the caller handling the
+    disposable form. It must never be copied into canonical state or persisted.
+    """
+
+    return _business_number(value)
+
+
 def _kma_code(value: Any) -> str:
     cleaned = re.sub(r"[-\s]", "", _clean(value)).upper()
     if not _KMA_CODE_RE.fullmatch(cleaned):
@@ -312,6 +322,7 @@ __all__ = [
     "hash_company_access_code",
     "hash_participant_access_code",
     "normalize_access_code",
+    "normalize_business_registration_number",
     "validate_company_id",
     "validate_access_code",
     "verify_company_access_code",

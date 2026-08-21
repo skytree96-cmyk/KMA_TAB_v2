@@ -17,8 +17,7 @@ stop_on_stale(
 
 from tap.data import load_competencies, questions_for_factors
 from tap.company_scope_ui import (
-    company_admin_code_from_page,
-    company_registration_code_from_page,
+    company_business_number_from_page,
     render_company_scope_gate,
 )
 from tap.github_demo_store import (
@@ -51,7 +50,6 @@ row_by_code = {row["factor_code"]: row for row in competencies}
 
 level_labels = {"staff": "실무자", "manager": "관리자·리더", "executive": "임원"}
 COMPANY_SCOPE_KEY = "project_setup"
-PROJECT_WRITE_ACCESS_CODE_WIDGET_KEY = "_project_setup_company_write_access_code"
 
 
 def _save_project_to_demo_store() -> None:
@@ -63,7 +61,7 @@ def _save_project_to_demo_store() -> None:
         st.session_state["demo_store_project_pending"] = True
         st.session_state["demo_store_notice"] = {
             "level": "error",
-            "message": f"GitHub 테스트 저장 설정을 확인하지 못했습니다({type(exc).__name__}). 현 세션의 프로젝트는 유지됩니다.",
+            "message": f"기획검증 저장 설정을 확인하지 못했습니다({type(exc).__name__}). 현 세션의 프로젝트는 유지됩니다.",
         }
         return
 
@@ -71,15 +69,10 @@ def _save_project_to_demo_store() -> None:
         st.session_state["demo_store_project_pending"] = False
         st.session_state["demo_store_notice"] = {
             "level": "info",
-            "message": "GitHub 테스트 저장소가 미설정되어 현재 브라우저 세션과 JSON 파일 방식으로 진행합니다.",
+            "message": "기획검증용 저장소가 미설정되어 현재 브라우저 세션과 JSON 파일 방식으로 진행합니다.",
         }
         return
-    company_access_code = str(
-        st.session_state.get(PROJECT_WRITE_ACCESS_CODE_WIDGET_KEY)
-        or company_admin_code_from_page(st.session_state, COMPANY_SCOPE_KEY)
-        or ""
-    ).strip()
-    company_registration_code = company_registration_code_from_page(
+    company_access_code = company_business_number_from_page(
         st.session_state, COMPANY_SCOPE_KEY
     )
     company_id = str(st.session_state.get("company_id") or "").strip()
@@ -90,7 +83,7 @@ def _save_project_to_demo_store() -> None:
         st.session_state["demo_store_project_pending"] = True
         st.session_state["demo_store_notice"] = {
             "level": "warning",
-            "message": "GitHub 쓰기 토큰 또는 기업 관리자 확인코드가 미설정되어 테스트 프로젝트를 게시하지 못했습니다.",
+            "message": "완료 결과 저장 기능 또는 기업 승인 설정이 없어 테스트 프로젝트를 게시하지 못했습니다.",
         }
         return
     if not (
@@ -106,7 +99,7 @@ def _save_project_to_demo_store() -> None:
         st.session_state["demo_store_project_pending"] = True
         st.session_state["demo_store_notice"] = {
             "level": "warning",
-            "message": "현재 회사의 기업 관리자 확인코드를 다시 입력해 주세요. 참여자 접속코드와는 별도입니다.",
+            "message": "회사명과 사업자등록번호를 다시 확인해 주세요.",
         }
         return
 
@@ -114,7 +107,6 @@ def _save_project_to_demo_store() -> None:
         GitHubDemoStore(
             config,
             company_access_code=company_access_code,
-            company_registration_code=company_registration_code,
         ).save_project(
             project_payload_from_state(
                 st.session_state,
@@ -125,7 +117,7 @@ def _save_project_to_demo_store() -> None:
         st.session_state["demo_store_project_pending"] = True
         st.session_state["demo_store_notice"] = {
             "level": "error",
-            "message": f"GitHub 테스트 프로젝트 저장에 실패했습니다({type(exc).__name__}). 현 세션은 유지되며 검사 화면에서 다시 시도할 수 있습니다.",
+            "message": f"테스트 프로젝트 저장에 실패했습니다({type(exc).__name__}). 현 세션은 유지되며 검사 화면에서 다시 시도할 수 있습니다.",
         }
         return
 
@@ -257,18 +249,7 @@ if not company_scope_ready:
 
 project_write_ready = False
 if company_scope_ready and project_store_config is not None:
-    if PROJECT_WRITE_ACCESS_CODE_WIDGET_KEY not in st.session_state:
-        # Copy only between disposable page widgets; the raw code never enters
-        # canonical state or a project payload.
-        st.session_state[PROJECT_WRITE_ACCESS_CODE_WIDGET_KEY] = (
-            company_admin_code_from_page(st.session_state, COMPANY_SCOPE_KEY)
-        )
-    project_write_code = st.text_input(
-        "프로젝트 저장용 기업 관리자 확인코드",
-        type="password",
-        key=PROJECT_WRITE_ACCESS_CODE_WIDGET_KEY,
-        help="현재 회사에 새 프로젝트를 쓰기 전에 다시 확인합니다. 원문은 저장하지 않습니다.",
-    )
+    project_write_code = company_scope.access_code
     project_write_ready = bool(
         project_store_config.project_write_enabled
         and verify_company_access_code(
@@ -279,9 +260,9 @@ if company_scope_ready and project_store_config is not None:
         )
     )
     if project_write_code and not project_write_ready:
-        st.warning("현재 회사의 기업 관리자 확인코드가 일치하지 않습니다.")
+        st.warning("회사 확인값이 일치하지 않습니다. 회사 정보를 다시 확인해 주세요.")
     elif project_write_ready:
-        st.caption("기업 관리자 확인 완료 · 이 회사 범위에만 프로젝트가 저장됩니다.")
+        st.caption("KMA 승인 완료 · 이 회사 범위에만 프로젝트가 저장됩니다.")
 
 with st.container(border=True):
     st.markdown('<h3 class="tap-card-title">2. 교육과 검사 일정</h3>', unsafe_allow_html=True)

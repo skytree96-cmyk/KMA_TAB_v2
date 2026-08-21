@@ -328,12 +328,19 @@ def main() -> int:
             "def participant_key(",
             "def save_project(",
             "def save_submission(",
+            "def request_company_registration(",
+            "def review_company_registration(",
+            "def list_companies(",
+            "def company_approval_status(",
             "def access_granted(",
             "def report_preview_granted(",
             "status == 409",
         ),
         ROOT / "pages" / "0_user_guide.py": (
-            "기획검증용 GitHub 누적 저장",
+            "기획검증용 완료 결과 저장",
+            "회사 확인과 KMA 승인",
+            "회사명과 사업자등록번호 두 항목만 입력",
+            "참여 기업 및 관리자 범위",
             "프로젝트 코드를 선택한 검사 화면에 입력",
             "교육 참여자 ID 원문은 저장하지 않고 프로젝트별 가명키",
             "기획검증 접속코드",
@@ -347,6 +354,13 @@ def main() -> int:
             "submission_payload_from_state",
             ".save_submission(",
         ),
+        ROOT / "pages" / "6_kma_dashboard.py": (
+            '"companies": store.list_companies()',
+            "참여 기업 및 관리자 범위",
+            "KMA 승인관리 코드",
+            "review_company_registration(",
+            "사업자등록번호 원문과 개인 관리자 정보",
+        ),
         ROOT / "docs" / "GITHUB_DEMO_STORE_SETUP.md": (
             "demo-data",
             "tap-demo/v1/",
@@ -358,6 +372,9 @@ def main() -> int:
             "participant_access_code",
             "company_access_code",
             "report_preview_code",
+            "회사명·사업자등록번호로 기업 참여 요청",
+            "참여 기업 목록",
+            "사업자등록번호 원문과 관리자 개인 정보는 저장·표시하지 않습니다",
         ),
         ROOT / ".streamlit" / "secrets.toml.example": (
             "[github_demo_store]",
@@ -369,24 +386,29 @@ def main() -> int:
         ),
         ROOT / "tap" / "tenant.py": (
             "def derive_company_identity(",
+            "def normalize_business_registration_number(",
             "def hash_company_access_code(",
             "def hash_participant_access_code(",
             "business_registration_number",
-            "kma_assigned_code",
         ),
         ROOT / "tap" / "company_scope_ui.py": (
             "def render_company_scope_gate(",
-            "KMA 신규기업 등록 승인코드",
-            "기업 관리자 확인코드",
+            '"회사명"',
+            '"사업자등록번호"',
+            "회사 확인·참여 요청",
+            "KMA 승인 대기 중",
+            "request_company_registration(",
             "company_access_digest",
         ),
         ROOT / "docs" / "TAP_기업범위_권한설계_v1.md": (
             "기업 범위(tenant scope)",
+            "기업 신청·승인",
+            "KMA 참여 기업 목록",
             "기업 프로젝트 관리자",
             "기업 리포트 열람자",
             "KMA 측정 관리자",
             "KMA 시스템 운영자",
-            "개별 관리자를 식별하는 계정이 아니다",
+            "관리자 개인을 식별하는 계정 목록이 아니다",
         ),
     }
     for path, markers in github_demo_contract.items():
@@ -398,6 +420,24 @@ def main() -> int:
                 errors.append(
                     f"GitHub demo contract missing in {path.relative_to(ROOT)}: {marker}"
                 )
+
+    company_scope_source = (ROOT / "tap" / "company_scope_ui.py").read_text(
+        encoding="utf-8"
+    )
+    if company_scope_source.count("st.text_input(") != 2:
+        errors.append(
+            "company scope must expose exactly two inputs: company name and business registration number"
+        )
+    for stale_company_copy in (
+        "KMA 부여 기업코드",
+        "KMA 신규기업 등록 승인코드",
+        "기업 관리자 확인코드",
+        "회사 관리자 확인코드",
+    ):
+        if stale_company_copy in company_scope_source:
+            errors.append(
+                f"stale company gate copy remains in tap/company_scope_ui.py: {stale_company_copy}"
+            )
 
     navigation_paths = set(ROLE_LANDINGS.values())
     navigation_paths.update(path for items in ROLE_NAV.values() for path, _ in items)

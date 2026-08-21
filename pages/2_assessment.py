@@ -76,13 +76,13 @@ def _render_demo_store_access_gate(config: DemoStoreConfig) -> None:
         help="합성 테스트 프로젝트 게시, 완료 결과 저장, 교육 전 결과 연결에만 사용합니다.",
     )
     if not config.write_enabled:
-        st.caption("GitHub 쓰기 토큰 또는 서버 접속코드가 미설정되어 현 세션·JSON 방식으로만 진행됩니다.")
+        st.caption("완료 결과 저장 기능 또는 서버 접속코드가 미설정되어 현 세션·JSON 방식으로만 진행됩니다.")
     elif config.access_granted(_demo_access_code()):
-        st.caption("접속코드 확인 완료 · GitHub 합성 테스트 저장 기능을 사용할 수 있습니다.")
+        st.caption("접속코드 확인 완료 · 기획검증용 완료 결과 저장 기능을 사용할 수 있습니다.")
     elif _demo_access_code():
         st.warning("기획검증 접속코드가 일치하지 않습니다. 현 세션·JSON 데이터는 그대로 유지됩니다.")
     else:
-        st.caption("GitHub 합성 테스트 저장·연결 기능을 사용하려면 전달받은 접속코드를 입력하세요.")
+        st.caption("기획검증용 저장·연결 기능을 사용하려면 전달받은 접속코드를 입력하세요.")
 
 
 def _set_demo_store_notice(level: str, message: str) -> None:
@@ -105,7 +105,7 @@ def _configured_demo_store() -> tuple[DemoStoreConfig | None, GitHubDemoStore | 
     except Exception as exc:  # configuration errors must not break the session flow
         _set_demo_store_notice(
             "error",
-            f"GitHub 테스트 저장 설정을 확인하지 못했습니다({type(exc).__name__}). 현 세션과 JSON 파일은 계속 사용할 수 있습니다.",
+            f"기획검증 저장 설정을 확인하지 못했습니다({type(exc).__name__}). 현 세션과 JSON 파일은 계속 사용할 수 있습니다.",
         )
         return None, None
     return (
@@ -305,7 +305,7 @@ def _load_demo_project(project_code: str) -> None:
         return
     config, store = _configured_demo_store()
     if config is None or store is None:
-        st.error("GitHub 테스트 저장소가 설정되지 않아 프로젝트 코드를 불러올 수 없습니다.")
+        st.error("기획검증용 저장소가 설정되지 않아 프로젝트 코드를 불러올 수 없습니다.")
         return
     try:
         payload = store.load_project(code)
@@ -325,7 +325,7 @@ def _load_demo_project(project_code: str) -> None:
 def _render_demo_project_entry() -> None:
     config, store = _configured_demo_store()
     if config is None or not config.enabled or store is None:
-        st.info("GitHub 테스트 저장소가 미설정되어 현재 세션 또는 교육 전 기준파일(JSON)로 검사를 이어갑니다.")
+        st.info("기획검증용 저장소가 미설정되어 현재 세션 또는 교육 전 기준파일(JSON)로 검사를 이어갑니다.")
         return
     try:
         query_value = st.query_params.get("project", "")
@@ -450,13 +450,13 @@ def _render_stored_pre_submission_entry() -> None:
             key=PARTICIPANT_ID_WIDGET_KEY,
             on_change=save_participant_id_widget,
             args=(st.session_state,),
-            help="교육담당자가 무작위로 배정한 동일한 가명 ID를 입력하세요. 이름·사번은 사용하지 마세요. GitHub에는 원문 ID가 저장되지 않습니다.",
+            help="교육담당자가 무작위로 배정한 동일한 가명 ID를 입력하세요. 이름·사번은 사용하지 마세요. 기획검증용 저장소에는 원문 ID가 저장되지 않습니다.",
         )
         clicked = st.button("저장된 교육 전 결과 불러오기", type="primary", width="stretch")
     if not clicked:
         return
     if not config.write_enabled:
-        st.error("GitHub 쓰기 토큰 또는 서버 접속코드가 미설정되어 저장 결과를 조회할 수 없습니다. 기준파일(JSON)을 사용해 주세요.")
+        st.error("완료 결과 저장 기능 또는 서버 접속코드가 미설정되어 저장 결과를 조회할 수 없습니다. 기준파일(JSON)을 사용해 주세요.")
         return
     if not config.access_granted(_demo_access_code()):
         st.error("기획검증 접속코드를 입력하거나 다시 확인해 주세요. 기준파일(JSON) 방식은 계속 사용할 수 있습니다.")
@@ -496,7 +496,7 @@ def _render_stored_pre_submission_entry() -> None:
 def _retry_current_project_save() -> None:
     config, store = _configured_demo_store()
     if config is None or store is None or not config.write_enabled:
-        _set_demo_store_notice("warning", "GitHub 쓰기 토큰 또는 서버 접속코드가 미설정되어 아직 저장할 수 없습니다. 현 세션·JSON 방식은 유지됩니다.")
+        _set_demo_store_notice("warning", "완료 결과 저장 기능 또는 서버 접속코드가 미설정되어 아직 저장할 수 없습니다. 현 세션·JSON 방식은 유지됩니다.")
         return
     if not config.access_granted(_demo_access_code()):
         _set_demo_store_notice("warning", "기획검증 접속코드를 입력하거나 다시 확인해 주세요. 현 세션·JSON 방식은 유지됩니다.")
@@ -504,25 +504,25 @@ def _retry_current_project_save() -> None:
     try:
         store.save_project(project_payload_from_state(st.session_state))
     except Exception as exc:
-        _set_demo_store_notice("error", f"GitHub 테스트 프로젝트 재저장에 실패했습니다({type(exc).__name__}).")
+        _set_demo_store_notice("error", f"테스트 프로젝트 재저장에 실패했습니다({type(exc).__name__}).")
         return
     st.session_state["demo_store_project_pending"] = False
-    _set_demo_store_notice("success", f"테스트 프로젝트 {st.session_state.get('project_id', '')}를 GitHub에 저장했습니다.")
+    _set_demo_store_notice("success", f"테스트 프로젝트 {st.session_state.get('project_id', '')}를 기획검증용 저장소에 저장했습니다.")
 
 
 def _save_completed_submission(phase: str) -> None:
     config, store = _configured_demo_store()
     if config is None or not config.enabled or store is None:
         st.session_state["demo_store_submission_pending_phase"] = None
-        _set_demo_store_notice("info", "검사는 완료되었습니다. GitHub 저장소가 미설정되어 현 세션과 결과 파일 방식으로 보관합니다.")
+        _set_demo_store_notice("info", "검사는 완료되었습니다. 누적 저장소가 미설정되어 현 세션과 결과 파일 방식으로 보관합니다.")
         return
     if not config.write_enabled:
         st.session_state["demo_store_submission_pending_phase"] = phase
-        _set_demo_store_notice("warning", "검사는 완료되었지만 GitHub 쓰기 토큰 또는 서버 접속코드가 미설정되어 결과를 저장하지 못했습니다. 현 세션·JSON 결과는 유지됩니다.")
+        _set_demo_store_notice("warning", "검사는 완료되었지만 완료 결과 저장 기능 또는 서버 접속코드가 미설정되어 결과를 저장하지 못했습니다. 현 세션·JSON 결과는 유지됩니다.")
         return
     if not config.access_granted(_demo_access_code()):
         st.session_state["demo_store_submission_pending_phase"] = phase
-        _set_demo_store_notice("warning", "검사는 완료되었습니다. 기획검증 접속코드를 입력하거나 다시 확인하면 GitHub 저장을 재시도할 수 있으며, 현 세션·JSON 결과는 유지됩니다.")
+        _set_demo_store_notice("warning", "검사는 완료되었습니다. 기획검증 접속코드를 입력하거나 다시 확인하면 누적 저장을 재시도할 수 있으며, 현 세션·JSON 결과는 유지됩니다.")
         return
     try:
         store.save_submission(
@@ -530,10 +530,10 @@ def _save_completed_submission(phase: str) -> None:
         )
     except Exception as exc:
         st.session_state["demo_store_submission_pending_phase"] = phase
-        _set_demo_store_notice("error", f"검사는 완료되었지만 GitHub 결과 저장에 실패했습니다({type(exc).__name__}). 아래에서 다시 시도할 수 있습니다.")
+        _set_demo_store_notice("error", f"검사는 완료되었지만 결과 저장에 실패했습니다({type(exc).__name__}). 아래에서 다시 시도할 수 있습니다.")
         return
     st.session_state["demo_store_submission_pending_phase"] = None
-    _set_demo_store_notice("success", f"{phase_labels[phase]} 완료 결과를 GitHub 테스트 저장소에 누적했습니다.")
+    _set_demo_store_notice("success", f"{phase_labels[phase]} 완료 결과를 기획검증용 저장소에 누적했습니다.")
 
 
 def _render_post_baseline_entry(*, key: str) -> None:
@@ -723,12 +723,12 @@ page_header(
 demo_config, _ = _configured_demo_store()
 if demo_config is not None and demo_config.enabled:
     with st.container(border=True):
-        st.markdown("#### GitHub 기획검증 저장")
+        st.markdown("#### 기획검증용 완료 결과 저장")
         _render_demo_store_access_gate(demo_config)
 
 _render_demo_store_notice()
 if st.session_state.get("demo_store_project_pending"):
-    if st.button("GitHub 테스트 프로젝트 저장 다시 시도", width="stretch"):
+    if st.button("테스트 프로젝트 저장 다시 시도", width="stretch"):
         _retry_current_project_save()
         st.rerun()
 
@@ -853,7 +853,7 @@ if st.session_state.assessment_completed:
     st.success(f"{phase_labels[phase]}가 완료되었습니다.")
     pending_phase = st.session_state.get("demo_store_submission_pending_phase")
     if pending_phase == phase:
-        if st.button("GitHub 검사결과 저장 다시 시도", width="stretch"):
+        if st.button("검사결과 저장 다시 시도", width="stretch"):
             _save_completed_submission(phase)
             st.rerun()
     if phase == "pre":

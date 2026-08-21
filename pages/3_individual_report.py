@@ -58,7 +58,7 @@ def _render_pre_baseline_download(*, key: str) -> None:
     with st.container(border=True):
         st.markdown("#### 교육 후 검사 연결용 백업 파일")
         st.markdown(
-            "**GitHub 저장 결과를 불러오지 못할 때만 사용하는 보조 수단입니다.** "
+            "**누적 저장 결과를 불러오지 못할 때만 사용하는 보조 수단입니다.** "
             "다른 브라우저에서 이어할 가능성에 대비해 저장해 두세요."
         )
         st.caption(

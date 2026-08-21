@@ -73,6 +73,8 @@ class CloudflareOpenPageTests(unittest.TestCase):
         self.assertNotIn('href="#roles">검사 참여</a>', source)
         self.assertNotIn('href="#roles">프로젝트 코드로 검사 참여</a>', source)
         self.assertNotIn("github.com/skytree96-cmyk/KMA_TAB_v2", source)
+        self.assertNotIn("GitHub", source)
+        self.assertIn("검사 완료 결과만 기획검증용 저장소에 보관", source)
         self.assertNotIn('target="_top"', source)
         self.assertIn(
             'href="https://kmatap.streamlit.app/organization_report?tap_role=company"',

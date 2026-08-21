@@ -12,27 +12,20 @@ from dataclasses import dataclass, field
 from typing import Any, Mapping, MutableMapping
 
 from tap.github_demo_store import DemoStoreConfig, DemoStoreError, GitHubDemoStore
+from tap.github_demo_store import company_approval_status
 from tap.runtime_guard import source_fingerprint
 from tap.state import COMPANY_SCOPE_VERIFIED_KEY, activate_company_scope
 from tap.tenant import (
     CompanyIdentity,
     TenantError,
-    access_codes_equal,
     derive_company_identity,
     hash_company_access_code,
-    normalize_access_code,
-    validate_access_code,
+    normalize_business_registration_number,
     verify_company_access_code,
 )
 
 
 __tap_source_sha256__ = source_fingerprint(__file__)
-
-
-IDENTITY_OPTIONS = {
-    "kma": "KMA 부여 기업코드",
-    "business": "회사명 + 사업자등록번호",
-}
 
 
 @dataclass(frozen=True)
@@ -42,8 +35,10 @@ class CompanyScopeView:
     company_name: str = ""
     identity_source: str = ""
     access_digest: str = ""
-    # A raw code is returned only from this page's disposable password widget.
-    # It is never copied into canonical state or a persisted payload.
+    approval_status: str = ""
+    # For this synthetic planning demo, the normalized business number is the
+    # disposable proof used by the store. It is never copied into canonical
+    # state, persisted payloads, URLs, logs, or repr output.
     access_code: str = field(default="", repr=False)
 
 
@@ -56,7 +51,7 @@ def _widget_key(prefix: str, suffix: str) -> str:
 
 
 def _scope_from_state(
-    state: Mapping[str, Any], *, access_code: str = ""
+    state: Mapping[str, Any], *, access_code: str = "", approval_status: str = ""
 ) -> CompanyScopeView:
     return CompanyScopeView(
         verified=bool(state.get(COMPANY_SCOPE_VERIFIED_KEY)),
@@ -64,8 +59,14 @@ def _scope_from_state(
         company_name=_clean(state.get("company_name")),
         identity_source=_clean(state.get("company_identity_source")),
         access_digest=_clean(state.get("company_access_digest")),
-        access_code=normalize_access_code(access_code),
+        approval_status=_clean(approval_status),
+        access_code=_clean(access_code),
     )
+
+
+def _clear_verified_scope(state: MutableMapping[str, Any]) -> None:
+    state[COMPANY_SCOPE_VERIFIED_KEY] = False
+    state["company_access_digest"] = ""
 
 
 def _registry_identity(
@@ -97,14 +98,32 @@ def render_company_scope_gate(
     """
 
     state: MutableMapping[str, Any] = st.session_state
-    mode_key = _widget_key(key_prefix, "identity_mode")
     name_key = _widget_key(key_prefix, "company_name")
-    kma_key = _widget_key(key_prefix, "kma_code")
     business_key = _widget_key(key_prefix, "business_number")
-    admin_key = _widget_key(key_prefix, "admin_code")
-    bootstrap_key = _widget_key(key_prefix, "bootstrap_code")
+    business_proof = ""
+    try:
+        if _clean(state.get(business_key)):
+            business_proof = normalize_business_registration_number(
+                state.get(business_key)
+            )
+    except TenantError:
+        business_proof = ""
 
-    current = _scope_from_state(state, access_code=state.get(admin_key, ""))
+    current = _scope_from_state(state, access_code=business_proof)
+    if current.company_name and name_key not in state:
+        state[name_key] = current.company_name
+    if current.verified and current.company_id and config.read_enabled:
+        try:
+            current_registry = GitHubDemoStore(config).load_company(current.company_id)
+            if current_registry is None or company_approval_status(current_registry) != "approved":
+                _clear_verified_scope(state)
+                current = _scope_from_state(state)
+                st.warning("KMA 승인 상태가 변경되어 회사 범위를 다시 확인해야 합니다.")
+        except DemoStoreError as exc:
+            _clear_verified_scope(state)
+            current = _scope_from_state(state)
+            st.error(f"기업 승인 상태를 확인하지 못했습니다: {exc}")
+
     if current.verified and current.company_id:
         display_name = current.company_name or "등록 기업"
         st.success(
@@ -117,15 +136,8 @@ def render_company_scope_gate(
     with panel:
         st.markdown(f"#### {heading}")
         st.caption(
-            "관리자 화면은 확인된 한 회사의 프로젝트만 보여줍니다. "
-            "KMA가 부여한 기업코드가 있으면 우선 사용하세요."
-        )
-        mode = st.radio(
-            "기업 구분 방식",
-            options=list(IDENTITY_OPTIONS),
-            format_func=IDENTITY_OPTIONS.get,
-            horizontal=True,
-            key=mode_key,
+            "회사명과 사업자등록번호로 참여를 요청합니다. KMA 승인 전에는 "
+            "프로젝트·완료 현황·리포트를 열 수 없습니다."
         )
         company_name = st.text_input(
             "회사명",
@@ -133,53 +145,25 @@ def render_company_scope_gate(
             placeholder="예: 한국능률협회",
             help="관리자 화면에 표시할 회사명입니다.",
         )
-        if mode == "kma":
-            kma_assigned_code = st.text_input(
-                "KMA 부여 기업코드",
-                key=kma_key,
-                placeholder="예: KMAA001",
-                help="KMA가 회사별로 부여한 코드입니다. 프로젝트 접속코드와 다릅니다.",
-            )
-            business_registration_number = ""
-        else:
-            business_registration_number = st.text_input(
-                "사업자등록번호",
-                key=business_key,
-                placeholder="숫자 10자리",
-                help="기업 ID 생성에만 사용하며 원문은 GitHub·프로젝트·리포트에 저장하지 않습니다.",
-            )
-            kma_assigned_code = ""
-        admin_code = st.text_input(
-            "기업 관리자 확인코드",
-            type="password",
-            key=admin_key,
-            help=(
-                "회사별로 다르게 정하는 관리자 코드입니다. 참여자 접속코드·KMA 승인코드와 "
-                "별도이며 원문은 저장하지 않습니다."
-            ),
-        )
-        bootstrap_code = st.text_input(
-            "KMA 신규기업 등록 승인코드",
-            type="password",
-            key=bootstrap_key,
-            help=(
-                "아직 등록되지 않은 회사의 첫 프로젝트에서만 KMA가 전달한 승인코드를 입력합니다. "
-                "기존 회사는 비워 두세요."
-            ),
+        business_registration_number = st.text_input(
+            "사업자등록번호",
+            key=business_key,
+            placeholder="숫자 10자리",
+            help="기업 가명키와 확인값 생성에만 사용하며 원문은 저장하지 않습니다.",
         )
         st.caption(
-            "사업자등록번호·기업 관리자 확인코드·KMA 등록 승인코드의 원문은 저장하지 않고, "
-            "일방향 가명키·검증값만 저장합니다."
+            "사업자등록번호 원문은 기획검증용 저장소·프로젝트·리포트에 저장하지 않습니다. "
+            "현재 흐름은 합성데이터 기획검증용이며 실제 계정 인증을 대신하지 않습니다."
         )
         confirm = st.button(
-            "기업 범위 확인",
+            "회사 확인·참여 요청",
             type="primary",
             width="stretch",
             key=_widget_key(key_prefix, "confirm"),
         )
 
     if not confirm:
-        return _scope_from_state(state, access_code=state.get(admin_key, ""))
+        return _scope_from_state(state, access_code=business_proof)
 
     try:
         if not config.salt:
@@ -190,96 +174,124 @@ def render_company_scope_gate(
             salt=config.salt,
             company_name=company_name,
             business_registration_number=business_registration_number,
-            kma_assigned_code=kma_assigned_code,
         )
-        if not _clean(identity.company_name):
-            raise TenantError("관리자 화면에 표시할 회사명을 입력해 주세요.")
-        normalized_admin_code = validate_access_code(
-            admin_code,
-            "기업 관리자 확인코드",
+        business_proof = normalize_business_registration_number(
+            business_registration_number
         )
-        if config.participant_code and access_codes_equal(
-            normalized_admin_code,
-            config.participant_code,
-        ):
-            raise TenantError(
-                "기업 관리자 확인코드는 참여자 접속코드와 다르게 설정해 주세요."
-            )
+        digest = hash_company_access_code(
+            identity.company_id,
+            business_proof,
+            config.salt,
+        )
 
         registry: Mapping[str, Any] | None = None
         if config.read_enabled:
             registry = GitHubDemoStore(config).load_company(identity.company_id)
 
+        if registry is None:
+            if not config.project_write_enabled:
+                raise TenantError(
+                    "기업 참여 요청을 저장할 수 없습니다. KMA 관리자에게 저장소 설정을 확인해 주세요."
+                )
+            registry = GitHubDemoStore(
+                config,
+                company_access_code=business_proof,
+            ).request_company_registration(identity.to_payload(), digest)
+            st.success("기업 참여 요청을 접수했습니다. KMA 승인 후 다시 확인해 주세요.")
+            return CompanyScopeView(
+                verified=False,
+                company_id=identity.company_id,
+                company_name=identity.company_name,
+                identity_source=identity.identity_source,
+                access_digest=digest,
+                approval_status="pending",
+                access_code=business_proof,
+            )
+
+        status = company_approval_status(registry)
+        if status == "pending":
+            st.info("KMA 승인 대기 중입니다. 승인 후 같은 정보로 다시 확인해 주세요.")
+            return CompanyScopeView(
+                verified=False,
+                company_id=identity.company_id,
+                company_name=_clean(registry.get("company_name")) or identity.company_name,
+                identity_source=identity.identity_source,
+                access_digest=digest,
+                approval_status=status,
+                access_code=business_proof,
+            )
+        if status == "rejected":
+            note = _clean(registry.get("review_note"))
+            message = "KMA 검토에서 참여 요청이 반려되었습니다."
+            if note:
+                message += f" 사유: {note}"
+            st.error(message)
+            return CompanyScopeView(
+                verified=False,
+                company_id=identity.company_id,
+                company_name=_clean(registry.get("company_name")) or identity.company_name,
+                identity_source=identity.identity_source,
+                approval_status=status,
+            )
+
         if registry is not None:
-            digest = _clean(registry.get("company_access_digest"))
+            stored_digest = _clean(registry.get("company_access_digest"))
             if not verify_company_access_code(
                 identity.company_id,
-                normalized_admin_code,
-                digest,
+                business_proof,
+                stored_digest,
                 config.salt,
             ):
-                raise TenantError("기업 관리자 확인코드가 일치하지 않습니다.")
+                raise TenantError(
+                    "기존 기업 확인방식과 일치하지 않습니다. KMA 관리자에게 기업 등록 전환을 요청해 주세요."
+                )
             identity = _registry_identity(identity, registry)
-        else:
-            # First project creation is the MVP registration event. The KMA
-            # bootstrap approval and the tenant's durable administrator code
-            # are deliberately separate so one company's code cannot open
-            # another company created with the same bootstrap approval.
-            normalized_bootstrap_code = validate_access_code(
-                bootstrap_code,
-                "KMA 신규기업 등록 승인코드",
-            )
-            if not config.company_access_granted(normalized_bootstrap_code):
-                raise TenantError(
-                    "등록된 기업을 찾지 못했습니다. 신규 기업은 KMA가 전달한 "
-                    "신규기업 등록 승인코드가 필요합니다."
-                )
-            if access_codes_equal(
-                normalized_bootstrap_code,
-                normalized_admin_code,
-            ):
-                raise TenantError(
-                    "KMA 등록 승인코드와 기업 관리자 확인코드는 서로 다르게 설정해 주세요."
-                )
-            digest = hash_company_access_code(
-                identity.company_id,
-                normalized_admin_code,
-                config.salt,
-            )
 
         activate_company_scope(
             state,
             company_id=identity.company_id,
             company_name=identity.company_name,
             identity_source=identity.identity_source,
-            access_digest=digest,
+            access_digest=stored_digest,
         )
         st.rerun()
     except (TenantError, DemoStoreError) as exc:
         st.error(str(exc))
 
-    return _scope_from_state(state, access_code=state.get(admin_key, ""))
+    return _scope_from_state(state, access_code=business_proof)
+
+
+def company_business_number_from_page(
+    state: Mapping[str, Any], key_prefix: str
+) -> str:
+    """Return the disposable normalized business-number proof, if present."""
+
+    try:
+        return normalize_business_registration_number(
+            state.get(_widget_key(key_prefix, "business_number"))
+        )
+    except TenantError:
+        return ""
 
 
 def company_admin_code_from_page(state: Mapping[str, Any], key_prefix: str) -> str:
-    """Return this page's disposable company-admin code, if still present."""
+    """Backward-compatible alias for the disposable business proof."""
 
-    return normalize_access_code(state.get(_widget_key(key_prefix, "admin_code")))
+    return company_business_number_from_page(state, key_prefix)
 
 
 def company_registration_code_from_page(
     state: Mapping[str, Any], key_prefix: str
 ) -> str:
-    """Return the disposable KMA new-company registration approval code."""
+    """Legacy compatibility helper; company pages no longer accept this code."""
 
-    return normalize_access_code(
-        state.get(_widget_key(key_prefix, "bootstrap_code"))
-    )
+    return ""
 
 
 __all__ = [
     "CompanyScopeView",
     "company_admin_code_from_page",
+    "company_business_number_from_page",
     "company_registration_code_from_page",
     "render_company_scope_gate",
 ]

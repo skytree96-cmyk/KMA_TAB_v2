@@ -10,11 +10,12 @@ from tap.github_demo_store import (
     DemoStoreConfig,
     DemoStoreError,
     GitHubDemoStore,
+    company_approval_status,
     participant_key,
     project_payload_from_state,
     submission_payload_from_state,
 )
-from tap.tenant import derive_company_identity, hash_company_access_code
+from tap.tenant import CompanyIdentity, derive_company_identity, hash_company_access_code
 
 
 class FakeTransport:
@@ -183,6 +184,42 @@ class GitHubDemoStoreTests(unittest.TestCase):
             transport=self.transport,
             access_code="test-access-code",
         )
+
+    def _request_and_approve_company(
+        self,
+        *,
+        company_name: str,
+        business_number: str,
+    ) -> tuple[CompanyIdentity, str, GitHubDemoStore]:
+        identity = derive_company_identity(
+            salt=self.config.salt,
+            company_name=company_name,
+            business_registration_number=business_number,
+        )
+        digest = hash_company_access_code(
+            identity.company_id,
+            business_number,
+            self.config.salt,
+        )
+        company_store = GitHubDemoStore(
+            self.config,
+            transport=self.transport,
+            company_access_code=business_number,
+        )
+        requested = company_store.request_company_registration(
+            identity.to_payload(), digest
+        )
+        self.assertEqual("pending", company_approval_status(requested))
+        review_store = GitHubDemoStore(
+            self.config,
+            transport=self.transport,
+            company_registration_code="test-company-registration-code",
+        )
+        approved = review_store.review_company_registration(
+            identity.company_id, "approved"
+        )
+        self.assertEqual("approved", company_approval_status(approved))
+        return identity, digest, company_store
 
     def test_config_sources_and_public_read_status(self) -> None:
         config = DemoStoreConfig.from_sources(
@@ -609,43 +646,68 @@ class GitHubDemoStoreTests(unittest.TestCase):
             self.store.save_submission(changed)
 
     def test_tenant_paths_payloads_index_and_participant_project_lookup(self) -> None:
+        business_number = "1234567890"
         identity = derive_company_identity(
             salt=self.config.salt,
             company_name="테스트 기업",
-            business_registration_number="123-45-67890",
+            business_registration_number=business_number,
         )
-        admin_code = "company-admin-code"
         state = project_state()
         state.update(identity.to_payload())
         state["company_access_digest"] = hash_company_access_code(
             identity.company_id,
-            admin_code,
+            business_number,
             self.config.salt,
         )
         state["business_registration_number"] = "123-45-67890"
-        state["company_access_code"] = admin_code
         payload = project_payload_from_state(state)
         encoded = json.dumps(payload, ensure_ascii=False)
         self.assertNotIn("123-45-67890", encoded)
-        self.assertNotIn(admin_code, encoded)
+        self.assertNotIn(business_number, encoded)
         self.assertEqual(identity.company_id, payload["company_id"])
 
         unapproved_store = GitHubDemoStore(
             self.config,
             transport=self.transport,
-            access_code="test-access-code",
-            company_access_code=admin_code,
+            company_access_code=business_number,
         )
-        with self.assertRaisesRegex(DemoStoreError, "등록 승인코드"):
+        with self.assertRaisesRegex(DemoStoreError, "등록된 기업"):
             unapproved_store.save_project(payload)
         self.assertEqual({}, self.transport.files)
+
+        pending = unapproved_store.request_company_registration(
+            identity.to_payload(), state["company_access_digest"]
+        )
+        self.assertEqual("pending", pending["approval_status"])
+        with self.assertRaisesRegex(DemoStoreError, "승인 대기"):
+            unapproved_store.save_project(payload)
+
+        wrong_reviewer = GitHubDemoStore(
+            self.config,
+            transport=self.transport,
+            company_registration_code="wrong-kma-code",
+        )
+        with self.assertRaisesRegex(DemoStoreError, "KMA 승인관리 코드"):
+            wrong_reviewer.review_company_registration(
+                identity.company_id, "approved"
+            )
+
+        reviewer = GitHubDemoStore(
+            self.config,
+            transport=self.transport,
+            company_registration_code="test-company-registration-code",
+        )
+        approved = reviewer.review_company_registration(
+            identity.company_id, "approved", reviewer_note="합성데이터 기획검증"
+        )
+        self.assertEqual("approved", approved["approval_status"])
+        self.assertEqual(1, len(reviewer.list_companies()))
 
         tenant_store = GitHubDemoStore(
             self.config,
             transport=self.transport,
             access_code="test-access-code",
-            company_access_code=admin_code,
-            company_registration_code="test-company-registration-code",
+            company_access_code=business_number,
         )
         tenant_store.save_project(payload)
         self.assertIn(
@@ -665,7 +727,7 @@ class GitHubDemoStoreTests(unittest.TestCase):
             self.config,
             transport=self.transport,
             access_code="test-access-code",
-            company_access_code=admin_code,
+            company_access_code=business_number,
         )
         updated_payload = deepcopy(payload)
         updated_payload["project_name"] = "등록 후 수정된 프로젝트"
@@ -701,50 +763,29 @@ class GitHubDemoStoreTests(unittest.TestCase):
             ensure_ascii=False,
         )
         self.assertNotIn("123-45-67890", registry_text)
-        self.assertNotIn(admin_code, registry_text)
+        self.assertNotIn(business_number, registry_text)
         self.assertNotIn("123-45-67890", all_saved)
-        self.assertNotIn(admin_code, all_saved)
+        self.assertNotIn(business_number, all_saved)
+        self.assertNotIn("test-company-registration-code", all_saved)
 
     def test_tenant_filter_prevents_cross_company_project_collision(self) -> None:
-        first = derive_company_identity(
-            salt=self.config.salt,
+        first, first_digest, first_store = self._request_and_approve_company(
             company_name="첫 기업",
-            kma_assigned_code="KMA0001",
+            business_number="1111111111",
         )
-        second = derive_company_identity(
-            salt=self.config.salt,
+        second, second_digest, second_store = self._request_and_approve_company(
             company_name="둘째 기업",
-            kma_assigned_code="KMA0002",
+            business_number="2222222222",
         )
-        first_code = "first-admin"
-        second_code = "second-admin"
 
         first_state = project_state()
         first_state.update(first.to_payload())
-        first_state["company_access_digest"] = hash_company_access_code(
-            first.company_id, first_code, self.config.salt
-        )
-        first_store = GitHubDemoStore(
-            self.config,
-            transport=self.transport,
-            access_code="test-access-code",
-            company_access_code=first_code,
-            company_registration_code="test-company-registration-code",
-        )
+        first_state["company_access_digest"] = first_digest
         first_store.save_project(project_payload_from_state(first_state))
 
         second_state = project_state()
         second_state.update(second.to_payload())
-        second_state["company_access_digest"] = hash_company_access_code(
-            second.company_id, second_code, self.config.salt
-        )
-        second_store = GitHubDemoStore(
-            self.config,
-            transport=self.transport,
-            access_code="test-access-code",
-            company_access_code=second_code,
-            company_registration_code="test-company-registration-code",
-        )
+        second_state["company_access_digest"] = second_digest
         with self.assertRaisesRegex(DemoStoreError, "다른 기업"):
             second_store.save_project(project_payload_from_state(second_state))
 
@@ -810,7 +851,7 @@ class GitHubDemoStoreTests(unittest.TestCase):
 
     def test_legacy_shared_code_cannot_approve_new_company_registration(self) -> None:
         legacy_code = "legacy-shared-code"
-        admin_code = "tenant-admin-code"
+        business_number = "3333333333"
         config = DemoStoreConfig(
             enabled=True,
             owner="owner",
@@ -826,24 +867,177 @@ class GitHubDemoStoreTests(unittest.TestCase):
         identity = derive_company_identity(
             salt=config.salt,
             company_name="신규 기업",
-            kma_assigned_code="KMANEW1",
+            business_registration_number=business_number,
         )
         state = project_state()
         state.update(identity.to_payload())
         state["company_access_digest"] = hash_company_access_code(
             identity.company_id,
-            admin_code,
+            business_number,
             config.salt,
         )
         store = GitHubDemoStore(
             config,
             transport=self.transport,
-            company_access_code=admin_code,
+            company_access_code=business_number,
             company_registration_code=legacy_code,
         )
-        with self.assertRaisesRegex(DemoStoreError, "등록 승인코드"):
+        pending = store.request_company_registration(
+            identity.to_payload(), state["company_access_digest"]
+        )
+        self.assertEqual("pending", pending["approval_status"])
+        with self.assertRaisesRegex(DemoStoreError, "KMA 승인관리 코드"):
+            store.review_company_registration(identity.company_id, "approved")
+        with self.assertRaisesRegex(DemoStoreError, "승인 대기"):
             store.save_project(project_payload_from_state(state))
+        self.assertEqual(1, len(self.transport.files))
+
+    def test_rejected_registration_is_idempotent_and_cannot_be_reopened(self) -> None:
+        business_number = "4444444444"
+        identity = derive_company_identity(
+            salt=self.config.salt,
+            company_name="거절 테스트 기업",
+            business_registration_number=business_number,
+        )
+        digest = hash_company_access_code(
+            identity.company_id, business_number, self.config.salt
+        )
+        request_store = GitHubDemoStore(
+            self.config,
+            transport=self.transport,
+            company_access_code=business_number,
+        )
+        first = request_store.request_company_registration(
+            identity.to_payload(), digest
+        )
+        second = request_store.request_company_registration(
+            identity.to_payload(), digest
+        )
+        self.assertEqual(first["requested_at"], second["requested_at"])
+        self.assertEqual("pending", company_approval_status(second))
+
+        review_store = GitHubDemoStore(
+            self.config,
+            transport=self.transport,
+            company_registration_code="test-company-registration-code",
+        )
+        with self.assertRaisesRegex(DemoStoreError, "검토 메모"):
+            review_store.review_company_registration(
+                identity.company_id, "rejected"
+            )
+        rejected = review_store.review_company_registration(
+            identity.company_id,
+            "rejected",
+            reviewer_note="회사 정보 확인 필요",
+        )
+        self.assertEqual("rejected", company_approval_status(rejected))
+        self.assertEqual("회사 정보 확인 필요", rejected["review_note"])
+
+        replay = request_store.request_company_registration(
+            {**identity.to_payload(), "company_name": "변조된 회사명"},
+            digest,
+        )
+        self.assertEqual("rejected", company_approval_status(replay))
+        self.assertEqual("거절 테스트 기업", replay["company_name"])
+        with self.assertRaisesRegex(DemoStoreError, "검토가 완료"):
+            review_store.review_company_registration(
+                identity.company_id, "approved"
+            )
+        rejected_state = project_state()
+        rejected_state.update(identity.to_payload())
+        rejected_state["company_access_digest"] = digest
+        with self.assertRaisesRegex(DemoStoreError, "승인 거절"):
+            request_store.save_project(project_payload_from_state(rejected_state))
+
+    def test_registration_rejects_raw_business_number_fields_and_text(self) -> None:
+        business_number = "5555555555"
+        identity = derive_company_identity(
+            salt=self.config.salt,
+            company_name="원문 차단 기업",
+            business_registration_number=business_number,
+        )
+        digest = hash_company_access_code(
+            identity.company_id, business_number, self.config.salt
+        )
+        request_store = GitHubDemoStore(
+            self.config,
+            transport=self.transport,
+            company_access_code=business_number,
+        )
+        wrong_digest = hash_company_access_code(
+            identity.company_id, "not-the-business-number", self.config.salt
+        )
+        with self.assertRaisesRegex(DemoStoreError, "검증값이 일치"):
+            request_store.request_company_registration(
+                identity.to_payload(), wrong_digest
+            )
         self.assertEqual({}, self.transport.files)
+        raw_identity = {
+            **identity.to_payload(),
+            "business_registration_number": business_number,
+        }
+        with self.assertRaisesRegex(DemoStoreError, "저장할 수 없습니다"):
+            request_store.request_company_registration(raw_identity, digest)
+        with self.assertRaisesRegex(DemoStoreError, "회사명에 사업자등록번호"):
+            request_store.request_company_registration(
+                {**identity.to_payload(), "company_name": business_number},
+                digest,
+            )
+
+        request_store.request_company_registration(identity.to_payload(), digest)
+        review_store = GitHubDemoStore(
+            self.config,
+            transport=self.transport,
+            company_registration_code="test-company-registration-code",
+        )
+        with self.assertRaisesRegex(DemoStoreError, "메모에 사업자등록번호"):
+            review_store.review_company_registration(
+                identity.company_id,
+                "rejected",
+                reviewer_note=f"확인 필요 {business_number}",
+            )
+        saved_text = json.dumps(
+            [record["payload"] for record in self.transport.files.values()],
+            ensure_ascii=False,
+        )
+        self.assertNotIn(business_number, saved_text)
+
+    def test_statusless_kma_registry_remains_approved_for_legacy_projects(self) -> None:
+        identity = derive_company_identity(
+            salt=self.config.salt,
+            company_name="레거시 기업",
+            kma_assigned_code="LEGACY01",
+        )
+        legacy_admin_code = "legacy-company-admin"
+        digest = hash_company_access_code(
+            identity.company_id, legacy_admin_code, self.config.salt
+        )
+        registry = {
+            "schema_version": 1,
+            "demo_only": True,
+            "record_type": "company",
+            **identity.to_payload(),
+            "company_access_digest": digest,
+            "created_at": "2026-08-01T00:00:00Z",
+            "updated_at": "2026-08-01T00:00:00Z",
+        }
+        self.transport.seed(
+            f"tap-demo/v1/companies/{identity.company_id}/company.json",
+            registry,
+        )
+        self.assertEqual("approved", company_approval_status(registry))
+
+        state = project_state()
+        state.update(identity.to_payload())
+        state["company_access_digest"] = digest
+        legacy_store = GitHubDemoStore(
+            self.config,
+            transport=self.transport,
+            company_access_code=legacy_admin_code,
+        )
+        saved = legacy_store.save_project(project_payload_from_state(state))
+        self.assertEqual(identity.company_id, saved["company_id"])
+        self.assertEqual(1, len(legacy_store.list_companies()))
 
     def test_malicious_tenant_raw_values_are_rejected_before_storage(self) -> None:
         raw_values = {

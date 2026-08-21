@@ -37,21 +37,23 @@ class StateTests(unittest.TestCase):
             state,
             company_id="co_" + "a" * 64,
             company_name="한국능률협회",
-            identity_source="kma_assigned_code",
+            identity_source="business_registration",
             access_digest="cad_" + "b" * 64,
         )
 
         self.assertEqual("co_" + "a" * 64, state["company_id"])
         self.assertEqual("한국능률협회", state["company_name"])
         self.assertTrue(state["company_scope_verified"])
+        self.assertEqual("business_registration", state["company_identity_source"])
         self.assertNotIn("business_registration_number", state)
         self.assertNotIn("company_admin_access_code", state)
+        self.assertNotIn("company_registration_code", state)
 
     def test_company_switch_clears_project_and_assessment_scope(self):
         state = {
             "company_id": "co_" + "a" * 64,
             "company_name": "A사",
-            "company_identity_source": "kma_assigned_code",
+            "company_identity_source": "business_registration",
             "company_scope_verified": True,
             "project_id": "TAP-OLD",
             "participant_id": "P001",
@@ -65,7 +67,7 @@ class StateTests(unittest.TestCase):
             state,
             company_id="co_" + "c" * 64,
             company_name="B사",
-            identity_source="business_registration_number",
+            identity_source="business_registration",
             access_digest="cad_" + "d" * 64,
         )
 

@@ -124,7 +124,7 @@ def build_persistent_dashboard(
                 "project_id": project_id,
                 "name": name,
                 "scope": (
-                    f"코드 {project_id} · GitHub 기획검증 누적 · 교육 전 {len(row['pre'])}명 · "
+                    f"코드 {project_id} · 기획검증 누적 · 교육 전 {len(row['pre'])}명 · "
                     f"교육 후 {len(row['post'])}명"
                 ),
                 "invited": participants,
@@ -146,7 +146,7 @@ def build_persistent_dashboard(
         {
             "value": f"{project_count}개",
             "label": "누적 프로젝트",
-            "note": "GitHub 기획검증 저장소",
+            "note": "기획검증용 저장소",
         },
         {
             "value": f"{participant_count}명",

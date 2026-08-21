@@ -90,14 +90,48 @@ class UiRegressionTests(unittest.TestCase):
 
     def test_user_guide_explains_project_code_storage_and_session_fallback(self) -> None:
         source = (ROOT / "pages" / "0_user_guide.py").read_text(encoding="utf-8")
-        self.assertIn("기획검증용 GitHub 누적 저장", source)
+        self.assertIn("기획검증용 완료 결과 저장", source)
+        self.assertNotIn("GitHub", source)
         self.assertIn("교육 참여자 ID 원문은 저장하지 않고 프로젝트별 가명키", source)
         self.assertIn("교육담당자가 전달한 프로젝트 코드를 선택한 검사 화면에 입력", source)
         self.assertIn("교육 전·후 완료 결과만 저장", source)
         self.assertIn("‘교육 전 검사’ 또는 ‘교육 후 검사’를 먼저 선택", source)
-        self.assertIn("미연결 때에는 동일 브라우저에서 시작하거나 기준파일(JSON)", source)
+        self.assertIn("저장소를 사용할 수 없으면 동일 브라우저에서 시작하거나 기준파일(JSON)", source)
         self.assertIn("소표본 실제값을 화면에서만 미리보기", source)
         self.assertIn("다운로드·인쇄·외부 공유 대상이 아닙니다", source)
+
+    def test_company_scope_is_two_fields_with_kma_review_and_company_registry(self) -> None:
+        scope_source = (ROOT / "tap" / "company_scope_ui.py").read_text(
+            encoding="utf-8"
+        )
+        guide_source = (ROOT / "pages" / "0_user_guide.py").read_text(
+            encoding="utf-8"
+        )
+        kma_source = (ROOT / "pages" / "6_kma_dashboard.py").read_text(
+            encoding="utf-8"
+        )
+
+        self.assertEqual(2, scope_source.count("st.text_input("))
+        self.assertIn('"회사명"', scope_source)
+        self.assertIn('"사업자등록번호"', scope_source)
+        self.assertIn("회사 확인·참여 요청", scope_source)
+        self.assertIn("KMA 승인 대기 중", scope_source)
+        for stale_copy in (
+            "KMA 부여 기업코드",
+            "KMA 신규기업 등록 승인코드",
+            "기업 관리자 확인코드",
+            "회사 관리자 확인코드",
+        ):
+            self.assertNotIn(stale_copy, scope_source)
+
+        self.assertIn("회사 확인과 KMA 승인", guide_source)
+        self.assertIn("회사명과 사업자등록번호 두 항목만 입력", guide_source)
+        self.assertIn("사업자등록번호 원문은 저장하지 않", guide_source)
+        self.assertIn("참여 기업 및 관리자 범위", guide_source)
+        self.assertIn('"companies": store.list_companies()', kma_source)
+        self.assertIn("KMA 승인관리 코드", kma_source)
+        self.assertIn("review_company_registration(", kma_source)
+        self.assertIn("사업자등록번호 원문과 개인 관리자 정보", kma_source)
 
     def test_dark_theme_tokens_and_fixed_paper_report_exist(self) -> None:
         source = (ROOT / "tap" / "ui.py").read_text(encoding="utf-8")

@@ -250,7 +250,7 @@ else:
     )
 
 if store_error:
-    st.warning(f"GitHub 누적 프로젝트를 읽지 못했습니다: {store_error}")
+    st.warning(f"누적 프로젝트를 읽지 못했습니다: {store_error}")
 
 CSV_UPLOAD_KEY = "organization_report_csv_upload"
 CSV_USE_KEY = "organization_report_use_csv"
@@ -420,7 +420,7 @@ elif selected_project_key:
             source = pd.DataFrame(store_rows)
             stored_participants = int(source["participant_id"].nunique())
             st.success(
-                f"선택한 프로젝트의 GitHub 누적 완료결과 {stored_participants}명을 사용하고 있습니다. "
+                f"선택한 프로젝트의 누적 완료결과 {stored_participants}명을 사용하고 있습니다. "
                 "참여자 연결에는 원문 ID가 아닌 프로젝트별 가명키를 사용합니다."
             )
         elif current_project_id == store_project_code and session_rows:
@@ -507,7 +507,7 @@ participant_count_for_privacy = (
     else int(clean["participant_id"].nunique())
 )
 if source_kind in {"session", "store"} and participant_count_for_privacy < MIN_GROUP_N:
-    result_scope = "현재 브라우저" if source_kind == "session" else "GitHub 누적 저장소"
+    result_scope = "현재 브라우저" if source_kind == "session" else "누적 저장소"
     st.warning(
         f"{result_scope}에서 실제 완료 결과 {int(clean['participant_id'].nunique())}명의 데이터를 읽었습니다. "
         f"조직 리포트는 개인정보 보호를 위해 N≥{MIN_GROUP_N}일 때만 평균과 변화량을 공개합니다. "

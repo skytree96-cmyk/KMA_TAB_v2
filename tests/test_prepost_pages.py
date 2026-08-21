@@ -18,7 +18,8 @@ class PrePostPageTests(unittest.TestCase):
     def _authenticated_project_setup_app(self) -> AppTest:
         """Enter project setup through the real company-admin gate."""
 
-        admin_code = "prepost-company-admin"
+        business_number = "214-86-12345"
+        business_proof = "2148612345"
         config = DemoStoreConfig(
             enabled=True,
             owner="example",
@@ -29,7 +30,7 @@ class PrePostPageTests(unittest.TestCase):
         identity = derive_company_identity(
             salt=config.salt,
             company_name="전후검사 테스트 기업",
-            kma_assigned_code="KMAPREPOST001",
+            business_registration_number=business_number,
         )
         store = MagicMock()
         store.load_company.return_value = {
@@ -37,8 +38,9 @@ class PrePostPageTests(unittest.TestCase):
             "company_name": identity.company_name,
             "company_identity_source": identity.identity_source,
             "company_access_digest": hash_company_access_code(
-                identity.company_id, admin_code, config.salt
+                identity.company_id, business_proof, config.salt
             ),
+            "approval_status": "approved",
         }
         for patcher in (
             patch(
@@ -58,12 +60,11 @@ class PrePostPageTests(unittest.TestCase):
             identity.company_name
         )
         next(
-            item for item in app.text_input if item.label == "KMA 부여 기업코드"
-        ).set_value("KMAPREPOST001")
+            item for item in app.text_input if item.label == "사업자등록번호"
+        ).set_value(business_number)
         next(
-            item for item in app.text_input if item.label == "기업 관리자 확인코드"
-        ).set_value(admin_code)
-        next(item for item in app.button if item.label == "기업 범위 확인").click()
+            item for item in app.button if item.label == "회사 확인·참여 요청"
+        ).click()
         app.run()
         self.assertTrue(app.session_state["company_scope_verified"])
         return app

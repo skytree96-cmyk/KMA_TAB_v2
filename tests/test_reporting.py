@@ -101,33 +101,40 @@ class ReportingTests(unittest.TestCase):
 
         st.cache_data.clear()
         self.addCleanup(st.cache_data.clear)
-        admin_code = "report-company-admin"
-        company_code = "KMAREPORT001"
+        business_number = "220-81-12345"
+        business_proof = "2208112345"
         identity = derive_company_identity(
             salt=config.salt,
             company_name="리포트 테스트 기업",
-            kma_assigned_code=company_code,
+            business_registration_number=business_number,
         )
         store.load_company.return_value = {
             "company_id": identity.company_id,
             "company_name": identity.company_name,
             "company_identity_source": identity.identity_source,
             "company_access_digest": hash_company_access_code(
-                identity.company_id, admin_code, config.salt
+                identity.company_id, business_proof, config.salt
             ),
+            "approval_status": "approved",
         }
         next(item for item in app.text_input if item.label == "회사명").set_value(
             identity.company_name
         )
         next(
-            item for item in app.text_input if item.label == "KMA 부여 기업코드"
-        ).set_value(company_code)
+            item for item in app.text_input if item.label == "사업자등록번호"
+        ).set_value(business_number)
+        # ``tap.company_scope_ui`` can already be imported by an earlier AppTest
+        # in the full suite. Keep its bound store patched for the complete test,
+        # because every later widget rerun rechecks that the company is approved.
+        scope_store_patch = patch(
+            "tap.company_scope_ui.GitHubDemoStore", return_value=store
+        )
+        scope_store_patch.start()
+        self.addCleanup(scope_store_patch.stop)
         next(
-            item for item in app.text_input if item.label == "기업 관리자 확인코드"
-        ).set_value(admin_code)
-        with patch("tap.company_scope_ui.GitHubDemoStore", return_value=store):
-            next(item for item in app.button if item.label == "기업 범위 확인").click()
-            app.run()
+            item for item in app.button if item.label == "회사 확인·참여 요청"
+        ).click()
+        app.run()
         self.assertTrue(app.session_state["company_scope_verified"])
         self.assertEqual(identity.company_id, app.session_state["company_id"])
 

@@ -45,6 +45,10 @@ MAX_CONFLICT_RETRIES = 3
 _PROJECT_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")
 _PARTICIPANT_KEY_RE = re.compile(r"^p_[0-9a-f]{64}$")
 _COMPANY_ACCESS_DIGEST_RE = re.compile(r"^cac_[0-9a-f]{64}$")
+_COMPANY_APPROVAL_STATUSES = {"pending", "approved", "rejected"}
+_BUSINESS_NUMBER_LIKE_RE = re.compile(
+    r"(?<![0-9])[0-9]{3}[- ]?[0-9]{2}[- ]?[0-9]{5}(?![0-9])"
+)
 _REPOSITORY_PART_RE = re.compile(r"^[A-Za-z0-9_.-]+$")
 _FORBIDDEN_SUBMISSION_KEYS = {
     "participantid",
@@ -139,6 +143,10 @@ _COMPANY_ALLOWED_FIELDS = {
     "company_name",
     "company_identity_source",
     "company_access_digest",
+    "approval_status",
+    "requested_at",
+    "reviewed_at",
+    "review_note",
     "created_at",
     "updated_at",
 }
@@ -244,7 +252,7 @@ class DemoStoreConfig:
         code_labels = {
             "access_code": "레거시 기획검증 접속코드",
             "participant_access_code": "참여자 접속코드",
-            "company_access_code": "KMA 신규기업 등록 승인코드",
+            "company_access_code": "KMA 기업 승인관리 코드",
             "report_preview_code": "리포트 미리보기 코드",
         }
         for code_field, label in code_labels.items():
@@ -264,7 +272,7 @@ class DemoStoreConfig:
             and access_codes_equal(self.participant_code, self.company_code)
         ):
             raise DemoStoreError(
-                "KMA 신규기업 등록 승인코드와 참여자 접속코드는 서로 달라야 합니다."
+                "KMA 기업 승인관리 코드와 참여자 접속코드는 서로 달라야 합니다."
             )
 
         if self.enabled and not (self.owner and self.repo):
@@ -314,9 +322,9 @@ class DemoStoreConfig:
 
     @property
     def company_code(self) -> str:
-        """Explicit KMA approval code for first-time company registration.
+        """Explicit KMA code for approving or rejecting company requests.
 
-        The legacy shared ``access_code`` must never authorize a new tenant.
+        The legacy shared ``access_code`` must never authorize a KMA review.
         It remains available only to the old flat-path project flow.
         """
 
@@ -341,7 +349,7 @@ class DemoStoreConfig:
         )
 
     def company_access_granted(self, candidate: Any) -> bool:
-        """Constant-time KMA approval gate for a first company registration."""
+        """Constant-time KMA gate for company registration reviews."""
 
         return bool(
             self.project_write_enabled
@@ -577,7 +585,46 @@ def _company_name(value: Any) -> str:
     cleaned = _clean(value)
     if len(cleaned) > 120 or any(char in cleaned for char in "\r\n\t\x00"):
         raise DemoStoreError("company_name은 줄바꿈 없이 120자 이하여야 합니다.")
-    return " ".join(cleaned.split())
+    cleaned = " ".join(cleaned.split())
+    if _BUSINESS_NUMBER_LIKE_RE.search(cleaned):
+        raise DemoStoreError("회사명에 사업자등록번호를 입력할 수 없습니다.")
+    return cleaned
+
+
+def _review_note(value: Any) -> str:
+    raw = _clean(value)
+    if len(raw) > 300 or any(char in raw for char in "\r\n\t\x00"):
+        raise DemoStoreError("기업 검토 메모는 줄바꿈 없이 300자 이하여야 합니다.")
+    cleaned = " ".join(raw.split())
+    if _BUSINESS_NUMBER_LIKE_RE.search(cleaned):
+        raise DemoStoreError("기업 검토 메모에 사업자등록번호를 저장할 수 없습니다.")
+    return cleaned
+
+
+def company_approval_status(payload: Mapping[str, Any]) -> str:
+    """Return the registry status, treating pre-workflow records as approved.
+
+    Company registries created before the KMA review workflow have no status.
+    They remain readable so the migration never strands existing demo projects.
+    """
+
+    status = _clean(payload.get("approval_status")).lower()
+    if not status:
+        return "approved"
+    if status not in _COMPANY_APPROVAL_STATUSES:
+        raise DemoStoreError("기업 승인 상태 형식이 올바르지 않습니다.")
+    return status
+
+
+def _registry_timestamp(value: Any, label: str, *, required: bool = False) -> str:
+    cleaned = _clean(value)
+    if not cleaned:
+        if required:
+            raise DemoStoreError(f"{label}이(가) 필요합니다.")
+        return ""
+    if len(cleaned) > 40 or any(char in cleaned for char in "\r\n\t\x00"):
+        raise DemoStoreError(f"{label} 형식이 올바르지 않습니다.")
+    return cleaned
 
 
 def participant_key(
@@ -942,6 +989,18 @@ def _validate_company_registry(payload: Mapping[str, Any]) -> None:
     source = _clean(payload.get("company_identity_source"))
     if source and source not in {"business_registration", "kma_assigned"}:
         raise DemoStoreError("company_identity_source 형식이 올바르지 않습니다.")
+    explicit_status = _clean(payload.get("approval_status"))
+    status = company_approval_status(payload)
+    _registry_timestamp(payload.get("created_at"), "created_at", required=True)
+    _registry_timestamp(payload.get("updated_at"), "updated_at", required=True)
+    if explicit_status:
+        _registry_timestamp(payload.get("requested_at"), "requested_at", required=True)
+        reviewed_at = _registry_timestamp(payload.get("reviewed_at"), "reviewed_at")
+        review_note = _review_note(payload.get("review_note"))
+        if status == "pending" and (reviewed_at or review_note):
+            raise DemoStoreError("승인 대기 기업에는 검토 결과를 저장할 수 없습니다.")
+        if status in {"approved", "rejected"} and not reviewed_at:
+            raise DemoStoreError("검토 완료 기업에는 reviewed_at이 필요합니다.")
 
 
 def _validate_project_index(payload: Mapping[str, Any]) -> None:
@@ -1093,6 +1152,20 @@ class GitHubDemoStore:
                 raise DemoStoreError("기업 관리자 접속코드 검증을 위한 salt 설정이 필요합니다.")
             if not self._company_access_code:
                 raise DemoStoreError("기업 관리자 접속코드를 입력해 주세요.")
+            return
+        if scope == "registration":
+            if not self.config.salt:
+                raise DemoStoreError("기업 등록 요청 검증을 위한 salt 설정이 필요합니다.")
+            if not self._company_access_code:
+                raise DemoStoreError("사업자등록번호 확인값이 필요합니다.")
+            return
+        if scope == "kma_review":
+            if not self.config.company_code:
+                raise DemoStoreError("KMA 승인관리 코드가 설정되지 않았습니다.")
+            if not self.config.company_access_granted(
+                self._company_registration_code
+            ):
+                raise DemoStoreError("KMA 승인관리 코드가 일치하지 않습니다.")
             return
         raise DemoStoreError("지원하지 않는 저장 권한 범위입니다.")
 
@@ -1258,6 +1331,179 @@ class GitHubDemoStore:
             if payload.get("company_id") != company:
                 raise DemoStoreError("기업 레지스트리 경로와 company_id가 일치하지 않습니다.")
         return payload
+
+    def list_companies(self) -> list[dict[str, Any]]:
+        """Return every safe company registry, including pending requests.
+
+        The directory name and registry payload must agree. Raw business
+        registration numbers are never part of either surface.
+        """
+
+        records: list[dict[str, Any]] = []
+        for item in sorted(
+            self._list_directory(f"{ROOT_PATH}/companies"),
+            key=lambda row: _clean(row.get("path") or row.get("name")),
+        ):
+            if item.get("type") != "dir":
+                continue
+            candidate = _clean(item.get("name"))
+            try:
+                company = _company_id(candidate, required=True)
+            except DemoStoreError:
+                continue
+            payload = self.load_company(company)
+            if payload is not None:
+                records.append(payload)
+        return records
+
+    def request_company_registration(
+        self,
+        identity: Mapping[str, Any],
+        company_access_digest: str,
+    ) -> dict[str, Any]:
+        """Create an idempotent pending registration using safe identity data.
+
+        ``identity`` is restricted to :class:`CompanyIdentity.to_payload`'s
+        three non-secret fields. The caller supplies the disposable business
+        number through ``company_access_code`` on this store instance so the
+        digest can be verified without ever persisting the raw value.
+        """
+
+        safe_identity = dict(_json_safe(identity))
+        _reject_tenant_secrets(safe_identity)
+        allowed_identity_fields = {
+            "company_id",
+            "company_name",
+            "company_identity_source",
+        }
+        unknown = set(safe_identity) - allowed_identity_fields
+        if unknown:
+            raise DemoStoreError(
+                f"기업 등록 요청 허용목록 밖의 필드가 있습니다: {sorted(unknown)!r}"
+            )
+
+        company = _company_id(safe_identity.get("company_id"), required=True)
+        company_name = _company_name(safe_identity.get("company_name"))
+        if not company_name:
+            raise DemoStoreError("회사명을 입력해 주세요.")
+        source = _clean(safe_identity.get("company_identity_source"))
+        if source != "business_registration":
+            raise DemoStoreError(
+                "신규 기업 등록은 회사명과 사업자등록번호 방식만 지원합니다."
+            )
+        digest = _company_access_digest(company_access_digest, required=True)
+        if not verify_company_access_code(
+            company,
+            self._company_access_code,
+            digest,
+            self.config.salt,
+        ):
+            raise DemoStoreError("사업자등록번호 검증값이 일치하지 않습니다.")
+
+        now = _now_iso()
+        incoming: dict[str, Any] = {
+            "schema_version": SCHEMA_VERSION,
+            "demo_only": True,
+            "record_type": "company",
+            "company_id": company,
+            "company_name": company_name,
+            "company_identity_source": source,
+            "company_access_digest": digest,
+            "approval_status": "pending",
+            "requested_at": now,
+            "created_at": now,
+            "updated_at": now,
+        }
+        _validate_company_registry(incoming)
+
+        def merge_request(
+            current: Mapping[str, Any] | None,
+            new: Mapping[str, Any],
+        ) -> dict[str, Any]:
+            if current is None:
+                merged = dict(new)
+                _validate_company_registry(merged)
+                return merged
+
+            _validate_company_registry(current)
+            if _company_id(current.get("company_id"), required=True) != company:
+                raise DemoStoreError("기업 레지스트리 company_id가 일치하지 않습니다.")
+            status = company_approval_status(current)
+            if status != "pending":
+                # Approved and rejected requests cannot be reopened or
+                # overwritten from the public registration surface.
+                return dict(current)
+            current_digest = _company_access_digest(
+                current.get("company_access_digest"), required=True
+            )
+            if not hmac.compare_digest(current_digest, digest):
+                raise DemoStoreError("기업 등록 요청 검증값을 변경할 수 없습니다.")
+            current_source = _clean(current.get("company_identity_source"))
+            if current_source and current_source != source:
+                raise DemoStoreError("기업 식별 방식을 변경할 수 없습니다.")
+            merged = dict(current)
+            merged["company_name"] = company_name
+            merged["updated_at"] = _now_iso()
+            _validate_company_registry(merged)
+            return merged
+
+        return self._upsert(
+            self._company_path(company),
+            incoming,
+            merge_request,
+            f"TAP demo company registration request: {company}",
+            write_scope="registration",
+        )
+
+    def review_company_registration(
+        self,
+        company_id: str,
+        decision: str,
+        reviewer_note: str = "",
+    ) -> dict[str, Any]:
+        """Approve or reject one pending company after the KMA code gate."""
+
+        company = _company_id(company_id, required=True)
+        normalized_decision = _clean(decision).lower()
+        if normalized_decision not in {"approved", "rejected"}:
+            raise DemoStoreError("기업 검토 결과는 approved 또는 rejected여야 합니다.")
+        note = _review_note(reviewer_note)
+        if normalized_decision == "rejected" and not note:
+            raise DemoStoreError("기업 승인 거절 시 검토 메모가 필요합니다.")
+
+        incoming = {
+            "approval_status": normalized_decision,
+            "review_note": note,
+        }
+
+        def merge_review(
+            current: Mapping[str, Any] | None,
+            new: Mapping[str, Any],
+        ) -> dict[str, Any]:
+            if current is None:
+                raise DemoStoreError("검토할 기업 등록 요청을 찾지 못했습니다.")
+            _validate_company_registry(current)
+            if _company_id(current.get("company_id"), required=True) != company:
+                raise DemoStoreError("기업 레지스트리 company_id가 일치하지 않습니다.")
+            current_status = company_approval_status(current)
+            if current_status == normalized_decision:
+                return dict(current)
+            if current_status != "pending":
+                raise DemoStoreError("이미 검토가 완료된 기업 신청입니다.")
+            merged = dict(current)
+            merged.update(new)
+            merged["reviewed_at"] = _now_iso()
+            merged["updated_at"] = _now_iso()
+            _validate_company_registry(merged)
+            return merged
+
+        return self._upsert(
+            self._company_path(company),
+            incoming,
+            merge_review,
+            f"TAP demo company registration {normalized_decision}: {company}",
+            write_scope="kma_review",
+        )
 
     def _load_project_index(self, project_id: str) -> dict[str, Any] | None:
         project = _project_id(project_id)
@@ -1445,69 +1691,40 @@ class GitHubDemoStore:
                 )
 
             existing_registry = self.load_company(company)
-            if existing_registry is None and not self.config.company_access_granted(
-                self._company_registration_code
-            ):
+            if existing_registry is None:
                 raise DemoStoreError(
-                    "신규 기업 등록에는 KMA가 전달한 등록 승인코드가 필요합니다."
+                    "등록된 기업을 찾지 못했습니다. 먼저 기업 등록을 신청해 주세요."
                 )
-
-            registry_incoming: dict[str, Any] = {
-                "schema_version": SCHEMA_VERSION,
-                "demo_only": True,
-                "record_type": "company",
-                "company_id": company,
-                "company_name": _clean(incoming.get("company_name")),
-                "company_identity_source": _clean(
-                    incoming.get("company_identity_source")
-                ),
-                "company_access_digest": incoming_digest,
-                "updated_at": _now_iso(),
-            }
-
-            def merge_registry(
-                current: Mapping[str, Any] | None,
-                new: Mapping[str, Any],
-            ) -> dict[str, Any]:
-                if current is not None:
-                    _validate_company_registry(current)
-                    if current.get("company_id") != company:
-                        raise DemoStoreError("기업 레지스트리 company_id가 일치하지 않습니다.")
-                    current_digest = _company_access_digest(
-                        current.get("company_access_digest"),
-                        required=True,
-                    )
-                    if not verify_company_access_code(
-                        company,
-                        self._company_access_code,
-                        current_digest,
-                        self.config.salt,
-                    ):
-                        raise DemoStoreError("기업 관리자 접속코드가 일치하지 않습니다.")
-                    if not hmac.compare_digest(current_digest, incoming_digest):
-                        raise DemoStoreError("기업 관리자 접속코드 검증값을 변경할 수 없습니다.")
-                    current_source = _clean(current.get("company_identity_source"))
-                    incoming_source = _clean(new.get("company_identity_source"))
-                    if (
-                        current_source
-                        and incoming_source
-                        and current_source != incoming_source
-                    ):
-                        raise DemoStoreError("기업 식별 방식을 변경할 수 없습니다.")
-                merged = dict(current or {})
-                merged.update(new)
-                merged["created_at"] = _clean((current or {}).get("created_at")) or _now_iso()
-                merged["updated_at"] = _now_iso()
-                _validate_company_registry(merged)
-                return merged
-
-            self._upsert(
-                self._company_path(company),
-                registry_incoming,
-                merge_registry,
-                f"TAP demo company registry: {company}",
-                write_scope="tenant",
+            approval_status = company_approval_status(existing_registry)
+            if approval_status != "approved":
+                label = "승인 대기" if approval_status == "pending" else "승인 거절"
+                raise DemoStoreError(
+                    f"{label} 상태의 기업은 프로젝트를 저장할 수 없습니다."
+                )
+            registry_digest = _company_access_digest(
+                existing_registry.get("company_access_digest"), required=True
             )
+            if not hmac.compare_digest(registry_digest, incoming_digest):
+                raise DemoStoreError("기업 접근 검증값을 변경할 수 없습니다.")
+            if not verify_company_access_code(
+                company,
+                self._company_access_code,
+                registry_digest,
+                self.config.salt,
+            ):
+                raise DemoStoreError("기업 확인 정보가 일치하지 않습니다.")
+            registry_source = _clean(
+                existing_registry.get("company_identity_source")
+            )
+            incoming_source = _clean(incoming.get("company_identity_source"))
+            if registry_source and incoming_source != registry_source:
+                raise DemoStoreError("기업 식별 방식을 변경할 수 없습니다.")
+            # Registry metadata is authoritative; a project write cannot
+            # rename a company by manipulating session state.
+            incoming["company_name"] = _company_name(
+                existing_registry.get("company_name")
+            )
+            incoming["company_identity_source"] = registry_source
 
             index_incoming: dict[str, Any] = {
                 "schema_version": SCHEMA_VERSION,
@@ -1676,6 +1893,7 @@ __all__ = [
     "DemoStoreConfig",
     "DemoStoreError",
     "GitHubDemoStore",
+    "company_approval_status",
     "participant_key",
     "project_payload_from_state",
     "submission_payload_from_state",
