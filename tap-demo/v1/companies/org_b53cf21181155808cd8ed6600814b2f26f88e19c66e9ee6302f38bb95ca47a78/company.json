@@ -1,5 +1,5 @@
 {
-  "approval_status": "pending",
+  "approval_status": "approved",
   "company_access_digest": "cac_5aa7a2f877bd090465d49f0f32aee6e1c27e2da9d18ea9765ec27296afe49c9a",
   "company_id": "org_b53cf21181155808cd8ed6600814b2f26f88e19c66e9ee6302f38bb95ca47a78",
   "company_identity_source": "business_registration",
@@ -8,6 +8,8 @@
   "demo_only": true,
   "record_type": "company",
   "requested_at": "2026-08-21T02:05:21Z",
+  "review_note": "합성 6인 조직 리포트 검증용",
+  "reviewed_at": "2026-08-21T02:10:12Z",
   "schema_version": 1,
-  "updated_at": "2026-08-21T02:05:21Z"
+  "updated_at": "2026-08-21T02:10:12Z"
 }
