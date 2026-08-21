@@ -1,0 +1,13 @@
+{
+  "approval_status": "pending",
+  "company_access_digest": "cac_7962606c74b61067174673a9a55e2be10e4488c9797b47e7103b901553686575",
+  "company_id": "org_33d899edbb29e8155c0f217343c03ae912e64636b5869f2c59eec2396609461e",
+  "company_identity_source": "business_registration",
+  "company_name": "한국능률협회",
+  "created_at": "2026-08-21T03:24:15Z",
+  "demo_only": true,
+  "record_type": "company",
+  "requested_at": "2026-08-21T03:24:15Z",
+  "schema_version": 1,
+  "updated_at": "2026-08-21T03:24:15Z"
+}
