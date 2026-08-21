@@ -257,8 +257,8 @@ if pending_companies:
     with st.container(border=True):
         st.markdown("#### 신규 기업 승인 관리")
         st.caption(
-            "공개 데모의 KMA 역할 전환은 인증이 아닙니다. 승인·거절 저장은 별도의 "
-            "KMA 승인관리 코드가 일치할 때만 가능합니다."
+            "공개 데모의 KMA 역할 전환은 인증이 아닙니다. 아래 승인·거절은 "
+            "합성데이터 기획검증용 신청에만 사용하세요."
         )
         pending_by_id = {
             _clean(company.get("company_id")): company for company in pending_companies
@@ -272,11 +272,9 @@ if pending_companies:
             ),
             key="_kma_company_review_target",
         )
-        management_code = st.text_input(
-            "KMA 승인관리 코드",
-            type="password",
-            key="_kma_company_review_code",
-            help="Streamlit Secrets의 신규기업 승인관리 코드와 비교하며 저장하지 않습니다.",
+        confirm_demo_review = st.checkbox(
+            "합성데이터 기획검증용 신청임을 확인했습니다.",
+            key="_kma_company_review_confirm",
         )
         reviewer_note = st.text_area(
             "검토 메모(선택)",
@@ -290,11 +288,13 @@ if pending_companies:
             type="primary",
             width="stretch",
             key="_kma_company_approve",
+            disabled=not confirm_demo_review,
         )
         reject_clicked = reject_col.button(
             "승인 거절",
             width="stretch",
             key="_kma_company_reject",
+            disabled=not confirm_demo_review,
         )
         decision = "approved" if approve_clicked else "rejected" if reject_clicked else ""
         if decision:
@@ -302,14 +302,9 @@ if pending_companies:
                 review_config = DemoStoreConfig.from_sources(
                     secrets=demo_store_secrets
                 )
-                if not review_config.company_access_granted(management_code):
-                    raise DemoStoreError("KMA 승인관리 코드가 일치하지 않습니다.")
                 if decision == "rejected" and not reviewer_note.strip():
                     raise DemoStoreError("승인을 거절하려면 검토 메모에 사유를 입력해 주세요.")
-                review_store = GitHubDemoStore(
-                    review_config,
-                    company_registration_code=management_code,
-                )
+                review_store = GitHubDemoStore(review_config)
                 review_store.review_company_registration(
                     selected_company_id,
                     decision,

@@ -129,7 +129,9 @@ class UiRegressionTests(unittest.TestCase):
         self.assertIn("사업자등록번호 원문은 저장하지 않", guide_source)
         self.assertIn("참여 기업 및 관리자 범위", guide_source)
         self.assertIn('"companies": store.list_companies()', kma_source)
-        self.assertIn("KMA 승인관리 코드", kma_source)
+        self.assertIn("합성데이터 기획검증용 신청임을 확인했습니다.", kma_source)
+        self.assertNotIn("KMA 승인관리 코드", kma_source)
+        self.assertNotIn("company_registration_code", kma_source)
         self.assertIn("review_company_registration(", kma_source)
         self.assertIn("사업자등록번호 원문과 개인 관리자 정보", kma_source)
 

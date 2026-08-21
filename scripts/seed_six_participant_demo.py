@@ -398,10 +398,7 @@ def apply_fixture(
     )
     status = company_approval_status(registry)
     if status == "pending":
-        reviewer = GitHubDemoStore(
-            config,
-            company_registration_code=config.company_code,
-        )
+        reviewer = GitHubDemoStore(config)
         registry = reviewer.review_company_registration(
             identity.company_id,
             "approved",
@@ -482,8 +479,6 @@ def main(argv: list[str] | None = None) -> int:
     summary["output_dir"] = str(args.output_dir.resolve())
 
     if args.apply:
-        if not config.company_code:
-            raise SystemExit("--apply에는 KMA 기업 승인관리 코드 환경설정이 필요합니다.")
         if not config.participant_code:
             raise SystemExit("--apply에는 참여자 접속코드 환경설정이 필요합니다.")
         apply_fixture(

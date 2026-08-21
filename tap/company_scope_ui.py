@@ -280,18 +280,9 @@ def company_admin_code_from_page(state: Mapping[str, Any], key_prefix: str) -> s
     return company_business_number_from_page(state, key_prefix)
 
 
-def company_registration_code_from_page(
-    state: Mapping[str, Any], key_prefix: str
-) -> str:
-    """Legacy compatibility helper; company pages no longer accept this code."""
-
-    return ""
-
-
 __all__ = [
     "CompanyScopeView",
     "company_admin_code_from_page",
     "company_business_number_from_page",
-    "company_registration_code_from_page",
     "render_company_scope_gate",
 ]

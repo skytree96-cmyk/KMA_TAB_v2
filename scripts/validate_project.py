@@ -357,7 +357,7 @@ def main() -> int:
         ROOT / "pages" / "6_kma_dashboard.py": (
             '"companies": store.list_companies()',
             "참여 기업 및 관리자 범위",
-            "KMA 승인관리 코드",
+            "합성데이터 기획검증용 신청임을 확인했습니다.",
             "review_company_registration(",
             "사업자등록번호 원문과 개인 관리자 정보",
         ),
@@ -370,8 +370,8 @@ def main() -> int:
             "Read and write",
             "participant_hash_salt",
             "participant_access_code",
-            "company_access_code",
             "report_preview_code",
+            "별도 비밀번호나 Secret을 사용하지 않습니다",
             "회사명·사업자등록번호로 기업 참여 요청",
             "참여 기업 목록",
             "사업자등록번호 원문과 관리자 개인 정보는 저장·표시하지 않습니다",
@@ -381,7 +381,6 @@ def main() -> int:
             'branch = "demo-data"',
             "participant_hash_salt",
             "participant_access_code",
-            "company_access_code",
             "report_preview_code",
         ),
         ROOT / "tap" / "tenant.py": (
@@ -437,6 +436,32 @@ def main() -> int:
         if stale_company_copy in company_scope_source:
             errors.append(
                 f"stale company gate copy remains in tap/company_scope_ui.py: {stale_company_copy}"
+            )
+
+    kma_review_source = (ROOT / "pages" / "6_kma_dashboard.py").read_text(
+        encoding="utf-8"
+    )
+    for stale_review_gate in (
+        "KMA 승인관리 코드",
+        "company_registration_code",
+        "company_access_granted",
+    ):
+        if stale_review_gate in kma_review_source:
+            errors.append(
+                f"stale KMA review gate remains in pages/6_kma_dashboard.py: {stale_review_gate}"
+            )
+
+    demo_store_source = (ROOT / "tap" / "github_demo_store.py").read_text(
+        encoding="utf-8"
+    )
+    for stale_review_config in (
+        "company_registration_code",
+        "def company_access_granted(",
+        "    company_access_code: str = field",
+    ):
+        if stale_review_config in demo_store_source:
+            errors.append(
+                f"stale KMA review configuration remains in tap/github_demo_store.py: {stale_review_config}"
             )
 
     navigation_paths = set(ROLE_LANDINGS.values())

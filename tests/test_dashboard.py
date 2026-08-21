@@ -246,14 +246,12 @@ class DashboardTests(unittest.TestCase):
 
     def test_kma_dashboard_lists_company_registry_and_reviews_pending_company(self) -> None:
         company_id = "org_" + "a" * 64
-        management_code = "kma-review-code"
         config = DemoStoreConfig(
             enabled=True,
             owner="example",
             repo="tap-demo",
             token="github-test-token",
             salt="dashboard-company-list-salt",
-            company_access_code=management_code,
         )
         stored_submission = _stored_submission("pk-company", post_complete=True)
         stored_submission["company_id"] = company_id
@@ -317,11 +315,16 @@ class DashboardTests(unittest.TestCase):
             self.assertEqual(1, company_frame.iloc[1]["교육 전 완료"])
             self.assertEqual(0, company_frame.iloc[1]["교육 후 완료"])
 
-            next(
+            confirm = next(
                 item
-                for item in app.text_input
-                if item.label == "KMA 승인관리 코드"
-            ).set_value(management_code)
+                for item in app.checkbox
+                if item.label == "합성데이터 기획검증용 신청임을 확인했습니다."
+            )
+            self.assertTrue(
+                next(item for item in app.button if item.label == "기업 승인").disabled
+            )
+            confirm.set_value(True)
+            app.run()
             next(item for item in app.button if item.label == "기업 승인").click()
             app.run()
 
@@ -339,13 +342,13 @@ class DashboardTests(unittest.TestCase):
 
         self.assertIn('"companies": store.list_companies()', source)
         self.assertIn("review_company_registration(", source)
-        self.assertIn("company_registration_code=management_code", source)
+        self.assertIn("합성데이터 기획검증용 신청임을 확인했습니다.", source)
         self.assertIn("사업자등록번호 원문과 개인 관리자 정보는", source)
         self.assertNotIn('st.text_input("사업자등록번호"', source)
-        self.assertLess(
-            source.index("review_config.company_access_granted(management_code)"),
-            source.index("review_store.review_company_registration("),
-        )
+        self.assertNotIn("KMA 승인관리 코드", source)
+        self.assertNotIn("company_registration_code", source)
+        self.assertNotIn("company_access_granted", source)
+        self.assertIn("disabled=not confirm_demo_review", source)
 
     def test_store_item_responses_convert_to_group_factor_rows(self) -> None:
         questions = questions_for_factors(["CORE-CO"])

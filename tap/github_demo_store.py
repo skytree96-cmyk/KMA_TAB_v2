@@ -230,7 +230,6 @@ class DemoStoreConfig:
     salt: str = field(default="", repr=False)
     access_code: str = field(default="", repr=False)
     participant_access_code: str = field(default="", repr=False)
-    company_access_code: str = field(default="", repr=False)
     report_preview_code: str = field(default="", repr=False)
     api_url: str = DEFAULT_API_URL
     root_path: str = ROOT_PATH
@@ -252,7 +251,6 @@ class DemoStoreConfig:
         code_labels = {
             "access_code": "레거시 기획검증 접속코드",
             "participant_access_code": "참여자 접속코드",
-            "company_access_code": "KMA 기업 승인관리 코드",
             "report_preview_code": "리포트 미리보기 코드",
         }
         for code_field, label in code_labels.items():
@@ -265,15 +263,6 @@ class DemoStoreConfig:
             except TenantError as exc:
                 raise DemoStoreError(str(exc)) from exc
             object.__setattr__(self, code_field, normalized)
-
-        if (
-            self.participant_code
-            and self.company_code
-            and access_codes_equal(self.participant_code, self.company_code)
-        ):
-            raise DemoStoreError(
-                "KMA 기업 승인관리 코드와 참여자 접속코드는 서로 달라야 합니다."
-            )
 
         if self.enabled and not (self.owner and self.repo):
             raise DemoStoreError(
@@ -321,20 +310,10 @@ class DemoStoreConfig:
         return self.participant_access_code or self.access_code
 
     @property
-    def company_code(self) -> str:
-        """Explicit KMA code for approving or rejecting company requests.
-
-        The legacy shared ``access_code`` must never authorize a KMA review.
-        It remains available only to the old flat-path project flow.
-        """
-
-        return self.company_access_code
-
-    @property
     def legacy_project_code(self) -> str:
         """Code accepted only by the pre-tenant flat-path project writer."""
 
-        return self.access_code or self.company_access_code
+        return self.access_code
 
     @property
     def read_enabled(self) -> bool:
@@ -346,15 +325,6 @@ class DemoStoreConfig:
         return bool(
             self.write_enabled
             and access_codes_equal(self.participant_code, candidate)
-        )
-
-    def company_access_granted(self, candidate: Any) -> bool:
-        """Constant-time KMA gate for company registration reviews."""
-
-        return bool(
-            self.project_write_enabled
-            and self.company_code
-            and access_codes_equal(self.company_code, candidate)
         )
 
     def legacy_project_access_granted(self, candidate: Any) -> bool:
@@ -497,14 +467,6 @@ class DemoStoreConfig:
             )
             or secret("participant_access_code")
         )
-        company_access_code = _clean(
-            _first(
-                env,
-                "GITHUB_DEMO_STORE_COMPANY_ACCESS_CODE",
-                "TAP_DEMO_GITHUB_COMPANY_ACCESS_CODE",
-            )
-            or secret("company_access_code")
-        )
         report_preview_code = _clean(
             _first(
                 env,
@@ -529,7 +491,6 @@ class DemoStoreConfig:
             salt=salt,
             access_code=access_code,
             participant_access_code=participant_access_code,
-            company_access_code=company_access_code,
             report_preview_code=report_preview_code,
             api_url=api_url,
         )
@@ -1076,7 +1037,6 @@ class GitHubDemoStore:
         access_code: str = "",
         participant_access_code: str | None = None,
         company_access_code: str | None = None,
-        company_registration_code: str | None = None,
     ) -> None:
         if not isinstance(config, DemoStoreConfig):
             raise DemoStoreError("GitHubDemoStore에는 DemoStoreConfig가 필요합니다.")
@@ -1088,9 +1048,6 @@ class GitHubDemoStore:
         )
         self._company_access_code = normalize_access_code(
             access_code if company_access_code is None else company_access_code
-        )
-        self._company_registration_code = normalize_access_code(
-            company_registration_code
         )
 
     def status(self) -> dict[str, Any]:
@@ -1107,7 +1064,7 @@ class GitHubDemoStore:
                 and self.config.configured
                 and self.config.token
                 and (
-                    self.config.company_access_granted(self._company_access_code)
+                    self.config.legacy_project_access_granted(self._company_access_code)
                     or (self.config.salt and self._company_access_code)
                 )
             ),
@@ -1160,12 +1117,10 @@ class GitHubDemoStore:
                 raise DemoStoreError("사업자등록번호 확인값이 필요합니다.")
             return
         if scope == "kma_review":
-            if not self.config.company_code:
-                raise DemoStoreError("KMA 승인관리 코드가 설정되지 않았습니다.")
-            if not self.config.company_access_granted(
-                self._company_registration_code
-            ):
-                raise DemoStoreError("KMA 승인관리 코드가 일치하지 않습니다.")
+            # The public synthetic demo intentionally has no separate KMA
+            # approval code.  The server-side repository token still gates
+            # writes, while registry validation below enforces demo-only data
+            # and one-way pending -> approved/rejected transitions.
             return
         raise DemoStoreError("지원하지 않는 저장 권한 범위입니다.")
 
@@ -1461,7 +1416,7 @@ class GitHubDemoStore:
         decision: str,
         reviewer_note: str = "",
     ) -> dict[str, Any]:
-        """Approve or reject one pending company after the KMA code gate."""
+        """Approve or reject one pending demo company from the KMA screen."""
 
         company = _company_id(company_id, required=True)
         normalized_decision = _clean(decision).lower()

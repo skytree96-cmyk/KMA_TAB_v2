@@ -4,16 +4,19 @@ import json
 import tempfile
 import unittest
 from pathlib import Path
+from types import SimpleNamespace
+from unittest.mock import patch
 
 from scripts.seed_six_participant_demo import (
     SYNTHETIC_FACTOR_CODES,
     SYNTHETIC_PROJECT_ID,
+    apply_fixture,
     build_fixture_bundle,
     fixture_files,
     validate_fixture_bundle,
     write_fixture_bundle,
 )
-from tap.tenant import CompanyIdentity
+from tap.tenant import CompanyIdentity, derive_company_identity, hash_company_access_code
 
 
 class SixParticipantDemoFixtureTests(unittest.TestCase):
@@ -95,6 +98,69 @@ class SixParticipantDemoFixtureTests(unittest.TestCase):
                 (output / company_root / "company.json").read_text(encoding="utf-8")
             )
             self.assertEqual("approved", registry["approval_status"])
+
+    def test_apply_reviews_pending_company_without_a_management_code(self) -> None:
+        salt = "code-free-review-test-salt"
+        disposable_proof = "0" * 10
+        identity = derive_company_identity(
+            salt=salt,
+            company_name="TAP 합성 예시기업",
+            business_registration_number=disposable_proof,
+        )
+        digest = hash_company_access_code(
+            identity.company_id, disposable_proof, salt
+        )
+        bundle = build_fixture_bundle(
+            company_identity=identity,
+            company_access_digest=digest,
+            participant_salt=salt,
+        )
+        constructor_kwargs: list[dict[str, str]] = []
+        review_calls: list[tuple[str, str]] = []
+
+        class RecordingStore:
+            def __init__(self, _config, **kwargs):
+                constructor_kwargs.append(dict(kwargs))
+
+            def request_company_registration(self, _identity, _digest):
+                return {**bundle["company"], "approval_status": "pending"}
+
+            def review_company_registration(self, company_id, decision, **_kwargs):
+                review_calls.append((company_id, decision))
+                return {**bundle["company"], "approval_status": "approved"}
+
+            def save_project(self, project):
+                return dict(project)
+
+            def save_submission(self, submission):
+                return dict(submission)
+
+        # The config deliberately exposes only the participant write gate;
+        # company review does not receive a second secret.
+        config = SimpleNamespace(salt=salt, participant_code="participant-code")
+        with patch(
+            "scripts.seed_six_participant_demo.GitHubDemoStore", RecordingStore
+        ):
+            applied = apply_fixture(
+                bundle,
+                config=config,
+                disposable_company_proof=disposable_proof,
+            )
+
+        self.assertEqual(
+            [(identity.company_id, "approved")],
+            review_calls,
+        )
+        self.assertEqual(
+            [
+                {"company_access_code": disposable_proof},
+                {},
+                {"company_access_code": disposable_proof},
+                {"participant_access_code": "participant-code"},
+            ],
+            constructor_kwargs,
+        )
+        self.assertEqual(6, len(applied["submissions"]))
 
 
 if __name__ == "__main__":

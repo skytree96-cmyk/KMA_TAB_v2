@@ -177,7 +177,6 @@ class GitHubDemoStoreTests(unittest.TestCase):
             token="fake-token",
             salt="test-only-salt",
             access_code="test-access-code",
-            company_access_code="test-company-registration-code",
         )
         self.store = GitHubDemoStore(
             self.config,
@@ -210,16 +209,49 @@ class GitHubDemoStoreTests(unittest.TestCase):
             identity.to_payload(), digest
         )
         self.assertEqual("pending", company_approval_status(requested))
-        review_store = GitHubDemoStore(
-            self.config,
-            transport=self.transport,
-            company_registration_code="test-company-registration-code",
-        )
+        review_store = GitHubDemoStore(self.config, transport=self.transport)
         approved = review_store.review_company_registration(
             identity.company_id, "approved"
         )
         self.assertEqual("approved", company_approval_status(approved))
         return identity, digest, company_store
+
+    def test_code_free_review_still_requires_token_and_demo_registry(self) -> None:
+        business_number = "1010101010"
+        identity = derive_company_identity(
+            salt=self.config.salt,
+            company_name="승인 안전검사 기업",
+            business_registration_number=business_number,
+        )
+        digest = hash_company_access_code(
+            identity.company_id, business_number, self.config.salt
+        )
+        requester = GitHubDemoStore(
+            self.config,
+            transport=self.transport,
+            company_access_code=business_number,
+        )
+        requester.request_company_registration(identity.to_payload(), digest)
+
+        no_token_config = DemoStoreConfig(
+            enabled=True,
+            owner=self.config.owner,
+            repo=self.config.repo,
+            salt=self.config.salt,
+        )
+        with self.assertRaisesRegex(DemoStoreError, "token 설정"):
+            GitHubDemoStore(
+                no_token_config, transport=self.transport
+            ).review_company_registration(identity.company_id, "approved")
+
+        registry_path = (
+            f"tap-demo/v1/companies/{identity.company_id}/company.json"
+        )
+        self.transport.files[registry_path]["payload"]["demo_only"] = False
+        with self.assertRaisesRegex(DemoStoreError, "기업 레지스트리 형식"):
+            GitHubDemoStore(
+                self.config, transport=self.transport
+            ).review_company_registration(identity.company_id, "approved")
 
     def test_config_sources_and_public_read_status(self) -> None:
         config = DemoStoreConfig.from_sources(
@@ -682,21 +714,7 @@ class GitHubDemoStoreTests(unittest.TestCase):
         with self.assertRaisesRegex(DemoStoreError, "승인 대기"):
             unapproved_store.save_project(payload)
 
-        wrong_reviewer = GitHubDemoStore(
-            self.config,
-            transport=self.transport,
-            company_registration_code="wrong-kma-code",
-        )
-        with self.assertRaisesRegex(DemoStoreError, "KMA 승인관리 코드"):
-            wrong_reviewer.review_company_registration(
-                identity.company_id, "approved"
-            )
-
-        reviewer = GitHubDemoStore(
-            self.config,
-            transport=self.transport,
-            company_registration_code="test-company-registration-code",
-        )
+        reviewer = GitHubDemoStore(self.config, transport=self.transport)
         approved = reviewer.review_company_registration(
             identity.company_id, "approved", reviewer_note="합성데이터 기획검증"
         )
@@ -795,18 +813,7 @@ class GitHubDemoStoreTests(unittest.TestCase):
         )
         self.assertEqual([], first_store.list_projects(second.company_id))
 
-    def test_explicit_company_and_participant_config_codes_must_differ(self) -> None:
-        with self.assertRaisesRegex(DemoStoreError, "서로 달라야"):
-            DemoStoreConfig(
-                enabled=True,
-                owner="owner",
-                repo="repo",
-                token="token",
-                salt="salt",
-                participant_access_code="same-code",
-                company_access_code="same-code",
-            )
-
+    def test_participant_and_preview_config_codes_are_private(self) -> None:
         separated = DemoStoreConfig(
             enabled=True,
             owner="owner",
@@ -814,13 +821,13 @@ class GitHubDemoStoreTests(unittest.TestCase):
             token="private-token",
             salt="private-salt",
             participant_access_code="participant-secret",
-            company_access_code="company-secret",
+            report_preview_code="preview-secret",
         )
         rendered = repr(separated)
         self.assertNotIn("private-token", rendered)
         self.assertNotIn("private-salt", rendered)
         self.assertNotIn("participant-secret", rendered)
-        self.assertNotIn("company-secret", rendered)
+        self.assertNotIn("preview-secret", rendered)
 
     def test_unicode_codes_are_normalized_and_compared_without_type_error(self) -> None:
         config = DemoStoreConfig(
@@ -830,26 +837,13 @@ class GitHubDemoStoreTests(unittest.TestCase):
             token="token",
             salt="salt",
             participant_access_code=" 참여자코드 ",
-            company_access_code=" 승인코드 ",
             report_preview_code=" 미리보기코드 ",
         )
         self.assertTrue(config.access_granted("참여자코드"))
-        self.assertTrue(config.company_access_granted("승인코드"))
         self.assertTrue(config.report_preview_granted("미리보기코드"))
         self.assertFalse(config.access_granted("다른코드"))
 
-        with self.assertRaisesRegex(DemoStoreError, "서로 달라야"):
-            DemoStoreConfig(
-                enabled=True,
-                owner="owner",
-                repo="repo",
-                token="token",
-                salt="salt",
-                participant_access_code="ABC",
-                company_access_code="ＡＢＣ",
-            )
-
-    def test_legacy_shared_code_cannot_approve_new_company_registration(self) -> None:
+    def test_company_review_does_not_use_legacy_shared_code(self) -> None:
         legacy_code = "legacy-shared-code"
         business_number = "3333333333"
         config = DemoStoreConfig(
@@ -861,8 +855,6 @@ class GitHubDemoStoreTests(unittest.TestCase):
             access_code=legacy_code,
         )
         self.assertTrue(config.access_granted(legacy_code))
-        self.assertFalse(config.company_access_granted(legacy_code))
-        self.assertEqual("", config.company_code)
 
         identity = derive_company_identity(
             salt=config.salt,
@@ -880,17 +872,15 @@ class GitHubDemoStoreTests(unittest.TestCase):
             config,
             transport=self.transport,
             company_access_code=business_number,
-            company_registration_code=legacy_code,
         )
         pending = store.request_company_registration(
             identity.to_payload(), state["company_access_digest"]
         )
         self.assertEqual("pending", pending["approval_status"])
-        with self.assertRaisesRegex(DemoStoreError, "KMA 승인관리 코드"):
-            store.review_company_registration(identity.company_id, "approved")
-        with self.assertRaisesRegex(DemoStoreError, "승인 대기"):
-            store.save_project(project_payload_from_state(state))
-        self.assertEqual(1, len(self.transport.files))
+        approved = store.review_company_registration(identity.company_id, "approved")
+        self.assertEqual("approved", approved["approval_status"])
+        saved = store.save_project(project_payload_from_state(state))
+        self.assertEqual(identity.company_id, saved["company_id"])
 
     def test_rejected_registration_is_idempotent_and_cannot_be_reopened(self) -> None:
         business_number = "4444444444"
@@ -916,11 +906,7 @@ class GitHubDemoStoreTests(unittest.TestCase):
         self.assertEqual(first["requested_at"], second["requested_at"])
         self.assertEqual("pending", company_approval_status(second))
 
-        review_store = GitHubDemoStore(
-            self.config,
-            transport=self.transport,
-            company_registration_code="test-company-registration-code",
-        )
+        review_store = GitHubDemoStore(self.config, transport=self.transport)
         with self.assertRaisesRegex(DemoStoreError, "검토 메모"):
             review_store.review_company_registration(
                 identity.company_id, "rejected"
@@ -985,11 +971,7 @@ class GitHubDemoStoreTests(unittest.TestCase):
             )
 
         request_store.request_company_registration(identity.to_payload(), digest)
-        review_store = GitHubDemoStore(
-            self.config,
-            transport=self.transport,
-            company_registration_code="test-company-registration-code",
-        )
+        review_store = GitHubDemoStore(self.config, transport=self.transport)
         with self.assertRaisesRegex(DemoStoreError, "메모에 사업자등록번호"):
             review_store.review_company_registration(
                 identity.company_id,
