@@ -14,7 +14,7 @@ from pathlib import Path
 import re
 import secrets
 import sys
-from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
+from urllib.parse import parse_qsl, quote, urlencode, urlsplit, urlunsplit
 import uuid
 
 
@@ -23,6 +23,25 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 SCHEMA_RE = re.compile(r"tapcheck_[0-9a-f]{32}\Z")
+
+
+class _StageFailure(Exception):
+    """Carry only a static stage name and exception class, never DB messages."""
+
+    def __init__(self, stage: str, error_type: str):
+        self.stage = stage
+        self.error_type = error_type
+        super().__init__(stage)
+
+
+@contextmanager
+def _diagnostic_stage(stage: str):
+    try:
+        yield
+    except _StageFailure:
+        raise
+    except Exception as exc:
+        raise _StageFailure(stage, type(exc).__name__) from None
 
 
 def _schema_url(dsn: str, schema: str) -> str:
@@ -36,7 +55,9 @@ def _schema_url(dsn: str, schema: str) -> str:
     # No public/$user fallback: every unqualified AccountStore statement is
     # confined to the generated schema. pg_catalog remains implicitly visible.
     query.append(("options", f"-csearch_path={schema} -cstatement_timeout=15000 -clock_timeout=10000"))
-    return urlunsplit((parts.scheme, parts.netloc, parts.path, urlencode(query), ""))
+    # libpq applies RFC 3986 percent decoding, not HTML form decoding: '+' is
+    # literal. options arguments MUST use %20 for their separating spaces.
+    return urlunsplit((parts.scheme, parts.netloc, parts.path, urlencode(query, quote_via=quote), ""))
 
 
 @contextmanager
@@ -57,7 +78,7 @@ def _isolated_schema(dsn: str):
     created = False
     schema_oid = None
     try:
-        with psycopg.connect(maintenance_dsn, autocommit=True) as conn:
+        with _diagnostic_stage("schema-create"), psycopg.connect(maintenance_dsn, autocommit=True) as conn:
             # Deliberately omit IF NOT EXISTS: a collision must fail without
             # adopting, modifying, or deleting an already-existing schema.
             conn.execute(sql.SQL("CREATE SCHEMA {}").format(sql.Identifier(schema)))
@@ -69,7 +90,7 @@ def _isolated_schema(dsn: str):
             if not row or not row[1]:
                 raise RuntimeError("Schema ownership verification failed")
             schema_oid = row[0]
-        with psycopg.connect(scoped_url, connect_timeout=10) as conn:
+        with _diagnostic_stage("schema-isolation"), psycopg.connect(scoped_url, connect_timeout=10) as conn:
             current, paths = conn.execute("SELECT current_schema(), current_schemas(false)").fetchone()
             if current != schema or list(paths) != [schema]:
                 raise RuntimeError("Schema isolation verification failed")
@@ -78,9 +99,9 @@ def _isolated_schema(dsn: str):
         if created:
             # This is the only destructive operation. Require the exact newly
             # created name, original OID, and current ownership before dropping.
-            if not SCHEMA_RE.fullmatch(schema) or schema_oid is None:
-                raise RuntimeError("Schema cleanup guard failed")
-            with psycopg.connect(maintenance_dsn, autocommit=True) as conn:
+            with _diagnostic_stage("schema-cleanup"), psycopg.connect(maintenance_dsn, autocommit=True) as conn:
+                if not SCHEMA_RE.fullmatch(schema) or schema_oid is None:
+                    raise RuntimeError("Schema cleanup guard failed")
                 row = conn.execute(
                     "SELECT oid, nspowner=(SELECT oid FROM pg_roles WHERE rolname=current_user) "
                     "FROM pg_namespace WHERE nspname=%s", (schema,),
@@ -219,10 +240,13 @@ def main(argv: list[str] | None = None) -> int:
         if not dsn:
             raise ValueError("An explicit database URL is required")
         with _isolated_schema(dsn) as scoped_url:
-            _exercise(scoped_url)
+            with _diagnostic_stage("account-check"):
+                _exercise(scoped_url)
     except Exception as exc:
         # Never print exception text/tracebacks, DSNs, passwords, or raw SQL.
-        print(f"POSTGRES ACCOUNT CHECK FAILED: {type(exc).__name__}", flush=True)
+        error_type = exc.error_type if isinstance(exc, _StageFailure) else type(exc).__name__
+        stage = exc.stage if isinstance(exc, _StageFailure) else "configuration"
+        print(f"POSTGRES ACCOUNT CHECK FAILED: {error_type}; stage={stage}", flush=True)
         return 1
     print("POSTGRES ACCOUNT CHECK PASSED: pre/post persistence, tenant isolation, immutable submissions, reset/revocation, isolated schema cleaned", flush=True)
     return 0
