@@ -12,6 +12,7 @@ from tap.open_page import GUIDE_PDF_BASE64_TOKEN, OPEN_PAGE_PATH, PUBLIC_PAGE_CS
 
 LANDING_BRAND_CSS = """
 <style>
+  html,body,.stApp,[data-testid="stAppViewContainer"],[data-testid="stMain"] {background:var(--paper,#f8fbff) !important;}
   .site-header .brand {text-decoration:none;flex-shrink:0;}
   .site-header .tap-ci {flex-direction:row;align-items:center;gap:13px;margin:0;flex-wrap:nowrap;}
   .site-header .tap-ci .tap-ci-wordmark {font-size:32px;}
@@ -20,6 +21,7 @@ LANDING_BRAND_CSS = """
   .footer-brand .tap-ci .tap-ci-wordmark {font-size:34px;}
   @media(max-width:1150px) {.site-header .tap-ci .tap-ci-description {display:none;}}
   @media(max-width:640px) {.site-header .tap-ci .tap-ci-wordmark {font-size:29px;}}
+  @media(prefers-color-scheme:dark) {.site-header .tap-ci {--ci-kma:#e7f6f3;--ci-tap:#7dded0;--ci-caption:#b9cfd0;}}
 </style>
 """
 

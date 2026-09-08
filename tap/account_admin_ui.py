@@ -180,7 +180,7 @@ def _render_credentials(principal: Mapping[str, Any]) -> None:
         st.session_state.pop(PREFIX + "credentials", None)
         return
     rows = data["rows"]
-    with st.container(border=True):
+    with st.container(border=True, key=PREFIX + "credentials_panel"):
         st.subheader("발급한 로그인 정보")
         st.info("임시 비밀번호는 이 발급 화면에서만 확인할 수 있습니다. 필요한 정보를 내려받아 해당 사용자에게 전달한 후 닫아 주세요. 첫 로그인 때 비밀번호를 변경합니다.")
         st.dataframe([
