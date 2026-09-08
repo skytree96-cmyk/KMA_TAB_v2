@@ -65,8 +65,10 @@ def main() -> int:
         "/post_assessment?tap_role=participant",
         "/kma_dashboard?tap_role=kma",
     ):
-        if f'href="https://kmatap.streamlit.app{route}"' not in source:
-            raise AssertionError(f"absolute open-page link is missing: {route}")
+        if f'href="{route}"' not in source:
+            raise AssertionError(f"same-host open-page link is missing: {route}")
+    if 'href="https://kmatap.streamlit.app/' in source:
+        raise AssertionError("rendered app links must not redirect to the old host")
     if source.count(' data-guide-download href="/tap-user-guide.pdf"') != 3:
         raise AssertionError("top/mobile/footer guide download links must all exist")
     if source.count('href="/tap-user-guide.pdf"') != 3:
