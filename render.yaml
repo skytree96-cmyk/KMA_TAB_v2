@@ -1,0 +1,18 @@
+# TEST ONLY: public synthetic-data demo; no production accounts or persistence.
+# Python 3.12 is selected by the existing .python-version file.
+# Deploy reviewed commits manually; the current Blueprint setting is off.
+services:
+  - type: web
+    name: kma-tap-staging
+    repo: https://github.com/skytree96-cmyk/KMA_TAB_v2
+    branch: codex/render-staging
+    runtime: python
+    plan: free
+    region: singapore
+    buildCommand: python -m pip install -r requirements.txt
+    startCommand: python -m streamlit run streamlit_app.py --server.address=0.0.0.0 --server.port=$PORT --client.toolbarMode=minimal
+    healthCheckPath: /_stcore/health
+    autoDeployTrigger: "off"
+    envVars:
+      - key: GITHUB_DEMO_STORE_ENABLED
+        value: "false"

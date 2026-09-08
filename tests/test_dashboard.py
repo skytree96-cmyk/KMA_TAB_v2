@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import re
 import unittest
 from pathlib import Path
 from unittest.mock import MagicMock, patch
+from urllib.parse import urljoin, urlsplit
 
 import streamlit as st
 from streamlit.testing.v1 import AppTest
@@ -636,8 +638,7 @@ class DashboardTests(unittest.TestCase):
         self.assertNotIn('href="#roles">프로젝트 코드로 검사 참여</a>', source)
         self.assertGreaterEqual(
             source.count(
-                'data-app-link href="https://kmatap.streamlit.app/'
-                'pre_assessment?tap_role=participant"'
+                'data-app-link href="/pre_assessment?tap_role=participant"'
             ),
             4,
         )
@@ -648,10 +649,38 @@ class DashboardTests(unittest.TestCase):
             "/post_assessment?tap_role=participant",
             "/kma_dashboard?tap_role=kma",
         ):
-            self.assertIn(f'href="https://kmatap.streamlit.app{route}"', source)
+            self.assertIn(f'href="{route}"', source)
         self.assertNotIn(
             'organization_report?tap_role=company" target="_blank"', source
         )
+
+    def test_open_page_links_keep_current_host_and_static_source(self) -> None:
+        from tap.open_page import OPEN_PAGE_PATH, _rendered_open_page_html
+
+        static_source = OPEN_PAGE_PATH.read_bytes()
+        original_links = re.findall(
+            r'data-app-link href="([^"]+)"', static_source.decode("utf-8")
+        )
+        rendered_links = re.findall(
+            r'data-app-link href="([^"]+)"', _rendered_open_page_html()
+        )
+        self.assertGreaterEqual(len(original_links), 8)
+        self.assertEqual(len(original_links), len(rendered_links))
+        for original, rendered in zip(original_links, rendered_links):
+            self.assertTrue(original.startswith("https://kmatap.streamlit.app/"))
+            self.assertTrue(rendered.startswith("/") and not rendered.startswith("//"))
+            expected = urlsplit(original)
+            for origin in (
+                "https://kma-tap-staging.onrender.com",
+                "http://localhost:8501",
+                "https://tap.example.org",
+            ):
+                destination = urlsplit(urljoin(origin + "/", rendered))
+                self.assertEqual(urlsplit(origin).netloc, destination.netloc)
+                self.assertEqual(expected.path, destination.path)
+                self.assertEqual(expected.query, destination.query)
+                self.assertEqual(expected.fragment, destination.fragment)
+        self.assertEqual(static_source, OPEN_PAGE_PATH.read_bytes())
 
     def test_public_deep_link_sets_the_destination_role(self) -> None:
         app = AppTest.from_file(
