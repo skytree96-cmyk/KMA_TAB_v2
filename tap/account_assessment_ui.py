@@ -1,12 +1,14 @@
 """Account-bound participant assessments backed by the production store.
 
 Only assignment records returned for the authenticated account enter this UI.
-Drafts and completion status are reloaded from the server on every rerun; the
-browser session holds only widget values and navigation, never report records.
+The active draft is reloaded on independent reruns. Form callbacks commit before
+rendering the next question, without an additional rerun; the verified receipt
+is consumed once by that render. Report records are never persistently cached.
 """
 from __future__ import annotations
 
 import hashlib
+from copy import deepcopy
 from collections.abc import Mapping, MutableMapping
 from datetime import date, datetime, timedelta, timezone
 from time import time
@@ -90,29 +92,79 @@ def _checked_record(record: Any, assignment_id: str, phase: str, question_codes:
     return dict(record)
 
 
-def _show_error(action: str, exc: Exception) -> None:
+def _error_message(action: str, exc: Exception) -> str:
     # Store validation errors contain useful user-facing messages. Unexpected
     # connection/runtime failures must not expose SQL or infrastructure details.
     detail = str(exc) if isinstance(exc, ValueError) else "잠시 후 다시 시도해 주세요. 계속되면 교육담당자에게 문의해 주세요."
-    st.error(f"{action} {detail}")
+    return f"{action} {detail}"
 
 
-def _save(store: Any, token: str, assignment_id: str, phase: str, payload: dict[str, Any], completed: bool, codes: set[str]) -> bool:
+def _show_error(action: str, exc: Exception) -> None:
+    st.error(_error_message(action, exc))
+
+
+def _save(store: Any, token: str, assignment_id: str, phase: str, payload: dict[str, Any], completed: bool, codes: set[str], *, callback: bool = False, notify: bool = True) -> bool:
     try:
         receipt = _checked_record(store.save_assessment(token, assignment_id, phase, payload, completed), assignment_id, phase, codes)
         if receipt is None or receipt["completed"] is not completed or dict(receipt["payload"].get("responses", {})) != payload["responses"]:
             raise ValueError("저장 확인 응답이 일치하지 않아 다음 단계로 진행하지 않았습니다.")
+        if "current_question" in payload and receipt["payload"].get("current_question") != payload["current_question"]:
+            raise ValueError("저장된 진행 위치를 확인하지 못해 현재 문항을 유지했습니다.")
         if phase == "post" and dict(receipt["payload"].get("post_transfer_responses", {})) != dict(payload.get("post_transfer_responses", {})):
             raise ValueError("현업전이 응답의 저장을 확인하지 못했습니다.")
     except Exception as exc:
-        _show_error("응답을 저장하지 못했습니다.", exc)
+        if callback:
+            st.session_state.pop(PREFIX + "saved_record", None)
+            st.session_state[PREFIX + "error"] = _error_message("응답을 저장하지 못했습니다.", exc)
+        else:
+            _show_error("응답을 저장하지 못했습니다.", exc)
         return False
-    st.session_state[PREFIX + "notice"] = "최종 제출이 완료되었습니다." if completed else "응답이 저장되었습니다. 다음에 로그인하면 이어서 참여할 수 있습니다."
+    if callback:
+        st.session_state[PREFIX + "saved_record"] = {
+            "owner": st.session_state[PREFIX + "owner"], "record": deepcopy(receipt),
+        }
+    if notify:
+        st.session_state[PREFIX + "notice"] = "최종 제출이 완료되었습니다." if completed else "응답이 저장되었습니다. 다음에 로그인하면 이어서 참여할 수 있습니다."
     return True
 
 
 def _choose_phase(phase: str) -> None:
     st.session_state[PREFIX + "phase"] = phase
+
+
+def _go_to_question(phase: str, cursor: int) -> None:
+    st.session_state[PREFIX + phase + "_cursor"] = cursor
+
+
+def _submit_question(store: Any, token: str, assignment_id: str, owner: str, phase: str, cursor: int,
+                     question_code: str, codes: set[str]) -> None:
+    """Save before Streamlit's automatic form rerun, never after an old render."""
+    cursor_key = PREFIX + phase + "_cursor"
+    # A queued click from an old project, account, phase, or question must not
+    # overwrite the active draft or advance it a second time.
+    if (st.session_state.get(PREFIX + "owner") != owner
+            or st.session_state.get(PREFIX + "assignment") != assignment_id
+            or st.session_state.get(PREFIX + "phase") != phase
+            or st.session_state.get(cursor_key) != cursor):
+        return
+    choice = st.session_state.get(PREFIX + f"{phase}_response_{question_code}")
+    if type(choice) is not int or choice not in LIKERT_OPTIONS:
+        st.session_state[PREFIX + "error"] = "응답을 선택해 주세요. 수행 기회가 없었다면 0을 선택하세요."
+        return
+    st.session_state.pop(PREFIX + "saved_record", None)
+    try:
+        # Merge only this answer into the latest authorized server draft. A
+        # form may have remained open while another browser saved other items.
+        latest = _checked_record(store.load_assessment(token, assignment_id, phase), assignment_id, phase, codes)
+        next_payload = _current_payload(latest, phase)
+    except Exception as exc:
+        st.session_state[PREFIX + "error"] = _error_message("현재 응답을 확인하지 못했습니다.", exc)
+        return
+    next_payload["responses"][question_code] = choice
+    next_payload["current_question"] = cursor + 1
+    next_payload["duration_seconds"] = max(0.0, time() - next_payload["started_at"])
+    if _save(store, token, assignment_id, phase, next_payload, False, codes, callback=True, notify=False):
+        st.session_state[cursor_key] = cursor + 1
 
 
 def _current_payload(record: Mapping[str, Any] | None, phase: str) -> dict[str, Any]:
@@ -168,16 +220,13 @@ def _render_results(questions: list[dict[str, Any]], config: Mapping[str, Any], 
 
 def _render_review(store: Any, token: str, assignment_id: str, phase: str, questions: list[dict[str, Any]], payload: dict[str, Any]) -> None:
     codes = {q["question_code"] for q in questions}
-    cursor_key = PREFIX + phase + "_cursor"
     st.progress(1.0, text=f"{len(questions)}/{len(questions)} 역량문항 응답 완료")
     with st.expander("제출 전 내 응답 확인"):
         st.dataframe([
             {"문항": i + 1, "질문": q["revised_text"], "응답": LIKERT_OPTIONS[payload["responses"][q["question_code"]]]}
             for i, q in enumerate(questions)
         ], hide_index=True, width="stretch")
-    if st.button("역량문항 응답 수정", key=PREFIX + "review_back"):
-        st.session_state[cursor_key] = 0
-        st.rerun()
+    st.button("역량문항 응답 수정", key=PREFIX + "review_back", on_click=_go_to_question, args=(phase, 0))
     st.caption("최종 제출 후에는 응답을 변경할 수 없습니다.")
     if phase == "pre":
         if st.button("교육 전 검사 최종 제출", type="primary", key=PREFIX + "finish_pre", width="stretch"):
@@ -218,6 +267,7 @@ def _render_question(store: Any, token: str, assignment_id: str, phase: str, que
     cursor = max(0, min(int(st.session_state.get(cursor_key, payload["current_question"])), len(questions)))
     if cursor == len(questions) and set(responses) != codes:
         cursor = next(i for i, q in enumerate(questions) if q["question_code"] not in responses)
+    st.session_state[cursor_key] = cursor
     if cursor == len(questions):
         payload["current_question"] = cursor
         _render_review(store, token, assignment_id, phase, questions, payload)
@@ -226,26 +276,19 @@ def _render_question(store: Any, token: str, assignment_id: str, phase: str, que
     code = question["question_code"]
     current = responses.get(code)
     st.progress(len(responses) / len(questions), text=f"{len(responses)}/{len(questions)}문항 저장됨")
-    with st.container(border=True):
+    with st.container(border=True, key=PREFIX + "question_stage"):
         st.caption(f"{question['factor_name_ko']} · 문항 {cursor + 1}/{len(questions)} · 최근 8주")
         st.subheader(question["revised_text"])
         st.write("얼마나 자주 했습니까? 해당 행동을 할 상황이 없었다면 0을 선택하세요.")
         with st.form(PREFIX + f"{phase}_question_{code}"):
-            choice = st.radio("응답", options=list(LIKERT_OPTIONS), index=list(LIKERT_OPTIONS).index(current) if current in LIKERT_OPTIONS else None,
-                              format_func=lambda x: f"{x}. {LIKERT_OPTIONS[x]}", horizontal=True, key=PREFIX + f"{phase}_response_{code}")
-            submitted = st.form_submit_button("저장하고 제출 준비" if cursor == len(questions) - 1 else "저장하고 다음 문항 →", type="primary", width="stretch")
-        if submitted:
-            if choice is None:
-                st.error("응답을 선택해 주세요. 수행 기회가 없었다면 0을 선택하세요.")
-            else:
-                payload["responses"][code] = int(choice)
-                payload["current_question"] = cursor + 1
-                if _save(store, token, assignment_id, phase, payload, False, codes):
-                    st.session_state[cursor_key] = cursor + 1
-                    st.rerun()
-        if st.button("← 이전 문항", disabled=cursor == 0, key=PREFIX + phase + "_previous"):
-            st.session_state[cursor_key] = cursor - 1
-            st.rerun()
+            st.radio("응답", options=list(LIKERT_OPTIONS), index=list(LIKERT_OPTIONS).index(current) if current in LIKERT_OPTIONS else None,
+                     format_func=lambda x: f"{x}. {LIKERT_OPTIONS[x]}", horizontal=True, key=PREFIX + f"{phase}_response_{code}")
+            st.form_submit_button(
+                "저장하고 제출 준비" if cursor == len(questions) - 1 else "저장하고 다음 문항 →",
+                type="primary", width="stretch", on_click=_submit_question,
+                args=(store, token, assignment_id, st.session_state[PREFIX + "owner"], phase, cursor, code, codes),
+            )
+        st.button("← 이전 문항", disabled=cursor == 0, key=PREFIX + phase + "_previous", on_click=_go_to_question, args=(phase, cursor - 1))
 
 
 def render_participant(store: Any, token: str, principal: Mapping[str, Any]) -> None:
@@ -253,6 +296,9 @@ def render_participant(store: Any, token: str, principal: Mapping[str, Any]) -> 
     user_id = str(principal.get("id", ""))
     owner = hashlib.sha256(f"{token}|{user_id}".encode("utf-8")).hexdigest()
     _reset_scope(st.session_state, owner)
+    # A verified commit receipt replaces only the read immediately following
+    # that save. Pop before any early return; later reruns always reload the DB.
+    saved_record = st.session_state.pop(PREFIX + "saved_record", None)
     st.title("나의 교육평가")
     st.caption(f"{principal.get('display_name') or principal.get('login_id') or '참여자'}님의 배정 프로젝트와 검사 결과입니다.")
     try:
@@ -283,26 +329,51 @@ def render_participant(store: Any, token: str, principal: Mapping[str, Any]) -> 
             raise ValueError("프로젝트 설정 형식이 올바르지 않습니다.")
         questions = _project_questions(config)
         codes = {q["question_code"] for q in questions}
-        pre = _checked_record(store.load_assessment(token, assignment_id, "pre"), assignment_id, "pre", codes)
-        post = _checked_record(store.load_assessment(token, assignment_id, "post"), assignment_id, "post", codes)
     except Exception as exc:
         _show_error("검사를 불러오지 못했습니다.", exc)
         return
-    pre_complete = bool(pre and pre["completed"])
-    post_complete = bool(post and post["completed"])
+    # These flags come from this rerun's authorized assignment query. Read the
+    # inactive phase's answers only when a completed comparison needs them.
+    pre_complete = bool(assignment.get("pre_completed"))
+    post_complete = bool(assignment.get("post_completed"))
     st.subheader(str(assignment["project_name"]))
     st.caption(f"교육과정: {config.get('course_name', assignment['project_name'])} · 교육일: {config.get('training_date', '미설정')}")
     st.caption(f"교육 전 {'완료' if pre_complete else '미완료'} · 교육 후 {'완료' if post_complete else '미완료'}")
-    notice = st.session_state.pop(PREFIX + "notice", "")
-    if notice:
-        st.success(notice)
+    # A permanent block keeps form/question positions stable when a save error
+    # or completion message appears. Per-question progress already confirms save.
+    with st.container(key=PREFIX + "messages"):
+        notice = st.session_state.pop(PREFIX + "notice", "")
+        error = st.session_state.pop(PREFIX + "error", "")
+        if notice:
+            st.success(notice)
+        if error:
+            st.error(error)
     phase = st.radio("검사 단계", ["pre", "post"], index=1 if pre_complete else 0,
                      format_func=lambda p: PHASE_LABELS[p], horizontal=True, key=PREFIX + "phase")
-    active_record = pre if phase == "pre" else post
+    try:
+        receipt = saved_record.get("record") if isinstance(saved_record, Mapping) and saved_record.get("owner") == owner else None
+        if (isinstance(receipt, Mapping) and str(receipt.get("assignment_id")) == assignment_id
+                and receipt.get("phase") == phase
+                and receipt.get("completed") == (pre_complete if phase == "pre" else post_complete)):
+            active_record = _checked_record(receipt, assignment_id, phase, codes)
+        else:
+            active_record = _checked_record(store.load_assessment(token, assignment_id, phase), assignment_id, phase, codes)
+    except Exception as exc:
+        _show_error("검사를 불러오지 못했습니다.", exc)
+        return
     if active_record and active_record["completed"]:
         st.success(f"{PHASE_LABELS[phase]}가 최종 제출되었습니다. 제출된 응답은 변경할 수 없습니다.")
-        if pre_complete:
-            _render_results(questions, config, pre, post if phase == "post" else None)
+        if phase == "pre":
+            _render_results(questions, config, active_record)
+        else:
+            try:
+                pre = _checked_record(store.load_assessment(token, assignment_id, "pre"), assignment_id, "pre", codes)
+                if pre is None or not pre["completed"]:
+                    raise ValueError("완료된 교육 전 검사 결과를 확인하지 못했습니다.")
+            except Exception as exc:
+                _show_error("비교 결과를 불러오지 못했습니다.", exc)
+                return
+            _render_results(questions, config, pre, active_record)
         if phase == "pre" and not post_complete:
             st.button("교육 후 검사 열기", on_click=_choose_phase, args=("post",), key=PREFIX + "open_post", type="primary")
         return

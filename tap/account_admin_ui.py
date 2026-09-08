@@ -6,7 +6,6 @@ import hashlib
 import io
 import logging
 import re
-import secrets
 from datetime import date, datetime, timedelta
 from typing import Any, Callable, Mapping
 from zoneinfo import ZoneInfo
@@ -23,6 +22,7 @@ ROLE_LABELS = {"kma": "KMA 관리자", "company": "교육담당자", "participan
 LEVEL_LABELS = {"staff": "실무자", "manager": "관리자·리더", "executive": "임원"}
 MAX_BATCH_ROWS = 200
 MAX_CSV_BYTES = 256 * 1024
+PROFILE_FIELDS = {"department": ("부서", 100), "job_title": ("직급", 80), "email": ("이메일", 254), "phone": ("연락처", 40)}
 
 
 def _identifier(row: Mapping[str, Any]) -> str:
@@ -33,7 +33,7 @@ def _safe_error(exc: Exception) -> str:
     messages = {
         "AuthenticationError": "로그인 시간이 만료되었습니다. 다시 로그인해 주세요.",
         "AuthorizationError": "이 작업을 수행할 권한이 없습니다. 계정의 회사와 역할을 확인해 주세요.",
-        "ConflictError": "이미 등록된 아이디 또는 회사 코드입니다. 기존 목록을 확인해 주세요.",
+        "ConflictError": "이미 등록된 아이디 또는 사업자등록번호입니다. 기존 목록을 확인해 주세요.",
         "ValidationError": "입력 형식 또는 검사 일정을 확인해 주세요. 저장되지 않았습니다.",
         "RateLimitError": "잠시 후 다시 시도해 주세요. 요청이 일시적으로 많습니다.",
     }
@@ -53,14 +53,30 @@ def _notice(message: str) -> None:
     st.session_state[PREFIX + "notice"] = message
 
 
-def _login_id(value: str, slug: str) -> str:
+def _login_id(value: str, company_prefix: str | None = None) -> str:
     value = value.strip().lower()
-    slug = slug.strip().lower()
-    full = value if value.startswith(slug + "-") else f"{slug}-{value}"
-    suffix = full[len(slug) + 1:]
-    if not slug or not re.fullmatch(r"[a-z0-9][a-z0-9._-]{2,39}", suffix):
-        raise ValueError("아이디는 영문 소문자·숫자로 시작하는 3~40자의 영문·숫자·점·밑줄·하이픈으로 입력해 주세요.")
-    return full
+    if not value:
+        raise ValueError("아이디를 입력해 주세요.")
+    if company_prefix:
+        company_prefix = company_prefix.strip().lower()
+        if not value.startswith(company_prefix + "-"):
+            value = f"{company_prefix}-{value}"
+        if len(value) <= len(company_prefix) + 1:
+            raise ValueError("회사 식별정보 뒤에 사용할 아이디를 입력해 주세요.")
+    if not re.fullmatch(r"[a-z0-9][a-z0-9._-]{2,63}", value):
+        raise ValueError("아이디는 영문 소문자·숫자로 시작하는 3~64자의 영문·숫자·점·밑줄·하이픈으로 입력해 주세요.")
+    return value
+
+
+def _registration_number(value: str) -> str:
+    if not re.fullmatch(r"[0-9]{10}", value):
+        raise ValueError("사업자등록번호는 하이픈 없이 0~9 숫자 10자리로 입력해 주세요.")
+    return value
+
+
+def _company_registration_label(company: Mapping[str, Any]) -> str:
+    value = str(company.get("registration_number", company.get("slug", "")))
+    return value if re.fullmatch(r"[0-9]{10}", value) else "미등록"
 
 
 def _display_name(value: str) -> str:
@@ -70,7 +86,23 @@ def _display_name(value: str) -> str:
     return value
 
 
-def parse_participant_csv(content: bytes, slug: str) -> list[dict[str, str]]:
+def _participant_profile(values: Mapping[str, Any]) -> dict[str, str]:
+    profile: dict[str, str] = {}
+    for key, (label, limit) in PROFILE_FIELDS.items():
+        raw_value = str(values.get(key) or "")
+        value = raw_value.strip()
+        if len(value) > limit or any(ord(char) < 32 or 127 <= ord(char) <= 159 for char in raw_value):
+            raise ValueError(f"{label}은 줄바꿈 없이 {limit}자 이내로 입력해 주세요.")
+        profile[key] = value
+    if profile["email"] and not re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", profile["email"]):
+        raise ValueError("이메일 형식을 확인해 주세요. 예: name@example.com")
+    phone = profile["phone"]
+    if phone and (not re.fullmatch(r"\+?[0-9][0-9 ().-]*", phone) or not 5 <= len(re.findall(r"[0-9]", phone)) <= 20):
+        raise ValueError("연락처는 5~20개의 숫자와 +, 공백, 괄호, 하이픈, 점으로 입력해 주세요.")
+    return profile
+
+
+def parse_participant_csv(content: bytes, company_prefix: str) -> list[dict[str, str]]:
     """Validate a batch completely before the first account is created."""
     if len(content) > MAX_CSV_BYTES:
         raise ValueError("CSV 파일은 256KB 이하로 올려 주세요.")
@@ -80,23 +112,25 @@ def parse_participant_csv(content: bytes, slug: str) -> list[dict[str, str]]:
         raise ValueError("UTF-8 형식의 CSV 파일을 올려 주세요.") from exc
     reader = csv.DictReader(io.StringIO(text, newline=""), strict=True)
     try:
-        if reader.fieldnames != ["login_id", "display_name"]:
-            raise ValueError("첫 행은 login_id,display_name 순서여야 합니다. 아래 양식을 사용해 주세요.")
+        fields = reader.fieldnames or []
+        if fields[:2] != ["login_id", "display_name"] or len(fields) != len(set(fields)) or not set(fields[2:]).issubset(PROFILE_FIELDS):
+            raise ValueError("첫 두 열은 login_id,display_name이어야 합니다. 선택 열은 department,job_title,email,phone만 사용할 수 있습니다. 아래 양식을 사용해 주세요.")
         rows: list[dict[str, str]] = []
         seen: set[str] = set()
         for number, row in enumerate(reader, start=2):
-            if None in row or row.get("display_name") is None:
+            if None in row or any(value is None for value in row.values()):
                 raise ValueError(f"{number}행의 열 개수를 확인해 주세요.")
             if not any(str(value or "").strip() for value in row.values()):
                 continue
             try:
-                login_id = _login_id(str(row.get("login_id") or ""), slug)
+                login_id = _login_id(str(row.get("login_id") or ""), company_prefix)
                 name = _display_name(str(row.get("display_name") or ""))
+                profile = _participant_profile(row)
             except ValueError as exc:
                 raise ValueError(f"{number}행: {exc}") from exc
             if login_id in seen:
                 raise ValueError(f"{number}행: CSV 안에 같은 아이디가 두 번 있습니다.")
-            rows.append({"login_id": login_id, "display_name": name})
+            rows.append({"login_id": login_id, "display_name": name, **profile})
             seen.add(login_id)
             if len(rows) > MAX_BATCH_ROWS:
                 raise ValueError(f"한 번에 최대 {MAX_BATCH_ROWS}명까지 등록할 수 있습니다.")
@@ -121,8 +155,12 @@ def credentials_csv(rows: list[dict[str, str]]) -> bytes:
     return output.getvalue().encode("utf-8-sig")
 
 
-def _new_password() -> str:
-    return "T7!" + secrets.token_urlsafe(15)
+def _temporary_password(role: str) -> str:
+    # Only these two account roles use the explicitly requested initial password.
+    # KMA administrator passwords are managed outside this UI.
+    if role not in {"company", "participant"}:
+        raise ValueError("교육담당자와 참여자 계정만 임시 비밀번호를 발급할 수 있습니다.")
+    return "kma"
 
 
 def _remember_credentials(rows: list[dict[str, str]], principal: Mapping[str, Any]) -> None:
@@ -150,9 +188,10 @@ def _render_credentials(principal: Mapping[str, Any]) -> None:
             for row in rows
         ], hide_index=True, width="stretch")
         st.download_button("로그인 정보 CSV 내려받기", credentials_csv(rows), "tap_initial_accounts.csv", "text/csv", key=PREFIX + "credentials_download")
-        if st.button("전달 완료 · 발급 정보 닫기", key=PREFIX + "credentials_clear"):
-            st.session_state.pop(PREFIX + "credentials", None)
-            st.rerun()
+        st.button(
+            "전달 완료 · 발급 정보 닫기", key=PREFIX + "credentials_clear",
+            on_click=lambda: st.session_state.pop(PREFIX + "credentials", None),
+        )
 
 
 def build_project_config(
@@ -207,38 +246,81 @@ def build_project_config(
 def _render_companies(store: Any, token: str, companies: list[dict[str, Any]]) -> None:
     st.subheader("회원사")
     if companies:
-        st.dataframe([{"회사명": row["name"], "회사 코드": row["slug"], "상태": "사용 중" if row.get("active", True) else "중지"} for row in companies], hide_index=True, width="stretch")
+        st.dataframe([{"회사명": row["name"], "사업자등록번호": _company_registration_label(row), "상태": "사용 중" if row.get("active", True) else "중지"} for row in companies], hide_index=True, width="stretch")
     else:
         st.info("등록된 회원사가 없습니다. 먼저 회사를 등록해 주세요.")
     with st.form(PREFIX + "company_create", clear_on_submit=True):
         name = st.text_input("회사명", max_chars=120)
-        slug = st.text_input("회사 코드", help="영문 소문자로 시작하는 영문·숫자 2~20자입니다. 로그인 아이디 앞에 붙는 고유 코드입니다.", max_chars=20)
+        registration_input = st.text_input("사업자등록번호", help="하이픈 없이 숫자 10자리를 입력합니다. 맨 앞의 0도 그대로 입력해 주세요.", max_chars=20)
         if st.form_submit_button("회사 등록", type="primary"):
-            if not name.strip() or not re.fullmatch(r"[a-z][a-z0-9]{1,19}", slug.strip().lower()):
-                st.error("회사명과 영문 소문자로 시작하는 2~20자의 회사 코드를 입력해 주세요. 회사 코드에는 영문·숫자만 사용할 수 있습니다.")
+            try:
+                if not name.strip():
+                    raise ValueError("회사명을 입력해 주세요.")
+                registration_number = _registration_number(registration_input)
+            except ValueError as exc:
+                st.error(str(exc))
             else:
-                ok, _ = _attempt(lambda: store.create_company(token, name.strip(), slug.strip().lower()))
+                ok, _ = _attempt(lambda: store.create_company(token, name.strip(), registration_number))
                 if ok:
                     _notice("회사를 등록했습니다. 교육담당자 계정을 발급할 수 있습니다.")
+                    st.rerun()
+    if not companies:
+        return
+    st.subheader("사업자등록번호 등록·수정")
+    st.caption("미등록 회사의 번호를 보완하거나 등록된 번호를 수정할 수 있습니다.")
+    by_id = {_identifier(row): row for row in companies}
+    selected = st.selectbox("사업자등록번호를 변경할 회사", list(by_id), format_func=lambda value: f"{by_id[value]['name']} · {_company_registration_label(by_id[value])}", key=PREFIX + "registration_company")
+    current_number = _company_registration_label(by_id[selected])
+    with st.form(PREFIX + "registration_update_" + selected):
+        registration_input = st.text_input("등록할 사업자등록번호", value="" if current_number == "미등록" else current_number, help="하이픈 없이 0~9 숫자 10자리로 입력해 주세요.", max_chars=20, key=PREFIX + "registration_value_" + selected)
+        if st.form_submit_button("사업자등록번호 저장"):
+            try:
+                registration_number = _registration_number(registration_input)
+            except ValueError as exc:
+                st.error(str(exc))
+            else:
+                ok, _ = _attempt(lambda: store.set_company_registration_number(token, selected, registration_number))
+                if ok:
+                    _notice("사업자등록번호를 저장했습니다.")
                     st.rerun()
 
 
 def _render_create_user(store: Any, token: str, principal: Mapping[str, Any], company: Mapping[str, Any], role: str) -> None:
+    if role not in {"company", "participant"}:
+        st.error("교육담당자 또는 참여자 계정만 발급할 수 있습니다.")
+        return
     label = ROLE_LABELS[role]
     st.subheader(f"{label} 계정 발급")
-    st.caption(f"회사: {company['name']} · 로그인 아이디 앞에 {company['slug']}-가 붙습니다. 이메일은 사용하지 않습니다.")
+    st.caption(f"회사: {company['name']} · 사업자등록번호: {_company_registration_label(company)}")
+    if role == "participant":
+        st.caption(f"참여자 아이디 앞에는 회사 식별정보 {company['slug']}-가 자동으로 붙습니다. 이미 붙여 입력한 경우에는 한 번만 사용합니다.")
+    else:
+        st.caption("교육담당자는 입력한 아이디로 로그인합니다. 아이디는 전체 회원사에서 중복 없이 사용합니다.")
+    st.caption("영문 대문자는 소문자로 저장됩니다. 로그인에는 이메일을 사용하지 않습니다.")
+    st.info(f"{label}의 임시 비밀번호는 kma로 자동 발급됩니다. 첫 로그인 때 새 비밀번호로 변경해야 합니다.")
     with st.form(PREFIX + f"user_create_{role}_{_identifier(company)}", clear_on_submit=True):
-        suffix = st.text_input("아이디", max_chars=80, placeholder="예: user001", help="회사 코드를 제외하고 입력합니다. 3~40자의 영문 소문자·숫자·점·밑줄·하이픈을 사용할 수 있습니다.")
+        login_input = st.text_input("아이디", max_chars=80, placeholder="예: user001", help="영문 소문자·숫자·점·밑줄·하이픈을 사용할 수 있습니다. 완성된 로그인 아이디는 3~64자이며, 영문 소문자 또는 숫자로 시작해야 합니다.")
         name = st.text_input("이름", max_chars=80)
+        profile_input: dict[str, str] = {}
+        if role == "participant":
+            st.caption("부서·직급·이메일·연락처는 선택 입력입니다.")
+            left, right = st.columns(2)
+            with left:
+                profile_input["department"] = st.text_input("부서", max_chars=100)
+                profile_input["email"] = st.text_input("이메일", max_chars=254, placeholder="예: name@example.com")
+            with right:
+                profile_input["job_title"] = st.text_input("직급", max_chars=80)
+                profile_input["phone"] = st.text_input("연락처", max_chars=40, placeholder="예: 010-1234-5678")
         submitted = st.form_submit_button(f"{label} 계정 발급", type="primary")
     if submitted:
         try:
-            login_id, display_name = _login_id(suffix, str(company["slug"])), _display_name(name)
+            login_id, display_name = _login_id(login_input, str(company["slug"]) if role == "participant" else None), _display_name(name)
+            profile = _participant_profile(profile_input) if role == "participant" else None
         except ValueError as exc:
             st.error(str(exc))
         else:
-            password = _new_password()
-            ok, _ = _attempt(lambda: store.create_user(token, login_id, display_name, role, _identifier(company), password))
+            password = _temporary_password(role)
+            ok, _ = _attempt(lambda: store.create_user(token, login_id, display_name, role, _identifier(company), password, profile=profile))
             if ok:
                 _remember_credentials([{"login_id": login_id, "display_name": display_name, "temp_password": password}], principal)
                 _notice(f"{label} 계정을 발급했습니다.")
@@ -246,9 +328,9 @@ def _render_create_user(store: Any, token: str, principal: Mapping[str, Any], co
 
 
 def _render_batch(store: Any, token: str, principal: Mapping[str, Any], company: Mapping[str, Any], users: list[dict[str, Any]]) -> None:
-    with st.expander("CSV로 참여자 일괄 등록"):
-        st.caption(f"UTF-8 CSV · 한 번에 최대 {MAX_BATCH_ROWS}명 · 아이디와 이름만 입력합니다. 각 계정에 서로 다른 임시 비밀번호가 발급됩니다.")
-        st.download_button("CSV 양식 내려받기", "\ufefflogin_id,display_name\nuser001,참여자1\nuser002,참여자2\n".encode("utf-8"), "tap_participants_template.csv", "text/csv", key=PREFIX + "batch_template")
+    with st.expander("CSV로 참여자 일괄 등록", key=PREFIX + f"batch_expander_{_identifier(company)}", on_change="rerun"):
+        st.caption(f"UTF-8 CSV · 한 번에 최대 {MAX_BATCH_ROWS}명 · 아이디·이름은 필수이며 부서·직급·이메일·연락처는 선택입니다. 기존 아이디·이름 2열 양식도 사용할 수 있습니다. 참여자 아이디 앞에는 회사 식별정보가 자동으로 붙습니다. 임시 비밀번호는 모두 kma이며, 첫 로그인 때 변경해야 합니다.")
+        st.download_button("CSV 양식 내려받기", "\ufefflogin_id,display_name,department,job_title,email,phone\nuser001,참여자1,,,,\nuser002,참여자2,,,,\n".encode("utf-8"), "tap_participants_template.csv", "text/csv", key=PREFIX + "batch_template")
         upload = st.file_uploader("참여자 CSV", type=["csv"], key=PREFIX + "batch_upload")
         if upload is None:
             return
@@ -259,7 +341,7 @@ def _render_batch(store: Any, token: str, principal: Mapping[str, Any], company:
             return
         existing = {str(row["login_id"]).lower() for row in users}
         duplicate_count = sum(row["login_id"] in existing for row in rows)
-        st.dataframe([{"로그인 아이디": row["login_id"], "이름": row["display_name"], "등록": "기존 계정 · 제외" if row["login_id"] in existing else "새 계정"} for row in rows], hide_index=True, width="stretch")
+        st.dataframe([{"로그인 아이디": row["login_id"], "이름": row["display_name"], **{label: row.get(key, "") for key, (label, _) in PROFILE_FIELDS.items()}, "등록": "기존 계정 · 제외" if row["login_id"] in existing else "새 계정"} for row in rows], hide_index=True, width="stretch")
         pending = [row for row in rows if row["login_id"] not in existing]
         if duplicate_count:
             st.info(f"이미 등록된 {duplicate_count}개 계정은 변경하지 않습니다.")
@@ -268,16 +350,16 @@ def _render_batch(store: Any, token: str, principal: Mapping[str, Any], company:
             failures: list[str] = []
             with st.spinner("참여자 계정을 발급하고 있습니다."):
                 for row in pending:
-                    password = _new_password()
+                    password = _temporary_password("participant")
                     try:
-                        store.create_user(token, row["login_id"], row["display_name"], "participant", _identifier(company), password)
+                        store.create_user(token, row["login_id"], row["display_name"], "participant", _identifier(company), password, profile={key: row.get(key, "") for key in PROFILE_FIELDS})
                     except Exception as exc:
                         LOGGER.error("Participant batch account creation failed: %s", type(exc).__name__)
                         failures.append(f"{row['login_id']}: {_safe_error(exc)}")
                         if type(exc).__name__ in {"AuthenticationError", "AuthorizationError", "RateLimitError"}:
                             break
                     else:
-                        issued.append({**row, "temp_password": password})
+                        issued.append({"login_id": row["login_id"], "display_name": row["display_name"], "temp_password": password})
                         _remember_credentials([issued[-1]], principal)
             _notice(f"참여자 {len(issued)}명 계정을 발급했습니다.")
             if failures:
@@ -287,20 +369,21 @@ def _render_batch(store: Any, token: str, principal: Mapping[str, Any], company:
 
 def _render_manage_users(store: Any, token: str, principal: Mapping[str, Any], users: list[dict[str, Any]]) -> None:
     st.subheader("계정 관리")
-    allowed = [row for row in users if row.get("role") != "kma" and _identifier(row) != _identifier(principal)]
+    allowed = [row for row in users if row.get("role") in {"company", "participant"} and _identifier(row) != _identifier(principal)]
     if principal.get("role") == "company":
         allowed = [row for row in allowed if row.get("role") == "participant"]
     if not allowed:
         st.info("관리할 계정이 없습니다.")
         return
-    st.dataframe([{"로그인 아이디": row["login_id"], "이름": row.get("display_name", ""), "역할": ROLE_LABELS.get(row["role"], ""), "회사": row.get("company_name", ""), "상태": "사용 중" if row.get("active", True) else "중지"} for row in allowed], hide_index=True, width="stretch")
+    st.dataframe([{"로그인 아이디": row["login_id"], "이름": row.get("display_name", ""), "역할": ROLE_LABELS.get(row["role"], ""), "회사": row.get("company_name", ""), **{label: row.get(key, "") for key, (label, _) in PROFILE_FIELDS.items()}, "상태": "사용 중" if row.get("active", True) else "중지"} for row in allowed], hide_index=True, width="stretch")
     by_id = {_identifier(row): row for row in allowed}
     selected = st.selectbox("관리할 계정", list(by_id), format_func=lambda value: f"{by_id[value]['display_name']} · {by_id[value]['login_id']}", key=PREFIX + "manage_user")
     user = by_id[selected]
+    st.caption("임시 비밀번호를 kma로 재발급합니다. 다시 로그인할 때 새 비밀번호로 변경해야 합니다.")
     left, right = st.columns(2)
     with left:
         if st.button("임시 비밀번호 재발급", key=PREFIX + "password_reset"):
-            password = _new_password()
+            password = _temporary_password(str(user["role"]))
             ok, _ = _attempt(lambda: store.reset_password(token, selected, password))
             if ok:
                 _remember_credentials([{"login_id": str(user["login_id"]), "display_name": str(user["display_name"]), "temp_password": password}], principal)
@@ -437,13 +520,13 @@ def render_admin(store: Any, token: str, principal: Mapping[str, Any]) -> None:
     company_names = {_identifier(row): str(row["name"]) for row in companies}
     projects = [{**row, "company_name": company_names.get(str(row.get("company_id")), "")} for row in projects]
     if role == "kma":
-        company_tab, user_tab, project_tab = st.tabs(["회원사", "교육담당자·계정", "프로젝트 현황"])
+        company_tab, user_tab, project_tab = st.tabs(["회원사", "교육담당자·계정", "프로젝트 현황"], key=PREFIX + "kma_tabs", on_change="rerun")
         with company_tab:
             _render_companies(store, token, companies)
         with user_tab:
             active_companies = {_identifier(row): row for row in companies if row.get("active", True)}
             if active_companies:
-                company_id = st.selectbox("계정을 발급할 회사", list(active_companies), format_func=lambda value: f"{active_companies[value]['name']} · {active_companies[value]['slug']}", key=PREFIX + "issue_company")
+                company_id = st.selectbox("계정을 발급할 회사", list(active_companies), format_func=lambda value: f"{active_companies[value]['name']} · {_company_registration_label(active_companies[value])}", key=PREFIX + "issue_company")
                 _render_create_user(store, token, principal, active_companies[company_id], "company")
             else:
                 st.info("먼저 회원사를 등록해 주세요.")
@@ -456,7 +539,7 @@ def render_admin(store: Any, token: str, principal: Mapping[str, Any]) -> None:
             st.error("계정에 연결된 회사를 확인하지 못했습니다. KMA 관리자에게 문의해 주세요.")
             return
         st.caption(str(company["name"]))
-        project_tab, create_tab, user_tab = st.tabs(["프로젝트·참여 현황", "프로젝트 만들기", "참여자 계정"])
+        project_tab, create_tab, user_tab = st.tabs(["프로젝트·참여 현황", "프로젝트 만들기", "참여자 계정"], key=PREFIX + "company_tabs", on_change="rerun")
         with project_tab:
             _render_projects(store, token, principal, projects, users)
         with create_tab:

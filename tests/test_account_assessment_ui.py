@@ -3,11 +3,13 @@ from __future__ import annotations
 import copy
 import hashlib
 import unittest
+from unittest.mock import patch
 
 from streamlit.testing.v1 import AppTest
 
 from tap.account_assessment_ui import PREFIX, TRANSFER_ITEMS, _checked_record, _project_questions, _reset_scope
 from tap.data import questions_for_factors
+import tap.account_assessment_ui as assessment_ui
 
 
 def project_config():
@@ -40,11 +42,18 @@ class MemoryStore:
         self.records = {}
         self.fail_next = False
         self.calls = []
+        self.reads = []
 
     def list_assignments(self, token):
-        return copy.deepcopy(self.assignments)
+        self.reads.append(("assignments", token))
+        rows = copy.deepcopy(self.assignments)
+        for row in rows:
+            for phase in ("pre", "post"):
+                row[phase + "_completed"] = bool(self.records.get((row["id"], phase), {}).get("completed"))
+        return rows
 
     def load_assessment(self, token, assignment_id, phase):
+        self.reads.append(("assessment", assignment_id, phase))
         return copy.deepcopy(self.records.get((assignment_id, phase)))
 
     def save_assessment(self, token, assignment_id, phase, payload, completed):
@@ -87,7 +96,8 @@ def answer(app, value):
 
 class AccountAssessmentTests(unittest.TestCase):
     def test_scope_change_drops_old_widgets(self):
-        state = {"auth": "keep", PREFIX + "owner": "old", PREFIX + "selector": "a", PREFIX + "pre_response_Q": 4}
+        state = {"auth": "keep", PREFIX + "owner": "old", PREFIX + "selector": "a", PREFIX + "pre_response_Q": 4,
+                 PREFIX + "saved_record": {"owner": "old", "record": {"payload": {"responses": {"Q": 4}}}}}
         _reset_scope(state, "new")
         self.assertEqual(state, {"auth": "keep", PREFIX + "owner": "new"})
         state[PREFIX + "selector"] = "b"
@@ -167,6 +177,128 @@ class AccountAssessmentTests(unittest.TestCase):
         first = store.config["question_snapshot_codes"][0]
         self.assertEqual(store.records["a", "pre"]["payload"]["responses"][first], 2)
         self.assertEqual(store.records["b", "pre"]["payload"]["responses"][first], 5)
+
+    def test_next_renders_only_the_new_question_with_three_store_calls(self):
+        store = MemoryStore()
+        app = participant_app(store)
+        questions = _project_questions(store.config)
+        question_texts = {q["revised_text"] for q in questions}
+        before_reads = len(store.reads)
+        with patch.object(assessment_ui.st, "subheader", wraps=assessment_ui.st.subheader) as titles:
+            answer(app, 4)
+        # This observes intermediate reruns, not just AppTest's final DOM. The
+        # old handler rendered [old question, new question] on every click.
+        rendered = [call.args[0] for call in titles.call_args_list if call.args and call.args[0] in question_texts]
+        self.assertEqual(rendered, [questions[1]["revised_text"]])
+        self.assertEqual(store.reads[before_reads:], [("assessment", "a", "pre"), ("assignments", "session-token")])
+        self.assertEqual(len(store.calls), 1)
+        self.assertNotIn(PREFIX + "saved_record", app.session_state)
+        # A receipt is single-use. An independent rerun reauthorizes the
+        # assignment and reloads the active draft; no persistent data cache.
+        before_reads = len(store.reads)
+        app.run()
+        self.assertEqual(store.reads[before_reads:], [("assignments", "session-token"), ("assessment", "a", "pre")])
+
+    def test_failed_question_save_preserves_position_choice_and_retry(self):
+        store = MemoryStore()
+        app = participant_app(store)
+        store.fail_next = True
+        answer(app, 5)
+        self.assertTrue(app.error)
+        self.assertNotIn(("a", "pre"), store.records)
+        self.assertEqual(app.session_state[PREFIX + "pre_cursor"], 0)
+        self.assertEqual(next(r for r in app.radio if r.label == "응답").value, 5)
+        self.assertNotIn(PREFIX + "saved_record", app.session_state)
+        self.assertTrue(any("문항 1/" in caption.value for caption in app.caption))
+        click(app, "저장하고 다음 문항 →")
+        self.assertEqual(app.session_state[PREFIX + "pre_cursor"], 1)
+        self.assertEqual(store.records["a", "pre"]["payload"]["responses"][store.config["question_snapshot_codes"][0]], 5)
+
+    def test_mismatched_saved_position_does_not_advance(self):
+        store = MemoryStore()
+        app = participant_app(store)
+        save = store.save_assessment
+
+        def wrong_receipt(*args):
+            receipt = save(*args)
+            receipt["payload"]["current_question"] = 0
+            return receipt
+
+        with patch.object(store, "save_assessment", side_effect=wrong_receipt):
+            answer(app, 3)
+        self.assertTrue(app.error)
+        self.assertEqual(app.session_state[PREFIX + "pre_cursor"], 0)
+        self.assertEqual(next(r for r in app.radio if r.label == "응답").value, 3)
+        self.assertNotIn(PREFIX + "saved_record", app.session_state)
+
+    def test_submission_merges_latest_draft_instead_of_overwriting_other_answers(self):
+        store = MemoryStore()
+        app = participant_app(store)
+        codes = store.config["question_snapshot_codes"]
+        # Simulate another browser saving after this form was first rendered.
+        store.records["a", "pre"] = {"assignment_id": "a", "phase": "pre", "completed": False,
+                                     "payload": {"responses": {codes[2]: 2}, "current_question": 0}}
+        answer(app, 4)
+        self.assertEqual(store.records["a", "pre"]["payload"]["responses"], {codes[0]: 4, codes[2]: 2})
+
+    def test_phase_and_assignment_switch_do_not_use_an_unrelated_receipt(self):
+        store = MemoryStore(multiple=True)
+        app = participant_app(store)
+        answer(app, 4)
+        old_receipt = {"owner": app.session_state[PREFIX + "owner"], "record": copy.deepcopy(store.records["a", "pre"])}
+        app.session_state[PREFIX + "saved_record"] = old_receipt
+        before_reads = len(store.reads)
+        next(r for r in app.radio if r.label == "검사 단계").set_value("post").run()
+        self.assertIn(("assessment", "a", "post"), store.reads[before_reads:])
+        self.assertNotIn(PREFIX + "saved_record", app.session_state)
+        app.session_state[PREFIX + "saved_record"] = old_receipt
+        before_reads = len(store.reads)
+        app.selectbox[0].set_value("b").run()
+        self.assertIn(("assessment", "b", "pre"), store.reads[before_reads:])
+        self.assertIsNone(next(r for r in app.radio if r.label == "응답").value)
+        self.assertNotIn(PREFIX + "saved_record", app.session_state)
+
+    def test_concurrent_final_submission_invalidates_the_draft_receipt(self):
+        store = MemoryStore()
+        app = participant_app(store)
+        save = store.save_assessment
+
+        def save_then_other_browser_submits(*args):
+            receipt = save(*args)
+            # The draft commit succeeded, then another browser completed the
+            # same assessment before the callback's following assignment read.
+            record = store.records["a", "pre"]
+            record["payload"]["responses"] = {code: 4 for code in store.config["question_snapshot_codes"]}
+            record["completed"] = True
+            record["completed_at"] = 2
+            return receipt
+
+        before_reads = len(store.reads)
+        with patch.object(store, "save_assessment", side_effect=save_then_other_browser_submits):
+            answer(app, 4)
+        self.assertEqual(store.reads[before_reads:], [
+            ("assessment", "a", "pre"), ("assignments", "session-token"), ("assessment", "a", "pre"),
+        ])
+        self.assertTrue(app.dataframe)
+        self.assertIn("나의 교육 전 검사 결과", [title.value for title in app.subheader])
+        self.assertFalse(any(r.label == "응답" for r in app.radio))
+        self.assertNotIn(PREFIX + "saved_record", app.session_state)
+
+    def test_snapshot_order_and_previous_navigation_keep_question_identity(self):
+        store = MemoryStore()
+        store.config["question_snapshot_codes"].reverse()
+        app = participant_app(store)
+        questions = _project_questions(store.config)
+        for index in range(3):
+            self.assertIn(questions[index]["revised_text"], [title.value for title in app.subheader])
+            answer(app, index)
+        click(app, "← 이전 문항")
+        self.assertIn(questions[2]["revised_text"], [title.value for title in app.subheader])
+        self.assertEqual(next(r for r in app.radio if r.label == "응답").value, 2)
+        answer(app, 5)
+        self.assertIn(questions[3]["revised_text"], [title.value for title in app.subheader])
+        responses = store.records["a", "pre"]["payload"]["responses"]
+        self.assertEqual(responses, {questions[0]["question_code"]: 0, questions[1]["question_code"]: 1, questions[2]["question_code"]: 5})
 
 
 if __name__ == "__main__":

@@ -126,9 +126,10 @@ def _denied(exception_type, function, *args) -> None:
 
 def _exercise(scoped_url: str) -> None:
     from tap.account_store import (
-        AccountStore, AuthenticationError, AuthorizationError, ConflictError,
+        AccountStore, AuthenticationError, AuthorizationError, ConflictError, ValidationError,
         hash_password,
     )
+    import psycopg
     from tap.data import questions_for_factors
     from tap.scoring import score_pre_post_responses
 
@@ -137,26 +138,41 @@ def _exercise(scoped_url: str) -> None:
     changed = secrets.token_urlsafe(24)
     reset = secrets.token_urlsafe(24)
     store = AccountStore(scoped_url, clock=lambda: now[0])
-    store.initialize()
+    # Create the prior schema and a real legacy user only in this isolated schema.
+    legacy_schema = (ROOT / "database" / "account_schema.sql").read_text(encoding="utf-8")
+    legacy_schema = legacy_schema.replace(" department TEXT NOT NULL DEFAULT '', job_title TEXT NOT NULL DEFAULT '',\n", "")
+    legacy_schema = legacy_schema.replace(" email TEXT NOT NULL DEFAULT '', phone TEXT NOT NULL DEFAULT '',\n", "")
+    with psycopg.connect(scoped_url, connect_timeout=10) as conn:
+        for statement in legacy_schema.split(";"):
+            if statement.strip():
+                conn.execute(statement)
+        columns = {row[0] for row in conn.execute("SELECT column_name FROM information_schema.columns WHERE table_schema=current_schema() AND table_name='tap_users'")}
+        _check(not {"department", "job_title", "email", "phone"} & columns)
     seed_hash = hash_password(initial)
     _check(store.bootstrap_admin("check-admin", seed_hash))
+    store.initialize()
+    store.initialize()
     _check(not store.bootstrap_admin("check-admin-again", seed_hash))
     temporary_admin = store.login("check-admin", initial)
+    _check(all(store.principal(temporary_admin)[key] == "" for key in ("department", "job_title", "email", "phone")))
     admin = store.change_password(temporary_admin, initial, changed)
     _denied(AuthenticationError, store.principal, temporary_admin)
-    company_a = store.create_company(admin, "Isolated Check A", "checka")
-    company_b = store.create_company(admin, "Isolated Check B", "checkb")
+    company_a = store.create_company(admin, "Isolated Check A", "0123456789")
+    company_b = store.create_company(admin, "Isolated Check B", "1234567890")
 
-    def user(login_id: str, role: str, company: dict):
-        record = store.create_user(admin, login_id, "Isolated Test Account", role, company["id"], initial)
+    def user(login_id: str, role: str, company: dict, profile=None):
+        record = store.create_user(admin, login_id, "Isolated Test Account", role, company["id"], initial, profile=profile)
         temporary_token = store.login(login_id, initial)
         _check(store.principal(temporary_token)["must_change_password"])
         _denied(AuthorizationError, store.list_projects, temporary_token)
         return record, store.change_password(temporary_token, initial, changed)
 
-    participant, participant_token = user("checka-one", "participant", company_a)
-    _, peer_token = user("checka-two", "participant", company_a)
-    _, other_company_token = user("checkb-manager", "company", company_b)
+    profile = {"department": "People", "job_title": "Manager", "email": "participant@example.invalid", "phone": "+82 10-1234-5678"}
+    participant, participant_token = user("0123456789-participant001", "participant", company_a, profile=profile)
+    _check({key: store.principal(participant_token)[key] for key in profile} == profile)
+    _, peer_token = user("0123456789-participant002", "participant", company_a)
+    _, other_company_token = user("manager001", "company", company_b)
+    _check(participant["id"] not in {row["id"] for row in store.list_users(other_company_token)})
     project = store.create_project(admin, "Isolated PostgreSQL Check", {
         "company_id": company_a["id"], "selected_factors": ["CORE-CO"],
         "target_level": "manager", "course_name": "Persistence Check",
@@ -166,6 +182,13 @@ def _exercise(scoped_url: str) -> None:
     })
     assignment = store.assign_participant(admin, project["id"], participant["id"])
     assignment_id = assignment["id"]
+    corrected = store.set_company_registration_number(admin, company_a["id"], "0000000001")
+    _check(corrected["id"] == company_a["id"] and corrected["registration_number"] == "0000000001")
+    _check(store.principal(participant_token)["login_id"] == "0123456789-participant001")
+    _denied(AuthorizationError, store.set_company_registration_number, other_company_token, company_a["id"], "2222222222")
+    _denied(ConflictError, store.create_company, admin, "Duplicate Check", "0000000001")
+    _denied(ConflictError, store.create_user, admin, "manager001", "Duplicate Account", "company", company_a["id"], initial)
+    _denied(ValidationError, store.create_user, admin, "participant001", "Missing Prefix", "participant", company_a["id"], initial)
     codes = project["config"]["question_snapshot_codes"]
     _check(len(codes) == 4)
     own = store.list_assignments(participant_token)
@@ -184,6 +207,7 @@ def _exercise(scoped_url: str) -> None:
 
     # A fresh store and fresh connections must recover the server draft.
     store = AccountStore(scoped_url, clock=lambda: now[0])
+    _check({key: store.principal(participant_token)[key] for key in profile} == profile)
     restored = store.load_assessment(participant_token, assignment_id, "pre")
     _check(restored is not None and restored["payload"] == draft and not restored["completed"])
     pre = {"responses": {code: 0 if index == 0 else 3 for index, code in enumerate(codes)},

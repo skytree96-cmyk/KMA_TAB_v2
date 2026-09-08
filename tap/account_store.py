@@ -59,7 +59,11 @@ LOGIN_MAX_FAILURES = 5
 KST = timezone(timedelta(hours=9))
 _SCRYPT_N, _SCRYPT_R, _SCRYPT_P = 2**15, 8, 3
 _LOGIN_RE = re.compile(r"[a-z0-9][a-z0-9._-]{2,63}\Z")
-_SLUG_RE = re.compile(r"[a-z][a-z0-9]{1,19}\Z")
+_REGISTRATION_RE = re.compile(r"[0-9]{10}\Z")
+_PROFILE_LIMITS = {"department": 100, "job_title": 80, "email": 254, "phone": 40}
+_PROFILE_LABELS = {"department": "부서", "job_title": "직급", "email": "이메일", "phone": "연락처"}
+_EMAIL_RE = re.compile(r"[^@\s]+@[^@\s]+\.[^@\s]+\Z")
+_PHONE_RE = re.compile(r"\+?[0-9][0-9 ().-]*\Z")
 _TRANSFER_KEYS = frozenset({"application_opportunity", "supervisor_support", "resources_authority", "time_process_support"})
 _BARRIERS = frozenset({"적용 기회 부족", "상사·동료 지원 부족", "도구·정보·권한 부족", "시간·프로세스 제약", "특별한 방해요인 없음"})
 
@@ -184,6 +188,15 @@ class AccountStore:
             for statement in schema.split(";"):
                 if statement.strip():
                     self._execute(conn, statement)
+            # Additive migration for databases created before optional profiles.
+            # The existing initialization lock/transaction covers all columns.
+            existing = {row["name"] for row in self._all(conn, "PRAGMA table_info(tap_users)")} if self._sqlite else set()
+            for field in _PROFILE_LIMITS:
+                if self._sqlite:
+                    if field not in existing:
+                        self._execute(conn, f"ALTER TABLE tap_users ADD COLUMN {field} TEXT NOT NULL DEFAULT ''")
+                else:
+                    self._execute(conn, f"ALTER TABLE tap_users ADD COLUMN IF NOT EXISTS {field} TEXT NOT NULL DEFAULT ''")
 
     def bootstrap_admin(self, login_id: str, password_hash: str) -> bool:
         """Server-only seed hook. Never expose this method as an end-user form."""
@@ -267,7 +280,7 @@ class AccountStore:
 
     @staticmethod
     def _public_user(user):
-        return {key: (bool(user[key]) if key in {"active", "must_change_password"} else user[key]) for key in ("id", "login_id", "display_name", "role", "company_id", "active", "must_change_password", "company_name", "company_slug") if key in user}
+        return {key: (bool(user[key]) if key in {"active", "must_change_password"} else user[key]) for key in ("id", "login_id", "display_name", "role", "company_id", "active", "must_change_password", "company_name", "company_slug", "department", "job_title", "email", "phone") if key in user}
 
     def principal(self, token: str) -> dict:
         with self._transaction() as conn:
@@ -296,18 +309,45 @@ class AccountStore:
     def list_companies(self, token: str) -> list[dict]:
         with self._transaction() as conn:
             user = self._require(conn, token, {"kma", "company"})
-            return self._all(conn, "SELECT id,name,slug,active FROM tap_companies" + (" WHERE id=?" if user["role"] == "company" else "") + " ORDER BY name", (user["company_id"],) if user["role"] == "company" else ())
+            rows = self._all(conn, "SELECT id,name,slug,active FROM tap_companies" + (" WHERE id=?" if user["role"] == "company" else "") + " ORDER BY name", (user["company_id"],) if user["role"] == "company" else ())
+            return [self._public_company(row) for row in rows]
+
+    @staticmethod
+    def _registration_number(value: Any) -> str:
+        # Preserve leading zeroes and reject Unicode digits or punctuation.
+        if not isinstance(value, str) or not _REGISTRATION_RE.fullmatch(value):
+            raise ValidationError("사업자등록번호는 숫자 10자리로 입력해 주세요.")
+        return value
+
+    @staticmethod
+    def _public_company(company: dict) -> dict:
+        result = {key: company[key] for key in ("id", "name", "slug", "active")}
+        result["active"] = bool(result["active"])
+        # The legacy column and all UUID links remain unchanged.
+        result["registration_number"] = result["slug"]
+        return result
 
     def create_company(self, token: str, name: str, slug: str) -> dict:
-        name, slug = _text(name, "회사명"), _text(slug, "회사 ID", 20).lower()
-        if not _SLUG_RE.fullmatch(slug):
-            raise ValidationError("회사 ID는 영문으로 시작하는 영문 소문자·숫자 2~20자입니다.")
+        name, slug = _text(name, "회사명"), self._registration_number(slug)
         with self._transaction() as conn:
             actor = self._require(conn, token, {"kma"})
             company_id = str(uuid.uuid4())
             self._execute(conn, "INSERT INTO tap_companies(id,name,slug,created_at) VALUES (?,?,?,?)", (company_id, name, slug, self._clock()))
             self._audit(conn, actor["id"], "create_company", company_id)
-            return {"id": company_id, "name": name, "slug": slug, "active": True}
+            return self._public_company({"id": company_id, "name": name, "slug": slug, "active": True})
+
+    def set_company_registration_number(self, token: str, company_id: str, registration_number: str) -> dict:
+        """Correct company metadata without renaming accounts or UUIDs."""
+        with self._transaction() as conn:
+            actor = self._require(conn, token, {"kma"})
+            number = self._registration_number(registration_number)
+            company = self._one(conn, "SELECT id,name,slug,active FROM tap_companies WHERE id=?", (company_id,), lock=True)
+            if not company:
+                raise ValidationError("회사를 확인하세요.")
+            self._execute(conn, "UPDATE tap_companies SET slug=? WHERE id=?", (number, company_id))
+            self._audit(conn, actor["id"], "set_company_registration_number", company_id)
+            company["slug"] = number
+            return self._public_company(company)
 
     def list_users(self, token: str) -> list[dict]:
         with self._transaction() as conn:
@@ -315,9 +355,30 @@ class AccountStore:
             rows = self._all(conn, "SELECT u.*,c.name AS company_name,c.slug AS company_slug FROM tap_users u LEFT JOIN tap_companies c ON c.id=u.company_id" + (" WHERE u.company_id=?" if actor["role"] == "company" else "") + " ORDER BY u.created_at,u.id", (actor["company_id"],) if actor["role"] == "company" else ())
             return [self._public_user(row) for row in rows]
 
-    def create_user(self, token: str, login_id: str, display_name: str, role: str, company_id: str | None, temp_password: str) -> dict:
+    @staticmethod
+    def _profile(profile: dict | None) -> dict[str, str]:
+        if profile is None:
+            profile = {}
+        if not isinstance(profile, dict) or set(profile) - _PROFILE_LIMITS.keys():
+            raise ValidationError("추가 계정 정보 형식을 확인해 주세요.")
+        cleaned = {}
+        for field, maximum in _PROFILE_LIMITS.items():
+            value = profile.get(field, "")
+            if (not isinstance(value, str) or any(ord(c) < 32 or 127 <= ord(c) <= 159 for c in value)
+                    or len(value.strip()) > maximum):
+                raise ValidationError(f"{_PROFILE_LABELS[field]}는 제어문자 없이 {maximum}자 이내로 입력해 주세요.")
+            cleaned[field] = value.strip()
+        if cleaned["email"] and not _EMAIL_RE.fullmatch(cleaned["email"]):
+            raise ValidationError("이메일 형식을 확인해 주세요.")
+        phone = cleaned["phone"]
+        if phone and (not _PHONE_RE.fullmatch(phone) or not 5 <= sum(c in "0123456789" for c in phone) <= 20):
+            raise ValidationError("연락처는 숫자와 +, 공백, 괄호, 하이픈, 점을 사용해 입력해 주세요.")
+        return cleaned
+
+    def create_user(self, token: str, login_id: str, display_name: str, role: str, company_id: str | None, temp_password: str, *, profile: dict | None = None) -> dict:
         login_id, display_name = _login_id(login_id), _text(display_name, "이름")
         _password_input(temp_password)
+        profile = self._profile(profile)
         with self._transaction() as conn:
             actor = self._require(conn, token, {"kma", "company"})
             if role not in {"company", "participant"}:
@@ -327,12 +388,12 @@ class AccountStore:
             company = self._one(conn, "SELECT * FROM tap_companies WHERE id=? AND active=1", (company_id,))
             if not company:
                 raise ValidationError("회사를 확인하세요.")
-            if not login_id.startswith(company["slug"] + "-") or len(login_id) <= len(company["slug"]) + 1:
-                raise ValidationError(f"로그인 ID는 {company['slug']}-로 시작해야 합니다.")
+            if role == "participant" and (not login_id.startswith(company["slug"] + "-") or len(login_id) <= len(company["slug"]) + 1):
+                raise ValidationError(f"참여자 로그인 ID는 {company['slug']}-로 시작해야 합니다.")
             user_id = str(uuid.uuid4())
-            self._execute(conn, "INSERT INTO tap_users(id,login_id,display_name,role,company_id,password_hash,created_at) VALUES (?,?,?,?,?,?,?)", (user_id, login_id, display_name, role, company_id, hash_password(temp_password), self._clock()))
+            self._execute(conn, "INSERT INTO tap_users(id,login_id,display_name,role,company_id,password_hash,created_at,department,job_title,email,phone) VALUES (?,?,?,?,?,?,?,?,?,?,?)", (user_id, login_id, display_name, role, company_id, hash_password(temp_password), self._clock(), profile["department"], profile["job_title"], profile["email"], profile["phone"]))
             self._audit(conn, actor["id"], "create_user", user_id)
-            return {"id": user_id, "login_id": login_id, "display_name": display_name, "role": role, "company_id": company_id, "active": True, "must_change_password": True, "company_name": company["name"], "company_slug": company["slug"]}
+            return {"id": user_id, "login_id": login_id, "display_name": display_name, "role": role, "company_id": company_id, "active": True, "must_change_password": True, "company_name": company["name"], "company_slug": company["slug"], **profile}
 
     def _managed_user(self, conn, actor, user_id):
         target = self._one(conn, "SELECT * FROM tap_users WHERE id=?", (user_id,), lock=True)

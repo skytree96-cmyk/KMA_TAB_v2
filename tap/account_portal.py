@@ -55,7 +55,7 @@ def _login(store: AccountStore | None) -> None:
         st.title("로그인")
         st.markdown('<div class="tap-account-intro">교육 전·후 업무행동의 변화를 확인합니다.<br>발급받은 ID로 로그인하면 내 교육과 관리 화면이 열립니다.</div>', unsafe_allow_html=True)
         with st.form("_tap_login_form", clear_on_submit=True):
-            login_id = st.text_input("로그인 ID", max_chars=64, placeholder="회사명-사번 또는 지정 ID", disabled=store is None)
+            login_id = st.text_input("로그인 ID", max_chars=64, placeholder="발급받은 로그인 ID", disabled=store is None)
             password = st.text_input("비밀번호", type="password", max_chars=128, disabled=store is None)
             submitted = st.form_submit_button("로그인", type="primary", use_container_width=True, disabled=store is None)
         if store is None:

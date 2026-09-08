@@ -10,6 +10,8 @@ CREATE TABLE IF NOT EXISTS tap_users (
  company_id TEXT REFERENCES tap_companies(id), password_hash TEXT NOT NULL,
  active INTEGER NOT NULL DEFAULT 1 CHECK (active IN (0,1)),
  must_change_password INTEGER NOT NULL DEFAULT 1 CHECK (must_change_password IN (0,1)),
+ department TEXT NOT NULL DEFAULT '', job_title TEXT NOT NULL DEFAULT '',
+ email TEXT NOT NULL DEFAULT '', phone TEXT NOT NULL DEFAULT '',
  created_at DOUBLE PRECISION NOT NULL,
  CHECK ((role = 'kma' AND company_id IS NULL) OR (role <> 'kma' AND company_id IS NOT NULL))
 );
