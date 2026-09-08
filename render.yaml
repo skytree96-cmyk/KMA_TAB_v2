@@ -13,7 +13,7 @@ services:
     autoDeployTrigger: "off"
     envVars:
       - key: TAP_POSTGRES_PREFLIGHT
-        value: "1"
+        value: "0"
       - key: TAP_APP_MODE
         value: production
       - key: GITHUB_DEMO_STORE_ENABLED
