@@ -76,7 +76,7 @@ def _login(store: AccountStore | None) -> None:
 
 def _password_change(store: AccountStore, token: str, required: bool) -> None:
     st.subheader("처음 사용할 비밀번호 설정" if required else "비밀번호 변경")
-    st.caption("12자 이상으로 설정해 주세요. 담당자는 기존 비밀번호를 조회할 수 없습니다.")
+    st.caption("3~128자로 설정해 주세요. 담당자는 기존 비밀번호를 조회할 수 없습니다.")
     with st.form("_tap_change_password", clear_on_submit=True):
         old = st.text_input("현재 비밀번호", type="password", max_chars=128)
         new = st.text_input("새 비밀번호", type="password", max_chars=128)

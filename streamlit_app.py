@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 import streamlit as st
 
 from tap.runtime_guard import stop_on_stale
@@ -7,8 +9,8 @@ from tap.account_mode import production_mode
 
 
 st.set_page_config(
-    page_title="KMA TAP | 교육 전·후 업무행동 변화점검",
-    page_icon="T",
+    page_title="KMA TAP",
+    page_icon=Path(__file__).resolve().parent / "assets" / "kmatap-favicon.png",
     layout="wide",
     initial_sidebar_state="expanded" if production_mode() else "collapsed",
 )

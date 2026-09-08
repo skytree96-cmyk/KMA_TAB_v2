@@ -71,7 +71,7 @@ class AccountStoreTests(unittest.TestCase):
         self.assertNotIn(INITIAL, self.seed_hash)
         self.assertNotEqual(self.seed_hash, hash_password(INITIAL))
         with self.assertRaises(ValidationError):
-            hash_password("short")
+            hash_password("ab")
         with self.assertRaises(ValidationError):
             AccountStore("sqlite:///" + self.path)
         with self.assertRaises(ValidationError):
@@ -255,6 +255,46 @@ class AccountStoreTests(unittest.TestCase):
         self.assertFalse(self.store.list_assignments(self.admin, project["id"])[0]["active"])
         self.store.set_assignment_active(self.admin, assignment["id"], True)
         self.assertEqual(len(self.store.list_assignments(token)), 2)
+
+
+class PasswordLengthTests(unittest.TestCase):
+    def test_hash_password_accepts_three_through_128_characters(self):
+        for invalid in ("", "a", "ab", "a" * 129):
+            with self.subTest(length=len(invalid)), self.assertRaisesRegex(ValidationError, "3~128"):
+                hash_password(invalid)
+        for valid in ("abc", "가나다", "a" * 128):
+            with self.subTest(length=len(valid)):
+                self.assertTrue(verify_password(valid, hash_password(valid)))
+
+    def test_three_character_passwords_work_for_bootstrap_create_change_and_reset(self):
+        with tempfile.TemporaryDirectory() as directory:
+            store = AccountStore("sqlite:///" + str(Path(directory) / "passwords.sqlite"), allow_sqlite_for_tests=True)
+            store.initialize()
+            self.assertTrue(store.bootstrap_admin("kma-admin", hash_password("abc")))
+            initial = store.login("kma-admin", "abc")
+            self.assertTrue(store.principal(initial)["must_change_password"])
+            admin = store.change_password(initial, "abc", "def")
+            company = store.create_company(admin, "비밀번호 검증 회사", "length")
+            for invalid in ("ab", "a" * 129):
+                with self.subTest(operation="create", length=len(invalid)), self.assertRaises(ValidationError):
+                    store.create_user(admin, "length-001", "참여자", "participant", company["id"], invalid)
+            user = store.create_user(admin, "length-001", "참여자", "participant", company["id"], "ghi")
+            token = store.login(user["login_id"], "ghi")
+            for invalid in ("ab", "a" * 129):
+                with self.subTest(operation="change", length=len(invalid)), self.assertRaises(ValidationError):
+                    store.change_password(token, "ghi", invalid)
+                with self.subTest(operation="reset", length=len(invalid)), self.assertRaises(ValidationError):
+                    store.reset_password(admin, user["id"], invalid)
+            changed = store.change_password(token, "ghi", "jkl")
+            self.assertFalse(store.principal(changed)["must_change_password"])
+            store.reset_password(admin, user["id"], "mno")
+            with self.assertRaises(AuthenticationError):
+                store.principal(changed)
+            reset = store.login(user["login_id"], "mno")
+            self.assertTrue(store.principal(reset)["must_change_password"])
+            longest = "x" * 128
+            store.change_password(reset, "mno", longest)
+            self.assertFalse(store.principal(store.login(user["login_id"], longest))["must_change_password"])
 
 
 if __name__ == "__main__":

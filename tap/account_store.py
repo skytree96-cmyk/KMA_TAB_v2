@@ -65,8 +65,8 @@ _BARRIERS = frozenset({"적용 기회 부족", "상사·동료 지원 부족", "
 
 
 def _password_input(password: str) -> bytes:
-    if not isinstance(password, str) or not 12 <= len(password) <= 128:
-        raise ValidationError("비밀번호는 12~128자여야 합니다.")
+    if not isinstance(password, str) or not 3 <= len(password) <= 128:
+        raise ValidationError("비밀번호는 3~128자여야 합니다.")
     return password.encode("utf-8")
 
 
