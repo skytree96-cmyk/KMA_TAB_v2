@@ -1,18 +1,34 @@
-# TEST ONLY: public synthetic-data demo; no production accounts or persistence.
-# Python 3.12 is selected by the existing .python-version file.
-# Deploy reviewed commits manually; the current Blueprint setting is off.
+# KMA TAP account deployment. Free database is for the initial 30-day validation.
 services:
   - type: web
-    name: kma-tap-staging
+    name: kmatap
     repo: https://github.com/skytree96-cmyk/KMA_TAB_v2
-    branch: codex/render-staging
+    branch: codex/production-accounts
     runtime: python
     plan: free
     region: singapore
     buildCommand: python -m pip install -r requirements.txt
-    startCommand: python -m streamlit run streamlit_app.py --server.address=0.0.0.0 --server.port=$PORT --client.toolbarMode=minimal
+    startCommand: python scripts/start_accounts.py
     healthCheckPath: /_stcore/health
     autoDeployTrigger: "off"
     envVars:
+      - key: TAP_POSTGRES_PREFLIGHT
+        value: "1"
+      - key: TAP_APP_MODE
+        value: production
       - key: GITHUB_DEMO_STORE_ENABLED
         value: "false"
+      - key: DATABASE_URL
+        fromDatabase:
+          name: kmatap-db
+          property: connectionString
+      - key: BOOTSTRAP_ADMIN_LOGIN
+        value: kma.admin
+      - key: BOOTSTRAP_ADMIN_PASSWORD_HASH
+        sync: false
+
+databases:
+  - name: kmatap-db
+    plan: free
+    region: singapore
+    ipAllowList: []

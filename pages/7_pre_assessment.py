@@ -13,6 +13,9 @@ from pathlib import Path
 import streamlit as st
 
 from tap.runtime_guard import stop_on_stale
+from tap.account_mode import guard_legacy_page
+
+guard_legacy_page()
 
 
 stop_on_stale(st, ("tap.baseline_transfer", "tap.github_demo_store", "tap.ui"))
