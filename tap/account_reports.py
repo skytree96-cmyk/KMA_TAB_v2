@@ -27,7 +27,37 @@ def summarize_project(project: Mapping[str, Any], results: list[dict[str, Any]])
     return aggregate_paired_factor_results(paired, min_group_n=MIN_GROUP_N)
 
 
-def _render_individual_report(project: Mapping[str, Any], results: list[dict[str, Any]]) -> None:
+def export_report_pdf(store: Any, token: str, project: Mapping[str, Any], assignment_id: str | None = None) -> bytes:
+    """Generate on download, rechecking the session and project scope each time."""
+    from tap.account_report_pdf import build_report_pdf
+    from tap.account_store import ValidationError
+    results = store.project_results(token, project["id"])
+    config = project["config"]
+    questions = config.get("question_snapshot") or questions_for_factors(config["selected_factors"])
+    if assignment_id is not None:
+        result = next((row for row in results if str(row["id"]) == assignment_id), None)
+        if not result or not result.get("pre_completed") or not result.get("post_completed"):
+            raise ValidationError("사전·사후 검사를 완료한 참여자를 선택해 주세요.")
+        scores = score_pre_post_responses(questions, (result.get("pre_payload") or {}).get("responses", {}),
+                                         (result.get("post_payload") or {}).get("responses", {}), config.get("target_means"))
+        rows = [{**row, "change": row["self_reported_change"], "valid_n": row["paired_valid_items"]} for row in scores]
+        subject = f"{result.get('user_name') or '참여자'} · {result.get('login_id') or ''}"
+        return build_report_pdf(project, rows, kind="individual", subject=subject, participant_count=1)
+    summaries = {row["factor_code"]: row for row in summarize_project(project, results)}
+    if not any(row["paired_n"] >= MIN_GROUP_N for row in summaries.values()):
+        raise ValidationError("조직 리포트는 역량별 전·후 유효응답 5명 이상일 때 다운로드할 수 있습니다.")
+    metadata = {row["factor_code"]: row for row in questions}
+    rows = []
+    for code, question in metadata.items():
+        row = summaries.get(code, {})
+        rows.append({"factor_code":code,"factor_name_ko":question["factor_name_ko"],"module_group":question.get("module_group", ""),
+                     "pre_score":row.get("pre_mean"),"post_score":row.get("post_mean"),"change":row.get("observed_change"),
+                     "valid_n":row.get("paired_n",0)})
+    count = len({row["user_id"] for row in results if row.get("pre_completed") and row.get("post_completed")})
+    return build_report_pdf(project, rows, kind="organization", subject="조직 전체", participant_count=count)
+
+
+def _render_individual_report(store: Any, token: str, project: Mapping[str, Any], results: list[dict[str, Any]]) -> None:
     st.subheader("개인별 전·후 리포트")
     key = f"account_individual_{project['id']}_"
     query = st.text_input("참여자 검색", placeholder="이름 또는 아이디", key=key + "search")
@@ -46,6 +76,9 @@ def _render_individual_report(project: Mapping[str, Any], results: list[dict[str
                             key=key + "selected")
     if selected not in eligible:
         return
+    st.download_button("개인 리포트 PDF 다운로드", data=lambda: export_report_pdf(store, token, project, selected),
+                       file_name="KMA_TAP_개인리포트.pdf", mime="application/pdf", on_click="ignore", type="primary",
+                       key=key + "pdf", width="stretch")
     result = eligible[selected]
     config = project["config"]
     questions = config.get("question_snapshot") or questions_for_factors(config["selected_factors"])
@@ -68,8 +101,9 @@ def render_project_report(store: Any, token: str, project: Mapping[str, Any]) ->
     columns[0].metric("배정 인원", len(results))
     columns[1].metric("사전검사 완료", sum(bool(row.get("pre_completed")) for row in results))
     columns[2].metric("사후검사 완료", sum(bool(row.get("post_completed")) for row in results))
-    _render_individual_report(project, results)
+    _render_individual_report(store, token, project, results)
     st.subheader("조직 전·후 리포트")
+    st.caption(f"선택한 프로젝트: {project.get('name') or project.get('project_name') or project['id']} · 다른 프로젝트는 프로젝트 목록에서 선택하세요.")
     summaries = summarize_project(project, results)
     if not summaries:
         st.info("사전·사후 검사를 모두 마친 참여자가 있으면 변화 리포트가 표시됩니다.")
@@ -78,6 +112,9 @@ def render_project_report(store: Any, token: str, project: Mapping[str, Any]) ->
     if not disclosed:
         st.info(f"각 역량의 사전·사후 유효응답이 {MIN_GROUP_N}명 이상일 때 평균과 변화량을 공개합니다.")
         return
+    st.download_button("조직 리포트 PDF 다운로드", data=lambda: export_report_pdf(store, token, project),
+                       file_name="KMA_TAP_조직리포트.pdf", mime="application/pdf", on_click="ignore", type="primary",
+                       key=f"account_report_pdf_{project['id']}", width="stretch")
     display_rows = [{"역량": row["factor_name_ko"], "전·후 유효 인원": row["paired_n"], "교육 전": row["pre_mean"], "교육 후": row["post_mean"], "변화": row["observed_change"], "상태": row["status"]} for row in summaries]
     frame = pd.DataFrame(display_rows)
     st.dataframe(frame, hide_index=True, use_container_width=True)

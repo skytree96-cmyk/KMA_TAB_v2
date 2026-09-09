@@ -728,8 +728,10 @@ def _render_workspace_projects(store: Any, token: str, principal: Mapping[str, A
                     ("사전검사", f"{config.get('pre_start_date', '미설정')} ~ {config.get('pre_end_date', '미설정')}"),
                     ("사후검사", f"{config.get('post_start_date', '미설정')} ~ {config.get('post_end_date', '미설정')}"),
                 ])
-                from tap.account_reports import render_project_report
-                render_project_report(store, token, project)
+    if project is not None:
+        with st.container(border=True, key="tap_workspace_project_reports"):
+            from tap.account_reports import render_project_report
+            render_project_report(store, token, project)
     if project is not None and principal.get("role") == "company":
         with st.container(border=True, key="tap_workspace_assignments"):
             _render_assignments(store, token, project, users)

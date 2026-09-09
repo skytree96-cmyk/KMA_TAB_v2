@@ -62,3 +62,31 @@ class IndividualAccountReportTests(unittest.TestCase):
         app.text_input[0].set_value("").run()
         self.assertIsNone(app.selectbox[0].value)
         self.assertFalse(app.dataframe)
+
+
+class ReportDownloadTests(unittest.TestCase):
+    records = AccountReportTests.records
+
+    def test_exports_recheck_authorization_and_match_the_selected_person_project(self):
+        from tap.account_reports import export_report_pdf
+        from tap.account_store import AuthorizationError, ValidationError
+        from types import SimpleNamespace
+        from unittest.mock import Mock, patch
+        project, results = self.records(5)
+        project.update(id="project-a",name="교육 A")
+        for i,row in enumerate(results):
+            row.update(id=f"assignment-{i}",user_name=f"참여자{i}",login_id=f"user{i}")
+        store = SimpleNamespace(project_results=Mock(return_value=results))
+        with patch("tap.account_report_pdf.build_report_pdf", return_value=b"%PDF-test") as build:
+            self.assertEqual(export_report_pdf(store, "token", project, "assignment-2"), b"%PDF-test")
+            self.assertEqual(build.call_args.kwargs["subject"], "참여자2 · user2")
+            self.assertEqual(build.call_args.kwargs["kind"], "individual")
+            store.project_results.assert_called_with("token", "project-a")
+            export_report_pdf(store, "token", project)
+            self.assertEqual(build.call_args.kwargs["kind"], "organization")
+            self.assertEqual(build.call_args.args[1][0]["valid_n"], 5)
+            with self.assertRaises(ValidationError): export_report_pdf(store, "token", project, "foreign-id")
+            store.project_results.return_value = results[:4]
+            with self.assertRaises(ValidationError): export_report_pdf(store, "token", project)
+            store.project_results.side_effect = AuthorizationError("denied")
+            with self.assertRaises(AuthorizationError): export_report_pdf(store, "revoked", project, "assignment-2")
