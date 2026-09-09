@@ -140,6 +140,11 @@ def _save(store: Any, token: str, assignment_id: str, phase: str, payload: dict[
 
 def _choose_phase(phase: str) -> None:
     st.session_state[PREFIX + "phase"] = phase
+    st.session_state[PREFIX + "focus"] = True
+
+
+def _exit_focus() -> None:
+    st.session_state[PREFIX + "focus"] = False
 
 
 def _go_to_question(phase: str, cursor: int) -> None:
@@ -200,7 +205,7 @@ def _render_results(questions: list[dict[str, Any]], config: Mapping[str, Any], 
     targets = config.get("target_means", {})
     pre_responses = pre["payload"]["responses"]
     if post is not None and post.get("completed"):
-        st.subheader("나의 교육 전·후 변화")
+        st.subheader("나의 교육 전·후 리포트")
         results = score_pre_post_responses(questions, pre_responses, post["payload"]["responses"], targets)
         st.dataframe([
             {"역량": r["factor_name_ko"], "교육 전(1~5)": r["pre_score"], "교육 후(1~5)": r["post_score"],
@@ -208,6 +213,12 @@ def _render_results(questions: list[dict[str, Any]], config: Mapping[str, Any], 
             for r in results
         ], hide_index=True, width="stretch")
         st.caption("두 시점 모두 1~5로 답한 동일 문항만 비교합니다. 0(수행 기회 없음)은 제외하며, 공통 유효문항이 부족한 역량은 산출하지 않습니다. 관찰된 자기보고 변화이며 교육의 인과효과를 뜻하지 않습니다.")
+        chart_rows = [{"역량": r["factor_name_ko"], "시점": label, "행동빈도": r[key]}
+                      for r in results for key, label in (("pre_score", "교육 전"), ("post_score", "교육 후"))
+                      if r[key] is not None]
+        if chart_rows:
+            st.bar_chart(chart_rows, x="역량", y="행동빈도", color="시점", stack=False,
+                         horizontal=True, height=max(240, len(results) * 64), width="stretch")
         transfer = post["payload"].get("post_transfer_responses", {})
         if transfer:
             with st.expander("내 현업전이 환경 응답"):
@@ -231,7 +242,7 @@ def _render_results(questions: list[dict[str, Any]], config: Mapping[str, Any], 
 def _render_review(store: Any, token: str, assignment_id: str, phase: str, questions: list[dict[str, Any]], payload: dict[str, Any]) -> None:
     codes = {q["question_code"] for q in questions}
     st.progress(1.0, text=f"{len(questions)}/{len(questions)} 역량문항 응답 완료")
-    with st.expander("제출 전 내 응답 확인"):
+    with st.expander("제출 전 내 응답 확인", expanded=True):
         st.dataframe([
             {"문항": i + 1, "질문": q["revised_text"], "응답": LIKERT_OPTIONS[payload["responses"][q["question_code"]]]}
             for i, q in enumerate(questions)
@@ -309,14 +320,14 @@ def render_participant(store: Any, token: str, principal: Mapping[str, Any]) -> 
     # A verified commit receipt replaces only the read immediately following
     # that save. Pop before any early return; later reruns always reload the DB.
     saved_record = st.session_state.pop(PREFIX + "saved_record", None)
-    st.title("나의 교육평가")
-    st.caption(f"{principal.get('display_name') or principal.get('login_id') or '참여자'}님의 배정 프로젝트와 검사 결과입니다.")
     try:
         assignments = store.list_assignments(token)
         if not isinstance(assignments, list) or any(not isinstance(a, Mapping) or str(a.get("user_id")) != user_id for a in assignments):
             raise ValueError("본인에게 배정된 프로젝트를 확인하지 못했습니다.")
         assignments = [a for a in assignments if a.get("active", True)]
     except Exception as exc:
+        _reset_scope(st.session_state, owner, "")
+        st.session_state[PREFIX + "focus"] = False
         _show_error("프로젝트를 불러오지 못했습니다.", exc)
         return
     if not assignments:
@@ -324,14 +335,25 @@ def render_participant(store: Any, token: str, principal: Mapping[str, Any]) -> 
         st.info("아직 배정된 프로젝트가 없습니다. 교육담당자가 배정하면 이곳에 자동으로 표시됩니다.")
         return
     by_id = {str(a["id"]): a for a in assignments}
-    if len(by_id) == 1:
+    selected = st.session_state.get(PREFIX + "assignment")
+    if selected not in by_id:
+        st.session_state[PREFIX + "focus"] = False
+    focused = bool(st.session_state.get(PREFIX + "focus"))
+    if not focused:
+        st.title("나의 교육평가")
+        st.caption(f"{principal.get('display_name') or principal.get('login_id') or '참여자'}님의 배정 프로젝트와 검사 결과입니다.")
+    if focused:
+        assignment_id = selected
+    elif len(by_id) == 1:
         assignment_id = next(iter(by_id))
     else:
         selector = PREFIX + "selector"
         if st.session_state.get(selector) not in by_id:
             st.session_state.pop(selector, None)
-        assignment_id = st.selectbox("참여할 프로젝트", list(by_id), format_func=lambda key: str(by_id[key]["project_name"]), key=selector)
+        options = list(by_id)
+        assignment_id = st.selectbox("참여할 프로젝트", options, index=options.index(selected) if selected in options else 0, format_func=lambda key: str(by_id[key]["project_name"]), key=selector)
     _reset_scope(st.session_state, owner, assignment_id)
+    st.session_state.setdefault(PREFIX + "focus", False)
     assignment = by_id[assignment_id]
     config = assignment.get("config", {})
     try:
@@ -346,9 +368,24 @@ def render_participant(store: Any, token: str, principal: Mapping[str, Any]) -> 
     # inactive phase's answers only when a completed comparison needs them.
     pre_complete = bool(assignment.get("pre_completed"))
     post_complete = bool(assignment.get("post_completed"))
-    st.subheader(str(assignment["project_name"]))
-    st.caption(f"교육과정: {config.get('course_name', assignment['project_name'])} · 교육일: {config.get('training_date', '미설정')}")
-    st.caption(f"교육 전 {'완료' if pre_complete else '미완료'} · 교육 후 {'완료' if post_complete else '미완료'}")
+    if not st.session_state.get(PREFIX + "focus"):
+        st.subheader(str(assignment["project_name"]))
+        st.caption(f"교육과정: {config.get('course_name', assignment['project_name'])} · 교육일: {config.get('training_date', '미설정')}")
+        st.caption(f"교육 전 {'완료' if pre_complete else '미완료'} · 교육 후 {'완료' if post_complete else '미완료'}")
+        if pre_complete and post_complete:
+            st.button("나의 전·후 리포트 보기", key=PREFIX + "open_report", on_click=_choose_phase,
+                      args=("post",), type="primary", width="stretch")
+        before, after = st.columns(2)
+        before.button("교육 전 검사", key=PREFIX + "enter_pre", on_click=_choose_phase, args=("pre",), type="primary", width="stretch")
+        after.button("교육 후 검사", key=PREFIX + "enter_post", on_click=_choose_phase, args=("post",), width="stretch")
+        return
+    phase = st.session_state.get(PREFIX + "phase", "pre")
+    if phase not in PHASE_LABELS:
+        phase = "pre"
+        st.session_state[PREFIX + "phase"] = phase
+    st.html('<span class="tap-assessment-focus" aria-hidden="true"></span>')
+    st.button("내 교육으로 돌아가기", key=PREFIX + "exit_focus", on_click=_exit_focus)
+    st.caption(f"{PHASE_LABELS[phase]} · {assignment['project_name']}")
     # A permanent block keeps form/question positions stable when a save error
     # or completion message appears. Per-question progress already confirms save.
     with st.container(key=PREFIX + "messages"):
@@ -358,8 +395,6 @@ def render_participant(store: Any, token: str, principal: Mapping[str, Any]) -> 
             st.success(notice)
         if error:
             st.error(error)
-    phase = st.radio("검사 단계", ["pre", "post"], index=1 if pre_complete else 0,
-                     format_func=lambda p: PHASE_LABELS[p], horizontal=True, key=PREFIX + "phase")
     try:
         receipt = saved_record.get("record") if isinstance(saved_record, Mapping) and saved_record.get("owner") == owner else None
         if (isinstance(receipt, Mapping) and str(receipt.get("assignment_id")) == assignment_id
@@ -399,11 +434,9 @@ def render_participant(store: Any, token: str, principal: Mapping[str, Any]) -> 
     except ValueError:
         st.error("검사 기간이 올바르게 설정되지 않았습니다. 교육담당자에게 문의해 주세요.")
         return
-    st.caption(f"{PHASE_LABELS[phase]} 기간: {start.isoformat()} ~ {end.isoformat()} (한국시간)")
     today = datetime.now(timezone(timedelta(hours=9))).date()
     if not start <= today <= end:
         st.info("아직 검사 기간이 시작되지 않았습니다." if today < start else "검사 기간이 종료되었습니다. 교육담당자에게 문의해 주세요.")
         return
-    st.write("최근 8주 동안 실제 업무에서 나타난 행동을 기준으로 응답해 주세요. 교육 전·후에 같은 문항과 기준을 사용합니다.")
-    st.caption("각 문항에서 저장 버튼을 누르면 응답이 보관됩니다. 검사 결과는 교육개발 목적의 자기보고 자료입니다.")
+    st.caption("최근 8주 동안 실제 업무에서 나타난 행동을 기준으로 응답해 주세요.")
     _render_question(store, token, assignment_id, phase, questions, _current_payload(active_record, phase))

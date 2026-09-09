@@ -159,7 +159,7 @@ def _render_projects(store: Any, token: str, projects: list[dict[str, Any]], rol
                                     by_id[value]["name"], (by_id[value].get("config") or {}).get("course_name")
                                 ) if item))
         if selected in by_id:
-            st.caption("동일 참여자의 전·후 응답을 조직 단위로 집계하며, 개인 응답과 개인 점수는 표시하지 않습니다.")
+            st.caption("완료한 참여자의 개인별 리포트와 조직 리포트를 확인합니다. 조직 평균은 역량별 유효응답 5명 이상일 때 표시됩니다.")
             try:
                 render_project_report(store, token, by_id[selected])
             except Exception as exc:

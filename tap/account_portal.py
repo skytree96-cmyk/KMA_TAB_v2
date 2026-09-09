@@ -39,44 +39,47 @@ def _notice() -> None:
 
 
 def _login(store: AccountStore | None) -> None:
-    with st.container(key="tap_login_shell"):
-        intro, account = st.columns([1.08, 1], gap="large", vertical_alignment="center")
-        with intro:
-            with st.container(key="tap_login_intro"):
-                st.markdown(brand_html(), unsafe_allow_html=True)
-                st.markdown(
-                    '<div class="tap-login-eyebrow">TRAINING ASSESSMENT PLATFORM</div>'
-                    '<div class="tap-login-headline">교육 전·후<br>업무행동의 <span>변화를<br>확인합니다.</span></div>'
-                    '<p class="tap-login-lead">발급받은 ID로 로그인하면<br>내 교육과 관리 화면이 열립니다.</p>'
-                    '<div class="tap-login-journey" aria-label="사전검사, 교육·현업 적용, 사후검사">'
-                    '<span><b>01</b>사전검사</span><i aria-hidden="true"></i>'
-                    '<span><b>02</b>교육·현업 적용</span><i aria-hidden="true"></i>'
-                    '<span><b>03</b>사후검사</span></div>',
-                    unsafe_allow_html=True,
-                )
-        with account:
-            with st.container(border=True, key="tap_login_card"):
-                st.title("로그인")
-                with st.form("_tap_login_form", clear_on_submit=True, border=False):
-                    login_id = st.text_input("로그인 ID", max_chars=64, placeholder="발급받은 로그인 ID", disabled=store is None)
-                    password = st.text_input("비밀번호", type="password", max_chars=128, disabled=store is None)
-                    submitted = st.form_submit_button("로그인", type="primary", use_container_width=True, disabled=store is None)
-                if store is None:
-                    st.info("계정 서비스 연결을 준비하고 있습니다. 설정이 완료되면 로그인할 수 있습니다.")
-                if submitted and store is not None:
-                    try:
-                        token = store.login(login_id, password)
-                    except AccountError as exc:
-                        st.error(str(exc))
-                    except Exception:
-                        st.error("로그인을 처리하지 못했습니다. 잠시 후 다시 시도해 주세요.")
-                    else:
-                        clear_identity()
-                        st.session_state[TOKEN_KEY] = token
-                        st.rerun()
-                st.caption("참여자 계정·비밀번호 문의는 교육담당자에게, 교육담당자 계정 문의는 KMA 관리자에게 요청해 주세요.")
-            with st.container(key="tap_login_links"):
-                st.html('<nav class="tap-login-navigation" aria-label="서비스 안내"><a href="/" target="_self">서비스 소개</a><span>·</span><a href="/guide" target="_self">이용 안내</a></nav>')
+    login_slot = st.empty()
+    with login_slot.container():
+        with st.container(key="tap_login_shell"):
+            intro, account = st.columns([1.08, 1], gap="large", vertical_alignment="center")
+            with intro:
+                with st.container(key="tap_login_intro"):
+                    st.markdown(brand_html(), unsafe_allow_html=True)
+                    st.markdown(
+                        '<div class="tap-login-eyebrow">TRAINING ASSESSMENT PLATFORM</div>'
+                        '<div class="tap-login-headline">교육 전·후<br>업무행동의 <span>변화를<br>확인합니다.</span></div>'
+                        '<p class="tap-login-lead">발급받은 ID로 로그인하면<br>내 교육과 관리 화면이 열립니다.</p>'
+                        '<div class="tap-login-journey" aria-label="사전검사, 교육·현업 적용, 사후검사">'
+                        '<span><b>01</b>사전검사</span><i aria-hidden="true"></i>'
+                        '<span><b>02</b>교육·현업 적용</span><i aria-hidden="true"></i>'
+                        '<span><b>03</b>사후검사</span></div>',
+                        unsafe_allow_html=True,
+                    )
+            with account:
+                with st.container(border=True, key="tap_login_card"):
+                    st.title("로그인")
+                    with st.form("_tap_login_form", clear_on_submit=True, border=False):
+                        login_id = st.text_input("로그인 ID", max_chars=64, placeholder="발급받은 로그인 ID", disabled=store is None)
+                        password = st.text_input("비밀번호", type="password", max_chars=128, disabled=store is None)
+                        submitted = st.form_submit_button("로그인", type="primary", use_container_width=True, disabled=store is None)
+                    if store is None:
+                        st.info("계정 서비스 연결을 준비하고 있습니다. 설정이 완료되면 로그인할 수 있습니다.")
+                    if submitted and store is not None:
+                        try:
+                            token = store.login(login_id, password)
+                        except AccountError as exc:
+                            st.error(str(exc))
+                        except Exception:
+                            st.error("로그인을 처리하지 못했습니다. 잠시 후 다시 시도해 주세요.")
+                        else:
+                            clear_identity()
+                            st.session_state[TOKEN_KEY] = token
+                            login_slot.empty()
+                            st.rerun()
+                    st.caption("참여자 계정·비밀번호 문의는 교육담당자에게, 교육담당자 계정 문의는 KMA 관리자에게 요청해 주세요.")
+                with st.container(key="tap_login_links"):
+                    st.html('<nav class="tap-login-navigation" aria-label="서비스 안내"><a href="/" target="_self">서비스 소개</a><span>·</span><a href="/guide" target="_self">이용 안내</a></nav>')
 
 
 def _password_change(store: AccountStore, token: str, required: bool) -> None:
@@ -150,7 +153,8 @@ def render_portal() -> None:
     with st.container(key="tap_workspace_main"):
         password_screen = bool(principal["must_change_password"]) or st.session_state[ACCOUNT_MENU_KEY] == "비밀번호 변경"
         label = "비밀번호 변경" if password_screen else section_label(role, section)
-        st.caption(f"워크스페이스 / {label}")
+        with st.container(key="tap_workspace_breadcrumb"):
+            st.caption(f"워크스페이스 / {label}")
         if password_screen:
             _password_change(store, token, bool(principal["must_change_password"]))
             return

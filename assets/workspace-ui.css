@@ -469,3 +469,18 @@
  .stApp:has(.st-key-tap_workspace_topbar) .st-key-account_dashboard_metrics [data-testid="stMetricLabel"] p {font-size:15px;}
  .tap-dash-rings {gap:8px;}.tap-dash-ring {width:80px;}.tap-dash-ring::before{inset:7px;}.tap-dash-ring strong {font-size:22px;}.tap-dash-ring-item b{font-size:13px;}.tap-dash-ring-item span{font-size:12px;}
 }
+
+/* A distraction-free assessment surface, with navigation available on exit. */
+.stApp:has(.tap-assessment-focus) .st-key-tap_workspace_topbar,
+.stApp:has(.tap-assessment-focus) .st-key-tap_workspace_breadcrumb {display:none;}
+.stApp:has(.tap-assessment-focus) .stMainBlockContainer {max-width:1120px;padding-top:20px;}
+.stApp:has(.tap-assessment-focus) .st-key-tap_workspace_main {min-height:calc(100dvh - 40px);padding:20px 28px;}
+.stApp:has(.tap-assessment-focus) .st-key-_tap_participant_question_stage {background:#fff;border:1px solid #dce9e6;border-radius:24px;padding:32px;box-shadow:0 12px 36px #164a3c0d;}
+@media(max-width:600px) {
+ .stApp:has(.tap-assessment-focus) .stMainBlockContainer {padding:8px;}
+ .stApp:has(.tap-assessment-focus) .st-key-tap_workspace_main {padding:12px 8px;}
+ .stApp:has(.tap-assessment-focus) .st-key-_tap_participant_question_stage {padding:18px 12px;border-radius:16px;}
+}
+
+/* Prevent the outgoing login layout from occupying the authenticated screen. */
+.stApp:has(.st-key-tap_workspace_topbar) .st-key-tap_login_shell {display:none;}

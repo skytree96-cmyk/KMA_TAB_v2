@@ -69,7 +69,7 @@ class MemoryStore:
         return copy.deepcopy(record)
 
 
-def participant_app(store):
+def participant_app(store, *, focus=True):
     app = AppTest.from_string(
         "import streamlit as st\n"
         "from tap.account_assessment_ui import render_participant\n"
@@ -78,7 +78,11 @@ def participant_app(store):
         default_timeout=30,
     )
     app.session_state["store"] = store
-    return app.run()
+    app.run()
+    if focus and not app.exception and app.button:
+        phase = "post" if store.records.get(("a", "pre"), {}).get("completed") else "pre"
+        click(app, "교육 후 검사" if phase == "post" else "교육 전 검사")
+    return app
 
 
 def click(app, label):
@@ -106,6 +110,31 @@ class AccountAssessmentTests(unittest.TestCase):
         self.assertNotIn(PREFIX + "phase", state)
         self.assertEqual(state[PREFIX + "selector"], "b")
 
+    def test_focus_entry_back_resume_and_revoked_assignment(self):
+        store = MemoryStore(multiple=True)
+        app = participant_app(store, focus=False)
+        self.assertFalse(any(r.label == "응답" for r in app.radio))
+        self.assertFalse(any(read[0] == "assessment" for read in store.reads))
+        app.selectbox[0].set_value("b").run()
+        click(app, "교육 전 검사")
+        self.assertTrue(app.session_state[PREFIX + "focus"])
+        self.assertFalse(app.selectbox)
+        self.assertFalse(app.title)
+        answer(app, 3)
+        click(app, "내 교육으로 돌아가기")
+        self.assertEqual(app.selectbox[0].value, "b")
+        self.assertFalse(app.session_state[PREFIX + "focus"])
+        click(app, "교육 전 검사")
+        self.assertTrue(any("문항 2/" in item.value for item in app.caption))
+        click(app, "내 교육으로 돌아가기")
+        click(app, "교육 후 검사")
+        self.assertEqual(app.session_state[PREFIX + "phase"], "post")
+        self.assertTrue(any("먼저 완료" in item.value for item in app.info))
+        store.assignments[1]["active"] = False
+        app.run()
+        self.assertFalse(app.session_state[PREFIX + "focus"])
+        self.assertFalse(any(r.label == "응답" for r in app.radio))
+
     def test_snapshot_and_cross_assignment_record_rejected(self):
         config = project_config()
         self.assertEqual([q["question_code"] for q in _project_questions(config)], config["question_snapshot_codes"])
@@ -128,6 +157,7 @@ class AccountAssessmentTests(unittest.TestCase):
         self.assertTrue(any("문항 2/" in caption.value for caption in app.caption))
         for _ in range(len(store.config["question_snapshot_codes"]) - 1):
             answer(app, 4)
+        self.assertTrue(next(e for e in app.expander if e.label == "제출 전 내 응답 확인").proto.expanded)
         self.assertFalse(store.records["a", "pre"]["completed"])
         store.fail_next = True
         click(app, "교육 전 검사 최종 제출")
@@ -145,9 +175,10 @@ class AccountAssessmentTests(unittest.TestCase):
             "payload": {"responses": {code: 3 for code in store.config["question_snapshot_codes"]}},
         }
         app = participant_app(store)
-        self.assertEqual(next(r for r in app.radio if r.label == "검사 단계").value, "post")
+        self.assertEqual(app.session_state[PREFIX + "phase"], "post")
         for _ in store.config["question_snapshot_codes"]:
             answer(app, 4)
+        self.assertTrue(next(e for e in app.expander if e.label == "제출 전 내 응답 확인").proto.expanded)
         click(app, "교육 후 검사 최종 제출")
         self.assertFalse(store.records["a", "post"]["completed"])
         self.assertTrue(app.error)
@@ -162,16 +193,24 @@ class AccountAssessmentTests(unittest.TestCase):
         self.assertTrue(store.records["a", "post"]["completed"])
         comparison = app.dataframe[0].value
         self.assertEqual(float(comparison.iloc[0]["관찰 변화"]), 1.0)
+        click(app, "내 교육으로 돌아가기")
+        click(app, "나의 전·후 리포트 보기")
+        self.assertTrue(any(item.value == "나의 교육 전·후 리포트" for item in app.subheader))
+        self.assertEqual(float(app.dataframe[0].value.iloc[0]["관찰 변화"]), 1.0)
 
     def test_assignment_switch_cannot_reuse_response_widgets(self):
         store = MemoryStore(multiple=True)
         app = participant_app(store)
         answer(app, 2)
+        click(app, "내 교육으로 돌아가기")
         app.selectbox[0].set_value("b").run()
+        click(app, "교육 전 검사")
         self.assertFalse(app.exception)
         self.assertIsNone(next(r for r in app.radio if r.label == "응답").value)
         answer(app, 5)
+        click(app, "내 교육으로 돌아가기")
         app.selectbox[0].set_value("a").run()
+        click(app, "교육 전 검사")
         self.assertFalse(app.exception)
         self.assertTrue(any("문항 2/" in caption.value for caption in app.caption))
         first = store.config["question_snapshot_codes"][0]
@@ -248,12 +287,15 @@ class AccountAssessmentTests(unittest.TestCase):
         old_receipt = {"owner": app.session_state[PREFIX + "owner"], "record": copy.deepcopy(store.records["a", "pre"])}
         app.session_state[PREFIX + "saved_record"] = old_receipt
         before_reads = len(store.reads)
-        next(r for r in app.radio if r.label == "검사 단계").set_value("post").run()
+        click(app, "내 교육으로 돌아가기")
+        click(app, "교육 후 검사")
         self.assertIn(("assessment", "a", "post"), store.reads[before_reads:])
         self.assertNotIn(PREFIX + "saved_record", app.session_state)
         app.session_state[PREFIX + "saved_record"] = old_receipt
         before_reads = len(store.reads)
+        click(app, "내 교육으로 돌아가기")
         app.selectbox[0].set_value("b").run()
+        click(app, "교육 전 검사")
         self.assertIn(("assessment", "b", "pre"), store.reads[before_reads:])
         self.assertIsNone(next(r for r in app.radio if r.label == "응답").value)
         self.assertNotIn(PREFIX + "saved_record", app.session_state)

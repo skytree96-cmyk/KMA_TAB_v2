@@ -26,6 +26,24 @@ class PortalAccessTests(unittest.TestCase):
         self.assertFalse(any(item.label in {"교육담당자", "참여자", "KMA 관리자"} for item in app.button))
         self.assertFalse(any("공개 데모" in item.value for item in app.markdown))
 
+    def test_successful_login_replaces_login_layout_with_workspace(self):
+        from tap import account_portal
+        class Store:
+            def login(self, login_id, password):
+                return "opaque-token"
+            def principal(self, token):
+                return dict(id="p1", login_id="user", display_name="참여자", role="participant", company_id="c1", must_change_password=False)
+        with patch.dict(os.environ, {"DATABASE_URL":"postgresql://test.invalid/test"}), patch.object(account_portal, "_configured_store", return_value=Store()), patch("tap.account_assessment_ui.render_participant") as participant:
+            app = AppTest.from_function(_portal_entry).run()
+            app.text_input[0].input("user")
+            app.text_input[1].input("kma")
+            next(button for button in app.button if button.label == "로그인").click().run()
+            self.assertEqual(list(app.exception), [])
+            self.assertEqual(app.session_state[account_portal.TOKEN_KEY], "opaque-token")
+            self.assertFalse(app.text_input)
+            self.assertFalse(any(title.value == "로그인" for title in app.title))
+            participant.assert_called_once()
+
     def test_all_legacy_entrypoints_stop_before_loading_demo(self):
         with patch.dict(os.environ, {"TAP_APP_MODE": "production"}):
             for path in sorted((ROOT / "pages").glob("*.py")):
