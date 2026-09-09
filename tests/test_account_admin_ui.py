@@ -310,6 +310,8 @@ _render_assignments(Store(), "token", {"id":"p1", "company_id":"co1"}, [{"id":"u
                 run_app(app)
                 selector = next(item for item in app.selectbox if item.label == "관리할 계정")
                 self.assertEqual(len(selector.options), 1)
+                selector.select("u2")
+                run_app(app)
                 next(item for item in app.button if item.label == "임시 비밀번호 재발급").click()
                 run_app(app)
                 self.assertEqual(list(app.exception), [])
@@ -364,6 +366,121 @@ _render_assignments(Store(), "token", {"id":"p1", "company_id":"co1"}, [{"id":"u
         self.assertTrue(any("3행" in item.value for item in app.error))
         self.assertFalse(any(item.label.startswith("새 참여자") for item in app.button))
         self.assertNotIn("issued", app.session_state.filtered_state)
+
+
+MANAGE_USERS_APP = '''
+import streamlit as st
+from tap.account_admin_ui import _render_manage_users
+class Store:
+    def reset_password(self, token, user_id, temp_password):
+        st.session_state["resets"] = st.session_state.get("resets", []) + [{"user_id":user_id, "password":temp_password}]
+    def set_user_active(self, token, user_id, active):
+        st.session_state["toggles"] = st.session_state.get("toggles", []) + [{"user_id":user_id, "active":active}]
+        st.session_state["users"] = [{**row, "active":active} if row["id"] == user_id else row for row in st.session_state["users"]]
+_render_manage_users(Store(), "opaque-token", st.session_state["principal"], st.session_state["users"])
+'''
+
+
+class AccountManagementSearchTests(unittest.TestCase):
+    def app(self, role="kma"):
+        app = AppTest.from_string(MANAGE_USERS_APP)
+        app.session_state["principal"] = {"id":"admin1", "role":role, "company_id":"co1"}
+        app.session_state["users"] = [
+            {"id":"u1", "login_id":"alpha-hong", "display_name":"홍길동", "role":"participant", "company_id":"co1", "company_name":"알파 교육", "active":True},
+            {"id":"u2", "login_id":"beta-hong", "display_name":"홍길동", "role":"participant", "company_id":"co2", "company_name":"Beta Academy", "active":True},
+            {"id":"u3", "login_id":"alpha-manager", "display_name":"김담당", "role":"company", "company_id":"co1", "company_name":"알파 교육", "active":False},
+            {"id":"admin2", "login_id":"system-admin", "display_name":"KMA 관리자", "role":"kma", "active":True},
+        ]
+        return app.run(timeout=30)
+
+    def search(self, app, value):
+        app.text_input(key="account_admin_manage_user_search").input(value)
+        run_app(app)
+        self.assertEqual(list(app.exception), [])
+
+    def assert_accounts(self, app, login_ids):
+        self.assertEqual(list(app.exception), [])
+        table = next(item.value for item in app.dataframe if "로그인 아이디" in item.value.columns)
+        self.assertEqual(list(table["로그인 아이디"]), login_ids)
+        options = app.selectbox(key="account_admin_manage_user").options
+        self.assertEqual([label.split(" · ")[1] for label in options], login_ids)
+        self.assertTrue(all(len(label.split(" · ")) == 3 for label in options))
+
+    def assert_no_account_actions(self, app):
+        self.assertFalse(any(item.label in {"임시 비밀번호 재발급", "계정 사용 중지", "계정 다시 활성화"} for item in app.button))
+
+    def test_search_matches_name_id_or_company_and_keeps_table_and_options_consistent(self):
+        app = self.app()
+        self.assert_accounts(app, ["alpha-hong", "beta-hong", "alpha-manager"])
+        self.assertIsNone(app.selectbox(key="account_admin_manage_user").value)
+        self.assert_no_account_actions(app)
+        for query, expected in (
+            ("  홍길동  ", ["alpha-hong", "beta-hong"]),
+            ("ALPHA-HO", ["alpha-hong"]),
+            ("bEtA aCaDeMy", ["beta-hong"]),
+            ("알파 교육", ["alpha-hong", "alpha-manager"]),
+            ("   ", ["alpha-hong", "beta-hong", "alpha-manager"]),
+        ):
+            with self.subTest(query=query):
+                self.search(app, query)
+                self.assert_accounts(app, expected)
+        self.search(app, "없는 회사")
+        self.assertTrue(any(item.value.startswith("검색 결과가 없습니다.") for item in app.info))
+        self.assertFalse(any(item.label == "관리할 계정" for item in app.selectbox))
+        self.assert_no_account_actions(app)
+        self.search(app, "")
+        self.assert_accounts(app, ["alpha-hong", "beta-hong", "alpha-manager"])
+        self.assertIsNone(app.selectbox(key="account_admin_manage_user").value)
+        self.assert_no_account_actions(app)
+
+    def test_search_preserves_matching_selection_and_clears_stale_action_target(self):
+        app = self.app()
+        app.selectbox(key="account_admin_manage_user").select("u1")
+        run_app(app)
+        self.search(app, "홍길동")
+        self.assertEqual(app.selectbox(key="account_admin_manage_user").value, "u1")
+        self.search(app, "알파 교육")
+        self.assertEqual(app.selectbox(key="account_admin_manage_user").value, "u1")
+        # A changed query and a click from the previous rendered account must
+        # never reset that old account or silently select the next result.
+        app.text_input(key="account_admin_manage_user_search").input("Beta Academy")
+        app.button(key="account_admin_password_reset").click()
+        run_app(app)
+        self.assertEqual(list(app.exception), [])
+        self.assert_accounts(app, ["beta-hong"])
+        self.assertIsNone(app.selectbox(key="account_admin_manage_user").value)
+        self.assert_no_account_actions(app)
+        self.assertNotIn("resets", app.session_state.filtered_state)
+        app.selectbox(key="account_admin_manage_user").select("u2")
+        run_app(app)
+        app.button(key="account_admin_password_reset").click()
+        run_app(app)
+        self.assertEqual(list(app.exception), [])
+        self.assertEqual(app.session_state["resets"], [{"user_id":"u2", "password":"kma"}])
+        self.assertEqual(app.session_state["account_admin_credentials"]["rows"][0]["login_id"], "beta-hong")
+        app.button(key="account_admin_toggle_active").click()
+        run_app(app)
+        self.assertEqual(list(app.exception), [])
+        self.assertEqual(app.session_state["toggles"], [{"user_id":"u2", "active":False}])
+        self.search(app, "검색 결과 없음")
+        self.assert_no_account_actions(app)
+        self.search(app, "")
+        self.assertIsNone(app.selectbox(key="account_admin_manage_user").value)
+        self.assert_no_account_actions(app)
+
+    def test_company_manager_search_cannot_expose_other_companies_or_managers(self):
+        app = self.app(role="company")
+        self.assert_accounts(app, ["alpha-hong"])
+        self.search(app, "홍길동")
+        self.assert_accounts(app, ["alpha-hong"])
+        self.search(app, "알파 교육")
+        self.assert_accounts(app, ["alpha-hong"])
+        for query in ("Beta Academy", "beta-hong", "김담당", "KMA 관리자"):
+            with self.subTest(query=query):
+                self.search(app, query)
+                self.assertTrue(any(item.value.startswith("검색 결과가 없습니다.") for item in app.info))
+                self.assertFalse(any(item.label == "관리할 계정" for item in app.selectbox))
+                self.assert_no_account_actions(app)
 
 
 if __name__ == "__main__":

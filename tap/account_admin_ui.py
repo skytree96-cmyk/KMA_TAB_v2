@@ -371,13 +371,37 @@ def _render_manage_users(store: Any, token: str, principal: Mapping[str, Any], u
     st.subheader("계정 관리")
     allowed = [row for row in users if row.get("role") in {"company", "participant"} and _identifier(row) != _identifier(principal)]
     if principal.get("role") == "company":
-        allowed = [row for row in allowed if row.get("role") == "participant"]
+        allowed = [row for row in allowed if row.get("role") == "participant" and row.get("company_id") == principal.get("company_id")]
+    selection_key = PREFIX + "manage_user"
     if not allowed:
+        st.session_state[selection_key] = None
         st.info("관리할 계정이 없습니다.")
         return
-    st.dataframe([{"로그인 아이디": row["login_id"], "이름": row.get("display_name", ""), "역할": ROLE_LABELS.get(row["role"], ""), "회사": row.get("company_name", ""), **{label: row.get(key, "") for key, (label, _) in PROFILE_FIELDS.items()}, "상태": "사용 중" if row.get("active", True) else "중지"} for row in allowed], hide_index=True, width="stretch")
-    by_id = {_identifier(row): row for row in allowed}
-    selected = st.selectbox("관리할 계정", list(by_id), format_func=lambda value: f"{by_id[value]['display_name']} · {by_id[value]['login_id']}", key=PREFIX + "manage_user")
+    query = st.text_input(
+        "계정 검색", key=PREFIX + "manage_user_search",
+        placeholder="이름, 아이디, 회사명으로 검색",
+        help="이름·아이디·회사명의 일부로 검색할 수 있습니다. 영문 대소문자는 구분하지 않습니다.",
+    ).strip().casefold()
+    matched = [row for row in allowed if not query or any(
+        query in str(row.get(field) or "").casefold()
+        for field in ("display_name", "login_id", "company_name")
+    )]
+    by_id = {_identifier(row): row for row in matched}
+    # A search must not silently change the target of reset/deactivation actions.
+    if st.session_state.get(selection_key) not in by_id:
+        st.session_state[selection_key] = None
+    st.caption(f"검색 결과 {len(matched)}명 · 전체 {len(allowed)}명")
+    if not matched:
+        st.info("검색 결과가 없습니다. 이름, 아이디 또는 회사명을 다시 입력해 주세요.")
+        return
+    st.dataframe([{"로그인 아이디": row["login_id"], "이름": row.get("display_name", ""), "역할": ROLE_LABELS.get(row["role"], ""), "회사": row.get("company_name", ""), **{label: row.get(key, "") for key, (label, _) in PROFILE_FIELDS.items()}, "상태": "사용 중" if row.get("active", True) else "중지"} for row in matched], hide_index=True, width="stretch")
+    selected = st.selectbox(
+        "관리할 계정", list(by_id),
+        format_func=lambda value: " · ".join(str(by_id[value].get(field) or "") for field in ("display_name", "login_id", "company_name") if by_id[value].get(field)),
+        key=selection_key, index=None, placeholder="관리할 계정을 선택하세요",
+    )
+    if selected is None:
+        return
     user = by_id[selected]
     st.caption("임시 비밀번호를 kma로 재발급합니다. 다시 로그인할 때 새 비밀번호로 변경해야 합니다.")
     left, right = st.columns(2)
@@ -479,11 +503,41 @@ def _render_assignments(store: Any, token: str, project: Mapping[str, Any], user
 
 def _render_projects(store: Any, token: str, principal: Mapping[str, Any], projects: list[dict[str, Any]], users: list[dict[str, Any]]) -> None:
     st.subheader("프로젝트 현황")
+    if principal.get("role") == "company":
+        projects = [row for row in projects if row.get("company_id") == principal.get("company_id")]
+    selection_key = PREFIX + "project_select"
     if not projects:
+        st.session_state[selection_key] = None
         st.info("등록된 프로젝트가 없습니다.")
         return
-    by_id = {_identifier(row): row for row in projects}
-    selected = st.selectbox("프로젝트 선택", list(by_id), format_func=lambda value: str(by_id[value].get("name") or by_id[value].get("project_name") or "교육평가 프로젝트") + (f" · {by_id[value]['company_name']}" if by_id[value].get("company_name") else ""), key=PREFIX + "project_select")
+    query = st.text_input(
+        "프로젝트 검색", key=PREFIX + "project_search",
+        placeholder="회사명, 프로젝트명, 교육명으로 검색",
+        help="회사명·프로젝트명·교육명의 일부로 검색할 수 있습니다. 영문 대소문자는 구분하지 않습니다.",
+    ).strip().casefold()
+    matched = [row for row in projects if not query or any(
+        query in str(value or "").casefold() for value in (
+            row.get("company_name"), row.get("name") or row.get("project_name"),
+            (row.get("config") or {}).get("course_name"),
+        )
+    )]
+    by_id = {_identifier(row): row for row in matched}
+    if st.session_state.get(selection_key) not in by_id:
+        st.session_state[selection_key] = None
+    st.caption(f"검색 결과 {len(matched)}개 · 전체 {len(projects)}개")
+    if not matched:
+        st.info("검색 결과가 없습니다. 회사명, 프로젝트명 또는 교육명을 다시 입력해 주세요.")
+        return
+    selected = st.selectbox(
+        "프로젝트 선택", list(by_id),
+        format_func=lambda value: " · ".join(str(part) for part in (
+            by_id[value].get("name") or by_id[value].get("project_name") or "교육평가 프로젝트",
+            by_id[value].get("company_name"), (by_id[value].get("config") or {}).get("course_name"),
+        ) if part),
+        key=selection_key, index=None, placeholder="프로젝트를 선택하세요",
+    )
+    if selected is None:
+        return
     project = by_id[selected]
     config = project.get("config", {})
     if config:
