@@ -288,6 +288,8 @@ def _exercise(scoped_url: str) -> None:
 
     from scripts.seed_sundaeguk import seed_company
     from tap.account_reports import summarize_project
+    # The earlier registration-edit check occupied the seed placeholder.
+    store.set_company_registration_number(admin, company_a["id"], "0000000002")
     fixture = seed_company(store)
     _check(fixture["created"] and (fixture["total"], fixture["pre_completed"], fixture["post_completed"], fixture["nonparticipants"]) == (15, 5, 5, 10))
     repeat = seed_company(store)
