@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 from contextlib import closing
+import json
+from datetime import datetime, timezone
 import sqlite3
 import unittest
 from unittest.mock import patch
@@ -102,7 +104,8 @@ class AccountCatalogTests(unittest.TestCase):
         self.store.save_assessment(token, assignment["id"], "post", self.payload(full, True), True)
         with patch.object(self.store, "_execute", wraps=self.store._execute) as execute:
             admin = self.store.dashboard_summary(self.admin)
-        self.assertFalse(any("payload_json" in call.args[1] for call in execute.call_args_list))
+        self.assertNotIn("payload_json", json.dumps(admin))
+        self.assertLessEqual(len(execute.call_args_list), 9)
         self.assertEqual((admin["companies_count"], admin["company_users_count"], admin["participant_users_count"]), (2, 2, 3))
         self.assertEqual(len(admin["projects"]), 3)
         summary_a = self.store.dashboard_summary(manager_a)
@@ -131,3 +134,43 @@ class AccountCatalogTests(unittest.TestCase):
         self.assertIsNone(by_id[removed["id"]]["post_payload"])
         with self.assertRaises(AuthorizationError):
             self.store.project_results(manager_b, full["id"])
+
+    def test_dashboard_people_include_unassigned_and_inactive_and_deduplicate(self):
+        _, manager = self.user("company", suffix="mgr")
+        active, token = self.user()
+        empty, empty_token = self.user(suffix="empty")
+        suspended, _ = self.user(suffix="unassigned")
+        foreign, foreign_token = self.user(company=self.b)
+        vacant = self.store.create_company(self.admin, "아직 미참여 회사", "1111111111")
+        projects = [self.project(), self.project(), self.project()]
+        assignments = [self.store.assign_participant(self.admin, project["id"], active["id"]) for project in projects]
+        for project, assignment in zip(projects, assignments):
+            self.store.save_assessment(token, assignment["id"], "pre", self.payload(project), True)
+        blank = self.store.assign_participant(self.admin, projects[0]["id"], empty["id"])
+        self.store.save_assessment(empty_token, blank["id"], "pre", {"responses": {}, "current_question": 0}, False)
+        other_project = self.project(company=self.b)
+        other_assignment = self.store.assign_participant(self.admin, other_project["id"], foreign["id"])
+        draft = self.payload(other_project)
+        draft["responses"] = {next(iter(draft["responses"])): 0}
+        self.store.save_assessment(foreign_token, other_assignment["id"], "pre", draft, False)
+        # Isolated fixture changes cover history and month boundaries without
+        # advancing the session clock or mutating any production account.
+        with closing(sqlite3.connect(self.path)) as conn:
+            conn.execute("UPDATE tap_users SET active=0 WHERE id IN (?,?)", (active["id"], suspended["id"]))
+            conn.execute("UPDATE tap_assignments SET active=0 WHERE user_id=?", (active["id"],))
+            conn.execute("UPDATE tap_assessments SET completed_at=? WHERE assignment_id=?", (datetime(2026, 8, 31, 15, 0, tzinfo=timezone.utc).timestamp(), assignments[0]["id"]))
+            conn.execute("UPDATE tap_assessments SET completed_at=? WHERE assignment_id=?", (datetime(2026, 8, 31, 14, 59, tzinfo=timezone.utc).timestamp(), assignments[1]["id"]))
+            conn.commit()
+        summary = self.store.dashboard_summary(self.admin)
+        self.assertEqual((summary["companies_count"], summary["participating_companies_count"], summary["participant_users_count"], summary["participating_users_count"], summary["pre_completed_users_count"]), (3, 2, 4, 2, 1))
+        companies = {row["company_id"]: row for row in summary["company_participation"]}
+        self.assertEqual((companies[self.a["id"]]["total"], companies[self.a["id"]]["participating"]), (3, 1))
+        self.assertEqual((companies[vacant["id"]]["total"], companies[vacant["id"]]["participating"]), (0, 0))
+        own = self.store.dashboard_summary(manager)
+        self.assertEqual((own["participant_users_count"], own["participating_users_count"], own["participating_companies_count"]), (3, 1, 1))
+        self.assertEqual([row["company_id"] for row in own["company_participation"]], [self.a["id"]])
+        months = {row["month"]: row for row in own["completion_trend"]}
+        self.assertEqual(len(months), 12)
+        self.assertEqual(months["2026-08"]["pre_completed"], 1)
+        self.assertEqual(months["2026-09"]["pre_completed"], 1)
+        self.assertTrue(all(row["post_completed"] == 0 for row in months.values()))

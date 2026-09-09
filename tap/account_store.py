@@ -318,7 +318,25 @@ class AccountStore:
             projects = self._all(conn, "SELECT p.id,p.company_id,c.name AS company_name,p.name,p.created_at,p.config_json,COALESCE(a.assigned,0) AS assigned,COALESCE(a.pre_completed,0) AS pre_completed,COALESCE(a.post_completed,0) AS post_completed FROM tap_projects p JOIN tap_companies c ON c.id=p.company_id LEFT JOIN (SELECT a.project_id,COUNT(*) AS assigned,SUM(CASE WHEN pre.completed=1 THEN 1 ELSE 0 END) AS pre_completed,SUM(CASE WHEN post.completed=1 THEN 1 ELSE 0 END) AS post_completed FROM tap_assignments a LEFT JOIN tap_assessments pre ON pre.assignment_id=a.id AND pre.phase='pre' LEFT JOIN tap_assessments post ON post.assignment_id=a.id AND post.phase='post' WHERE a.active=1 GROUP BY a.project_id) a ON a.project_id=p.id" + (" WHERE p.company_id=?" if scoped else "") + " ORDER BY p.created_at,p.id", params)
             for project in projects:
                 project["config"] = json.loads(project.pop("config_json"))
-            return {"companies_count": companies["total"], "company_users_count": counts.get("company", 0), "participant_users_count": counts.get("participant", 0), "projects": projects}
+            # Count people, not assignments. Include unassigned/inactive accounts and
+            # historical assignments so the denominator remains the whole registry.
+            has_answers = ("json_type(s.payload_json,'$.responses')='object' AND json_extract(s.payload_json,'$.responses')<>'{}'" if self._sqlite else "jsonb_typeof(s.payload_json::jsonb->'responses')='object' AND s.payload_json::jsonb->'responses'<>'{}'::jsonb")
+            company_participation = self._all(conn, "SELECT c.id AS company_id,c.name AS company_name,COUNT(DISTINCT u.id) AS total,COUNT(DISTINCT CASE WHEN " + has_answers + " THEN u.id END) AS participating,COUNT(DISTINCT CASE WHEN s.phase='pre' AND s.completed=1 THEN u.id END) AS pre_completed,COUNT(DISTINCT CASE WHEN s.phase='post' AND s.completed=1 THEN u.id END) AS post_completed FROM tap_companies c LEFT JOIN tap_users u ON u.company_id=c.id AND u.role='participant' LEFT JOIN tap_assignments a ON a.user_id=u.id LEFT JOIN tap_assessments s ON s.assignment_id=a.id" + (" WHERE c.id=?" if scoped else "") + " GROUP BY c.id,c.name ORDER BY c.name,c.id", params)
+            # Only immutable completion times can reconstruct a historic monthly
+            # trend. Draft updated_at is deliberately not treated as first activity.
+            now = datetime.fromtimestamp(self._clock(), timezone(timedelta(hours=9)))
+            month_index = now.year * 12 + now.month - 1
+            month_starts = [datetime(index // 12, index % 12 + 1, 1, tzinfo=now.tzinfo) for index in range(month_index - 11, month_index + 2)]
+            month_sql = "strftime('%Y-%m',s.completed_at,'unixepoch','+9 hours')" if self._sqlite else "to_char(to_timestamp(s.completed_at) AT TIME ZONE 'Asia/Seoul','YYYY-MM')"
+            trend_rows = self._all(conn, "SELECT " + month_sql + " AS month,COUNT(DISTINCT CASE WHEN s.phase='pre' THEN u.id END) AS pre_completed,COUNT(DISTINCT CASE WHEN s.phase='post' THEN u.id END) AS post_completed FROM tap_assessments s JOIN tap_assignments a ON a.id=s.assignment_id JOIN tap_users u ON u.id=a.user_id WHERE u.role='participant' AND s.completed=1 AND s.completed_at>=? AND s.completed_at<?" + (" AND u.company_id=?" if scoped else "") + " GROUP BY " + month_sql + " ORDER BY month", (month_starts[0].timestamp(), min(month_starts[-1].timestamp(), self._clock() + 0.000001), *params))
+            trend_by_month = {row["month"]: row for row in trend_rows}
+            completion_trend = [trend_by_month.get(start.strftime("%Y-%m"), {"month": start.strftime("%Y-%m"), "pre_completed": 0, "post_completed": 0}) for start in month_starts[:-1]]
+            return {"companies_count": companies["total"], "company_users_count": counts.get("company", 0), "participant_users_count": counts.get("participant", 0), "projects": projects,
+                    "participating_companies_count": sum(row["participating"] > 0 for row in company_participation),
+                    "participating_users_count": sum(row["participating"] for row in company_participation),
+                    "pre_completed_users_count": sum(row["pre_completed"] for row in company_participation),
+                    "post_completed_users_count": sum(row["post_completed"] for row in company_participation),
+                    "company_participation": company_participation, "completion_trend": completion_trend}
 
     def _question_bank(self, conn) -> list[dict]:
         overrides = {row["question_code"]: row for row in self._all(conn, "SELECT o.question_code,o.item_text,o.revision,o.updated_at,u.login_id AS updated_by FROM tap_question_overrides o JOIN tap_users u ON u.id=o.updated_by")}

@@ -34,7 +34,11 @@ class Store:
             projects = [row for row in projects if row["company_id"] == "co1"]
         return {"companies_count":2 if role == "kma" else 1,
                 "company_users_count":2 if role == "kma" else 1,
-                "participant_users_count":12 if role == "kma" else 10, "projects":projects}
+                "participant_users_count":12 if role == "kma" else 10, "projects":projects,
+                "participating_companies_count":2 if projects else 0,
+                "participating_users_count":9 if role == "kma" and projects else (8 if projects else 0),
+                "pre_completed_users_count":8 if projects else 0,"post_completed_users_count":3 if projects else 0,
+                "company_participation":[], "completion_trend":[{"month":"2026-09","pre_completed":8,"post_completed":3}]}
     def project_results(self, token, project_id):
         st.session_state["reads"] = st.session_state.get("reads", []) + [("report", project_id)]
         return []
@@ -59,7 +63,7 @@ class AccountDashboardTests(unittest.TestCase):
         return app
 
     def test_kma_and_company_load_one_aggregate_and_render_scoped_counts(self):
-        for role, expected in (("kma", ["2", "12", "9", "3"]), ("company", ["1", "10", "8", "3"])):
+        for role, expected in (("kma", ["2 개사", "9 명", "12 명", "2 개"]), ("company", ["8 명", "8 명", "3 명", "1 개"])):
             with self.subTest(role=role):
                 app = self.app(role)
                 self.assertEqual([metric.value for metric in app.metric], expected)
@@ -70,7 +74,7 @@ class AccountDashboardTests(unittest.TestCase):
                 self.assertEqual(len(app.tabs), 0)
                 self.assertFalse(app.error)
                 if role == "kma":
-                    self.assertTrue(any("회원사 2곳" in caption.value for caption in app.caption))
+                    self.assertTrue(any("전체 등록 기업 2개사" in caption.value for caption in app.caption))
                 else:
                     self.assertNotIn("Beta", str([frame.value for frame in app.dataframe]))
                     self.assertFalse(any(box.key == "account_dashboard_company" for box in app.selectbox))
@@ -89,7 +93,7 @@ class AccountDashboardTests(unittest.TestCase):
 
     def test_company_defensively_excludes_other_company_projects(self):
         app = self.app("company", unscoped_fake=True)
-        self.assertEqual(app.metric[0].value, "1")
+        self.assertEqual(app.metric[3].value, "1 개")
         self.assertEqual(len(app.selectbox(key="account_dashboard_report").options), 1)
         self.assertNotIn("Beta", str([frame.value for frame in app.dataframe]))
 
@@ -124,10 +128,19 @@ class AccountDashboardTests(unittest.TestCase):
 
     def test_empty_store_renders_zero_counts_without_demo_or_report(self):
         app = self.app(projects=[])
-        self.assertEqual([metric.value for metric in app.metric], ["0", "12", "0", "0"])
+        self.assertEqual([metric.value for metric in app.metric], ["0 개사", "0 명", "12 명", "0 개"])
         self.assertTrue(any("등록된 프로젝트가 없습니다" in item.value for item in app.info))
         self.assertEqual(len(app.dataframe), 0)
         self.assertEqual(app.session_state["reads"], [("dashboard", "session-token")])
+
+    def test_rates_handle_no_population_and_explain_denominator(self):
+        from tap.account_dashboard import _rate
+        self.assertEqual(_rate(0, 0), "—")
+        self.assertEqual(_rate(1, 4), "25%")
+        app = self.app()
+        self.assertTrue(any("전체 등록 참여자" in item.value for item in app.caption))
+        self.assertTrue(any("미배정·사용 중지 포함" in item.value for item in app.caption))
+        self.assertTrue(any("전체 검사 완료 추세" in item.value for item in app.subheader))
 
     def test_phase_status_and_schedule_checks_use_inclusive_dates(self):
         expected = {

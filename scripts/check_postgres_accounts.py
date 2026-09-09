@@ -218,6 +218,7 @@ def _exercise(scoped_url: str) -> None:
     summary = store.dashboard_summary(admin)
     _check((summary["companies_count"], summary["company_users_count"], summary["participant_users_count"]) == (2, 1, 3))
     _check(len(summary["projects"]) == 2)
+    _check(summary["participating_users_count"] == 0 and len(summary["company_participation"]) == 2)
     foreign_summary = store.dashboard_summary(other_company_token)
     _check(foreign_summary["companies_count"] == 1 and foreign_summary["projects"] == [])
     _check(foreign_summary["participant_users_count"] == 0)
@@ -228,6 +229,8 @@ def _exercise(scoped_url: str) -> None:
     _denied(AuthorizationError, store.save_assessment, peer_token, assignment_id, "pre", draft, False)
     receipt = store.save_assessment(participant_token, assignment_id, "pre", draft, False)
     _check(receipt["completed"] is False and receipt["payload"] == draft)
+    draft_summary = store.dashboard_summary(admin)
+    _check(draft_summary["participating_users_count"] == 1 and draft_summary["pre_completed_users_count"] == 0)
 
     # A fresh store and fresh connections must recover the server draft.
     store = AccountStore(scoped_url, clock=lambda: now[0])
@@ -261,7 +264,12 @@ def _exercise(scoped_url: str) -> None:
     report = store.project_results(admin, project["id"])
     _check(len(report) == 1 and report[0]["user_id"] == participant["id"])
     _check(report[0]["pre_payload"] == pre and report[0]["post_payload"] == post)
-    progress = {row["id"]: row for row in store.dashboard_summary(admin)["projects"]}
+    completed_summary = store.dashboard_summary(admin)
+    _check((completed_summary["participating_companies_count"], completed_summary["participating_users_count"], completed_summary["pre_completed_users_count"], completed_summary["post_completed_users_count"]) == (1, 1, 1, 1))
+    _check(len(completed_summary["completion_trend"]) == 12)
+    _check(sum(row["pre_completed"] for row in completed_summary["completion_trend"]) == 1)
+    _check(sum(row["post_completed"] for row in completed_summary["completion_trend"]) == 1)
+    progress = {row["id"]: row for row in completed_summary["projects"]}
     _check((progress[project["id"]]["assigned"], progress[project["id"]]["pre_completed"], progress[project["id"]]["post_completed"]) == (1, 1, 1))
     comparison = score_pre_post_responses(questions_for_factors(["CORE-CO"]), pre["responses"], post["responses"])
     _check(len(comparison) == 1 and comparison[0]["paired_valid_items"] == 3

@@ -425,3 +425,47 @@
 .stApp:has(.st-key-tap_workspace_topbar) .st-key-tap_workspace_nav [data-testid="stColumn"],
 .stApp:has(.st-key-tap_workspace_topbar) .st-key-tap_workspace_nav [data-testid="stButton"],
 .stApp:has(.st-key-tap_workspace_topbar) .st-key-tap_workspace_nav [data-testid="stButton"] button {width:max-content;min-width:max-content;max-width:none;}
+
+/* Dashboard: opaque white panels and explicit type hierarchy. */
+.stApp:has(.st-key-tap_workspace_topbar) [class*="st-key-account_dashboard_"][data-testid="stVerticalBlockBorderWrapper"],
+.stApp:has(.st-key-tap_workspace_topbar) :is(.st-key-account_dashboard_participation,.st-key-account_dashboard_ranking,.st-key-account_dashboard_trend,.st-key-account_dashboard_schedule,.st-key-account_dashboard_projects) {
+ background:#fff;border:1px solid #dce9e6;border-radius:22px;padding:26px;box-shadow:0 8px 28px #143f3610;
+}
+.stApp:has(.st-key-tap_workspace_topbar) .st-key-account_dashboard_metrics [data-testid="stMetric"] {background:#fff;border:1px solid #dce9e6;border-radius:20px;padding:24px;box-shadow:0 7px 20px #143f3609;}
+.stApp:has(.st-key-tap_workspace_topbar) .st-key-account_dashboard_metrics [data-testid="stMetricLabel"] p {font-weight:700;font-size:17px;color:#46635f;}
+.stApp:has(.st-key-tap_workspace_topbar) .st-key-account_dashboard_metrics [data-testid="stMetricValue"] p {font-weight:800;font-size:36px;line-height:1.4;color:#103b37;}
+.stApp:has(.st-key-tap_workspace_topbar) [class*="st-key-account_dashboard_"] h3 {font-size:23px;font-weight:800;color:#153d38;}
+.tap-dash-rings {display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;margin:20px 0 28px;}
+.tap-dash-ring-item {display:flex;flex-direction:column;align-items:center;gap:12px;text-align:center;min-width:0;}
+.tap-dash-ring {width:clamp(84px,10vw,134px);aspect-ratio:1;border-radius:50%;background:conic-gradient(var(--ring) calc(var(--rate)*1%),#e9f0ed 0);display:grid;place-items:center;position:relative;box-shadow:0 5px 12px #1269570b;}
+.tap-dash-ring::before {content:"";position:absolute;inset:10px;border-radius:50%;background:#fff;}
+.tap-dash-ring strong {z-index:1;font-size:28px;font-weight:800;color:var(--ring);}
+.tap-dash-ring-item b {font-size:16px;color:#23473f;font-weight:750;}
+.tap-dash-ring-item span {font-size:14px;color:#57736c;}
+.tap-dash-insight {display:flex;justify-content:space-between;align-items:center;gap:14px;flex-wrap:wrap;padding:17px 20px;background:#edf7f3;border:1px solid #d9eee5;border-radius:12px;color:#234f43;font-size:16px;}
+.tap-dash-insight strong {font-size:20px;font-weight:800;}
+.tap-dash-ranking {max-height:336px;overflow:auto;padding-right:5px;}
+.tap-dash-rank {display:flex;gap:14px;padding:16px 0;border-bottom:1px solid #e8f0ed;}
+.tap-dash-rank:last-child {border-bottom:0;}
+.tap-dash-rank-no {width:28px;height:28px;flex:none;border-radius:9px;background:#edf5f1;color:#38705f;font-size:13px;font-weight:800;display:grid;place-items:center;}
+.tap-dash-rank-body {min-width:0;flex:1;}
+.tap-dash-rank-body>div:first-child {display:flex;justify-content:space-between;gap:12px;color:#20483e;}
+.tap-dash-rank-body b {font-size:16px;font-weight:750;overflow-wrap:anywhere;}
+.tap-dash-rank-body strong {font-size:20px;color:#087b76;white-space:nowrap;}
+.tap-dash-rank-body>span {display:block;font-size:13px;color:#647e75;margin:5px 0 9px;}
+.tap-dash-track {height:5px;background:#eaf1ed;border-radius:8px;overflow:hidden;}
+.tap-dash-track i {display:block;height:100%;border-radius:8px;background:linear-gradient(90deg,#087b76,#51bcac);}
+@media(max-width:900px) {
+ .stApp:has(.st-key-tap_workspace_topbar) .st-key-account_dashboard_overview>[data-testid="stVerticalBlock"]>[data-testid="stHorizontalBlock"] {flex-direction:column;}
+ .stApp:has(.st-key-tap_workspace_topbar) .st-key-account_dashboard_overview [data-testid="stColumn"] {width:100%;flex:1 1 100%;}
+ .tap-dash-ring {width:120px;}
+}
+@media(max-width:600px) {
+ .stApp:has(.st-key-tap_workspace_topbar) :is(.st-key-account_dashboard_participation,.st-key-account_dashboard_ranking,.st-key-account_dashboard_trend,.st-key-account_dashboard_schedule,.st-key-account_dashboard_projects) {padding:18px 14px;border-radius:16px;}
+ .stApp:has(.st-key-tap_workspace_topbar) .st-key-account_dashboard_metrics [data-testid="stHorizontalBlock"] {display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;}
+ .stApp:has(.st-key-tap_workspace_topbar) .st-key-account_dashboard_metrics [data-testid="stColumn"] {min-width:0;width:100%;}
+ .stApp:has(.st-key-tap_workspace_topbar) .st-key-account_dashboard_metrics [data-testid="stMetric"] {padding:16px 12px;}
+ .stApp:has(.st-key-tap_workspace_topbar) .st-key-account_dashboard_metrics [data-testid="stMetricValue"] p {font-size:28px;}
+ .stApp:has(.st-key-tap_workspace_topbar) .st-key-account_dashboard_metrics [data-testid="stMetricLabel"] p {font-size:15px;}
+ .tap-dash-rings {gap:8px;}.tap-dash-ring {width:80px;}.tap-dash-ring::before{inset:7px;}.tap-dash-ring strong {font-size:22px;}.tap-dash-ring-item b{font-size:13px;}.tap-dash-ring-item span{font-size:12px;}
+}
