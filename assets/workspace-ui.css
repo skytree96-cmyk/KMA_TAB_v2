@@ -1,0 +1,398 @@
+/* KMA TAP authenticated workspace. Every override requires the real top bar.
+   Public landing, login, guide and assessment answer controls retain their styles. */
+.stApp:has(.st-key-tap_workspace_topbar) {
+  --tap-workspace-surface: #fff;
+  --tap-workspace-soft: #f8fafb;
+  --tap-workspace-border: #e2e9ec;
+  --tap-workspace-canvas: #f4f7f8;
+  --tap-workspace-selected: #eaf6f3;
+  --tap-workspace-shadow: 0 6px 20px rgba(19,55,67,.025);
+  background: var(--tap-workspace-canvas);
+}
+@supports (color: light-dark(white,black)) {
+  .stApp:has(.st-key-tap_workspace_topbar) {
+    --tap-workspace-surface: light-dark(#fff,#192d37);
+    --tap-workspace-soft: light-dark(#f8fafb,#203640);
+    --tap-workspace-border: light-dark(#e2e9ec,#324852);
+    --tap-workspace-canvas: light-dark(#f4f7f8,#11212a);
+    --tap-workspace-selected: light-dark(#eaf6f3,#203f43);
+    --tap-workspace-shadow: 0 6px 20px light-dark(#13374306,#0000001a);
+  }
+}
+.stApp:has(.st-key-tap_workspace_topbar) [data-testid="stSidebar"],
+.stApp:has(.st-key-tap_workspace_topbar) [data-testid="stSidebarCollapsedControl"] {
+  display: none;
+}
+.stApp:has(.st-key-tap_workspace_topbar) [data-testid="stMain"] {
+  margin-left: 0;
+  width: 100%;
+}
+.stApp:has(.st-key-tap_workspace_topbar) [data-testid="stMainBlockContainer"] {
+  max-width: none;
+  width: 100%;
+  padding: 0 0 3rem;
+}
+.stApp:has(.st-key-tap_workspace_topbar) [data-testid="stMainBlockContainer"] > [data-testid="stVerticalBlock"] {
+  gap: 0;
+}
+.stApp:has(.st-key-tap_workspace_topbar) .st-key-tap_workspace_topbar {
+  position: relative;
+  width: 100%;
+  padding: 0 28px;
+  border: 0;
+  border-bottom: 1px solid var(--tap-workspace-border);
+  border-radius: 0;
+  background: var(--tap-workspace-surface);
+  box-shadow: none;
+  gap: 0;
+}
+.stApp:has(.st-key-tap_workspace_topbar) .st-key-tap_workspace_topbar [data-testid="stHorizontalBlock"]:has(.st-key-tap_workspace_brand) {
+  display: grid;
+  grid-template-columns: 156px minmax(0,1fr) minmax(132px,190px);
+  align-items: center;
+  min-height: 76px;
+  gap: 28px;
+}
+.stApp:has(.st-key-tap_workspace_topbar) .st-key-tap_workspace_topbar [data-testid="stColumn"]:has(.st-key-tap_workspace_brand),
+.stApp:has(.st-key-tap_workspace_topbar) .st-key-tap_workspace_topbar [data-testid="stColumn"]:has(.st-key-tap_workspace_nav),
+.stApp:has(.st-key-tap_workspace_topbar) .st-key-tap_workspace_topbar [data-testid="stColumn"]:has(.st-key-tap_workspace_profile) {
+  width: auto;
+  min-width: 0;
+  flex: unset;
+}
+.stApp:has(.st-key-tap_workspace_topbar) .st-key-tap_workspace_brand .tap-ci {
+  margin: 0;
+  gap: 0;
+  min-height: 44px;
+  justify-content: center;
+}
+.stApp:has(.st-key-tap_workspace_topbar) .st-key-tap_workspace_brand .tap-ci-wordmark {
+  font-size: 28px;
+  letter-spacing: -.065em;
+}
+.stApp:has(.st-key-tap_workspace_topbar) .st-key-tap_workspace_brand .tap-ci-tap {margin-left: .08em;}
+.stApp:has(.st-key-tap_workspace_topbar) .st-key-tap_workspace_brand .tap-ci-description {display: none;}
+.stApp:has(.st-key-tap_workspace_topbar) .st-key-tap_workspace_brand,
+.stApp:has(.st-key-tap_workspace_topbar) .st-key-tap_workspace_nav,
+.stApp:has(.st-key-tap_workspace_topbar) .st-key-tap_workspace_profile {gap: 0;}
+.stApp:has(.st-key-tap_workspace_topbar) .st-key-tap_workspace_nav [data-testid="stHorizontalBlock"] {
+  flex-direction: row;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 4px;
+}
+.stApp:has(.st-key-tap_workspace_topbar) .st-key-tap_workspace_nav [data-testid="stColumn"] {
+  flex: 0 1 auto;
+  width: auto;
+  min-width: 0;
+}
+.stApp:has(.st-key-tap_workspace_topbar) .st-key-tap_workspace_nav [data-testid="stButton"] button {
+  position: relative;
+  min-height: 76px;
+  width: auto;
+  padding: 0 17px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--tap-muted);
+  font-size: 14px;
+  font-weight: 500;
+  white-space: nowrap;
+  box-shadow: none;
+  transform: none;
+}
+.stApp:has(.st-key-tap_workspace_topbar) .st-key-tap_workspace_nav [data-testid="stButton"] button p {
+  font-size: 14px;
+  line-height: 1.4;
+  white-space: nowrap;
+}
+.stApp:has(.st-key-tap_workspace_topbar) .st-key-tap_workspace_nav [data-testid="stButton"] button[kind^="primary"] {
+  background: transparent;
+  border: 0;
+  color: var(--tap-accent);
+  box-shadow: none;
+}
+.stApp:has(.st-key-tap_workspace_topbar) .st-key-tap_workspace_nav [data-testid="stButton"] button[kind^="primary"]::after {
+  content: "";
+  position: absolute;
+  right: 17px;
+  bottom: -1px;
+  left: 17px;
+  height: 3px;
+  border-radius: 3px 3px 0 0;
+  background: var(--tap-accent);
+}
+.stApp:has(.st-key-tap_workspace_topbar) .st-key-tap_workspace_nav [data-testid="stButton"] button:hover {
+  color: var(--tap-ink);
+  background: var(--tap-workspace-selected);
+  transform: none;
+  box-shadow: none;
+}
+.stApp:has(.st-key-tap_workspace_topbar) .st-key-tap_workspace_profile button {
+  min-height: 44px;
+  padding: 7px 10px;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  color: var(--tap-ink);
+  background: transparent;
+  box-shadow: none;
+  transform: none;
+}
+.stApp:has(.st-key-tap_workspace_topbar) .st-key-tap_workspace_profile button p {
+  font-size: 12px;
+  line-height: 1.45;
+}
+.stApp:has(.st-key-tap_workspace_topbar) .st-key-tap_workspace_profile button:hover,
+.stApp:has(.st-key-tap_workspace_topbar) .st-key-tap_workspace_profile button[aria-expanded="true"] {
+  background: var(--tap-workspace-selected);
+}
+.stApp:has(.st-key-tap_workspace_topbar) .st-key-tap_workspace_main {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 24px 28px 32px;
+  gap: 20px;
+}
+.stApp:has(.st-key-tap_workspace_topbar) .st-key-tap_workspace_main h1 {
+  font-size: 28px;
+  font-weight: 800;
+  line-height: 1.35;
+  padding: 0;
+  letter-spacing: -.045em;
+}
+.stApp:has(.st-key-tap_workspace_topbar) .st-key-tap_workspace_main h2 {
+  font-size: 23px;
+  line-height: 1.4;
+  padding: 0;
+}
+.stApp:has(.st-key-tap_workspace_topbar) .st-key-tap_workspace_main h3 {
+  font-size: 19px;
+  line-height: 1.45;
+  padding: 0;
+}
+.stApp:has(.st-key-tap_workspace_topbar) .st-key-tap_workspace_main p {
+  font-size: 14px;
+  line-height: 1.75;
+}
+.stApp:has(.st-key-tap_workspace_topbar) .st-key-tap_workspace_main [data-testid="stCaptionContainer"] p {
+  font-size: 12px;
+  line-height: 1.75;
+}
+.stApp:has(.st-key-tap_workspace_topbar) .st-key-tap_workspace_main [data-testid="stWidgetLabel"] p {
+  font-size: 13px;
+  line-height: 1.6;
+}
+.stApp:has(.st-key-tap_workspace_topbar) .st-key-tap_workspace_split [data-testid="stHorizontalBlock"]:has(.st-key-tap_workspace_project_list),
+.stApp:has(.st-key-tap_workspace_topbar) .st-key-tap_workspace_split [data-testid="stHorizontalBlock"]:has(.st-key-tap_workspace_account_list) {
+  align-items: flex-start;
+  gap: 20px;
+}
+.stApp:has(.st-key-tap_workspace_topbar) :is(.st-key-tap_workspace_project_list,.st-key-tap_workspace_project_detail,.st-key-tap_workspace_account_list,.st-key-tap_workspace_account_detail) {
+  padding: 22px;
+  border: 1px solid var(--tap-workspace-border);
+  border-radius: 16px;
+  background: var(--tap-workspace-surface);
+  box-shadow: var(--tap-workspace-shadow);
+  gap: 16px;
+  min-width: 0;
+}
+.stApp:has(.st-key-tap_workspace_topbar) :is(.st-key-tap_workspace_project_list,.st-key-tap_workspace_account_list) [data-testid="stTextInputRootElement"] {
+  min-height: 44px;
+  border-color: var(--tap-workspace-border);
+  border-radius: 9px;
+  background: var(--tap-workspace-soft);
+  box-shadow: none;
+}
+.stApp:has(.st-key-tap_workspace_topbar) :is(.st-key-tap_workspace_project_list,.st-key-tap_workspace_account_list) [data-testid="stTextInputRootElement"]:focus-within {
+  border-color: var(--tap-accent);
+  box-shadow: 0 0 0 3px var(--tap-soft);
+}
+.stApp:has(.st-key-tap_workspace_topbar) :is(.st-key-tap_workspace_project_list,.st-key-tap_workspace_account_list) [data-testid="stRadioGroup"] {
+  gap: 0;
+  align-items: stretch;
+  width: 100%;
+  border-top: 1px solid var(--tap-workspace-border);
+}
+/* Keep native radio inputs and their focus rings: each row is keyboard-selectable. */
+.stApp:has(.st-key-tap_workspace_topbar) :is(.st-key-tap_workspace_project_list,.st-key-tap_workspace_account_list) [data-testid="stRadioOption"] {
+  position: relative;
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 78px;
+  margin: 0;
+  padding: 17px 14px;
+  border: 0;
+  border-bottom: 1px solid var(--tap-workspace-border);
+  border-radius: 0;
+  background: var(--tap-workspace-surface);
+  box-shadow: none;
+}
+.stApp:has(.st-key-tap_workspace_topbar) :is(.st-key-tap_workspace_project_list,.st-key-tap_workspace_account_list) [data-testid="stRadioOption"] [data-testid="stMarkdownContainer"] p {
+  color: var(--tap-ink);
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1.6;
+}
+.stApp:has(.st-key-tap_workspace_topbar) :is(.st-key-tap_workspace_project_list,.st-key-tap_workspace_account_list) [data-testid="stRadioOption"] [data-testid="stCaptionContainer"] p {
+  color: var(--tap-muted);
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 1.75;
+}
+.stApp:has(.st-key-tap_workspace_topbar) :is(.st-key-tap_workspace_project_list,.st-key-tap_workspace_account_list) [data-testid="stRadioOption"][data-selected="true"] {
+  border-color: var(--tap-workspace-border);
+  background: var(--tap-workspace-selected);
+  box-shadow: none;
+}
+.stApp:has(.st-key-tap_workspace_topbar) :is(.st-key-tap_workspace_project_list,.st-key-tap_workspace_account_list) [data-testid="stRadioOption"][data-selected="true"]::before {
+  content: "";
+  position: absolute;
+  top: 16px;
+  bottom: 16px;
+  left: -1px;
+  width: 3px;
+  border-radius: 0 2px 2px 0;
+  background: var(--tap-accent);
+}
+.stApp:has(.st-key-tap_workspace_topbar) :is(.st-key-tap_workspace_project_list,.st-key-tap_workspace_account_list) [data-testid="stRadioOption"]:hover {
+  background: var(--tap-workspace-soft);
+}
+.stApp:has(.st-key-tap_workspace_topbar) :is(.st-key-tap_workspace_project_list,.st-key-tap_workspace_account_list) [data-testid="stRadioOption"][data-selected="true"]:hover {
+  background: var(--tap-workspace-selected);
+}
+.stApp:has(.st-key-tap_workspace_topbar) :is(.st-key-tap_workspace_project_list,.st-key-tap_workspace_account_list) [data-testid="stRadioOption"]:focus-within {
+  outline: 2px solid var(--tap-accent);
+  outline-offset: -2px;
+}
+.stApp:has(.st-key-tap_workspace_topbar) .tap-workspace-fields {
+  display: grid;
+  grid-template-columns: 75px minmax(0,1fr);
+  gap: 10px 12px;
+  margin: 0;
+  padding: 0;
+  font-size: 13px;
+  line-height: 1.75;
+}
+.stApp:has(.st-key-tap_workspace_topbar) .tap-workspace-fields dt {
+  margin: 0;
+  color: var(--tap-muted);
+  font-weight: 400;
+}
+.stApp:has(.st-key-tap_workspace_topbar) .tap-workspace-fields dd {
+  min-width: 0;
+  margin: 0;
+  color: var(--tap-ink);
+  overflow-wrap: anywhere;
+  word-break: keep-all;
+}
+.stApp:has(.st-key-tap_workspace_topbar) .st-key-tap_workspace_main [data-testid="stMetric"] {
+  border: 0;
+  border-radius: 9px;
+  padding: 12px;
+  background: var(--tap-workspace-soft);
+  box-shadow: none;
+}
+.stApp:has(.st-key-tap_workspace_topbar) .st-key-tap_workspace_main [data-testid="stMetricLabel"] p {
+  font-size: 11px;
+  line-height: 1.5;
+}
+.stApp:has(.st-key-tap_workspace_topbar) .st-key-tap_workspace_main [data-testid="stMetricValue"] {
+  color: var(--tap-ink);
+  font-size: 26px;
+  font-weight: 500;
+  letter-spacing: -.04em;
+  font-variant-numeric: tabular-nums;
+}
+.stApp:has(.st-key-tap_workspace_topbar) .st-key-tap_workspace_main [data-testid="stForm"] {
+  padding: 22px;
+  border-color: var(--tap-workspace-border);
+  border-radius: 16px;
+  background: var(--tap-workspace-surface);
+  box-shadow: var(--tap-workspace-shadow);
+}
+.stApp:has(.st-key-tap_workspace_topbar) .st-key-_tap_participant_question_stage [data-testid="stForm"] {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+.stApp:has(.st-key-tap_workspace_topbar) .st-key-tap_workspace_main :is([data-testid="stButton"],[data-testid="stFormSubmitButton"],[data-testid="stDownloadButton"]) button {
+  font-size: 13px;
+  border-radius: 9px;
+}
+@media (max-width: 1000px) {
+  .stApp:has(.st-key-tap_workspace_topbar) .st-key-tap_workspace_topbar {padding: 0 20px;}
+  .stApp:has(.st-key-tap_workspace_topbar) .st-key-tap_workspace_topbar [data-testid="stHorizontalBlock"]:has(.st-key-tap_workspace_brand) {
+    grid-template-columns: 140px minmax(0,1fr) minmax(122px,168px);
+    gap: 16px;
+  }
+  .stApp:has(.st-key-tap_workspace_topbar) .st-key-tap_workspace_nav [data-testid="stButton"] button {padding: 0 11px;}
+  .stApp:has(.st-key-tap_workspace_topbar) .st-key-tap_workspace_nav [data-testid="stButton"] button p {font-size: 13px;}
+  .stApp:has(.st-key-tap_workspace_topbar) .st-key-tap_workspace_nav [data-testid="stButton"] button[kind^="primary"]::after {left: 11px;right: 11px;}
+}
+@media (max-width: 900px) {
+  .stApp:has(.st-key-tap_workspace_topbar) .st-key-tap_workspace_split [data-testid="stHorizontalBlock"]:has(.st-key-tap_workspace_project_list),
+  .stApp:has(.st-key-tap_workspace_topbar) .st-key-tap_workspace_split [data-testid="stHorizontalBlock"]:has(.st-key-tap_workspace_account_list) {
+    flex-direction: column;
+  }
+  .stApp:has(.st-key-tap_workspace_topbar) .st-key-tap_workspace_split [data-testid="stColumn"]:has(.st-key-tap_workspace_project_list),
+  .stApp:has(.st-key-tap_workspace_topbar) .st-key-tap_workspace_split [data-testid="stColumn"]:has(.st-key-tap_workspace_project_detail),
+  .stApp:has(.st-key-tap_workspace_topbar) .st-key-tap_workspace_split [data-testid="stColumn"]:has(.st-key-tap_workspace_account_list),
+  .stApp:has(.st-key-tap_workspace_topbar) .st-key-tap_workspace_split [data-testid="stColumn"]:has(.st-key-tap_workspace_account_detail) {
+    width: 100%;
+    min-width: 0;
+    flex: 1 1 100%;
+  }
+}
+@media (max-width: 760px) {
+  .stApp:has(.st-key-tap_workspace_topbar) .st-key-tap_workspace_topbar {padding: 0 16px;}
+  .stApp:has(.st-key-tap_workspace_topbar) .st-key-tap_workspace_topbar [data-testid="stHorizontalBlock"]:has(.st-key-tap_workspace_brand) {
+    grid-template-columns: minmax(0,1fr) minmax(118px,170px);
+    gap: 0 12px;
+    min-height: 0;
+  }
+  .stApp:has(.st-key-tap_workspace_topbar) .st-key-tap_workspace_topbar [data-testid="stColumn"]:has(.st-key-tap_workspace_brand) {
+    grid-column: 1;
+    grid-row: 1;
+    min-height: 66px;
+    align-content: center;
+  }
+  .stApp:has(.st-key-tap_workspace_topbar) .st-key-tap_workspace_topbar [data-testid="stColumn"]:has(.st-key-tap_workspace_profile) {
+    grid-column: 2;
+    grid-row: 1;
+  }
+  .stApp:has(.st-key-tap_workspace_topbar) .st-key-tap_workspace_topbar [data-testid="stColumn"]:has(.st-key-tap_workspace_nav) {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    border-top: 1px solid var(--tap-workspace-border);
+  }
+  .stApp:has(.st-key-tap_workspace_topbar) .st-key-tap_workspace_brand .tap-ci-wordmark {font-size: 26px;}
+  .stApp:has(.st-key-tap_workspace_topbar) .st-key-tap_workspace_nav [data-testid="stHorizontalBlock"] {gap: 0;}
+  .stApp:has(.st-key-tap_workspace_topbar) .st-key-tap_workspace_nav [data-testid="stColumn"] {flex: 1 1 0;width: 0;}
+  .stApp:has(.st-key-tap_workspace_topbar) .st-key-tap_workspace_nav [data-testid="stButton"] button {
+    width: 100%;
+    min-height: 49px;
+    padding: 0 8px;
+  }
+  .stApp:has(.st-key-tap_workspace_topbar) .st-key-tap_workspace_main {padding: 20px 16px 28px;gap: 18px;}
+  .stApp:has(.st-key-tap_workspace_topbar) .st-key-tap_workspace_main h1 {font-size: 25px;}
+  .stApp:has(.st-key-tap_workspace_topbar) :is(.st-key-tap_workspace_project_list,.st-key-tap_workspace_project_detail,.st-key-tap_workspace_account_list,.st-key-tap_workspace_account_detail) {
+    padding: 18px;
+    border-radius: 14px;
+  }
+  .stApp:has(.st-key-tap_workspace_topbar) .st-key-tap_workspace_main [data-testid="stTextInput"] input {font-size: 16px;}
+  .stApp:has(.st-key-tap_workspace_topbar) .st-key-tap_workspace_main [data-testid="stForm"] {padding: 18px;}
+  .stApp:has(.st-key-tap_workspace_topbar) .st-key-_tap_participant_question_stage [data-testid="stForm"] {padding: 0;}
+  .stApp:has(.st-key-tap_workspace_topbar) .tap-workspace-fields {grid-template-columns: 68px minmax(0,1fr);gap: 8px 10px;}
+}
+
+/* Native widget foregrounds can remain light-theme colors when the host changes
+   color-scheme. Restrict these foreground overrides to management panels. */
+.stApp:has(.st-key-tap_workspace_topbar) :is(.st-key-tap_workspace_project_list,.st-key-tap_workspace_account_list) [data-testid="stRadioOption"],
+.stApp:has(.st-key-tap_workspace_topbar) :is(.st-key-tap_workspace_project_list,.st-key-tap_workspace_account_list) [data-testid="stRadioOption"] [data-testid="stMarkdownContainer"],
+.stApp:has(.st-key-tap_workspace_topbar) :is(.st-key-tap_workspace_project_list,.st-key-tap_workspace_project_detail,.st-key-tap_workspace_account_list,.st-key-tap_workspace_account_detail) [data-testid="stAlert"],
+.stApp:has(.st-key-tap_workspace_topbar) :is(.st-key-tap_workspace_project_list,.st-key-tap_workspace_project_detail,.st-key-tap_workspace_account_list,.st-key-tap_workspace_account_detail) [data-testid="stAlert"] [data-testid="stMarkdownContainer"],
+.stApp:has(.st-key-tap_workspace_topbar) :is(.st-key-tap_workspace_project_list,.st-key-tap_workspace_project_detail,.st-key-tap_workspace_account_list,.st-key-tap_workspace_account_detail) [data-testid="stAlert"] [data-testid="stMarkdownContainer"] p {
+  color: var(--tap-ink);
+}

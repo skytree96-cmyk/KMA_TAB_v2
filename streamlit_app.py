@@ -12,7 +12,7 @@ st.set_page_config(
     page_title="KMA TAP",
     page_icon=Path(__file__).resolve().parent / "assets" / "kmatap-favicon.png",
     layout="wide",
-    initial_sidebar_state="expanded" if production_mode() else "collapsed",
+    initial_sidebar_state="collapsed",
 )
 
 if production_mode():

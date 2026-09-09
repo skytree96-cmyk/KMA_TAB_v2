@@ -7,7 +7,8 @@ import streamlit as st
 
 from tap.account_store import AccountError, AccountStore
 from tap.brand import brand_css, brand_html
-from tap.account_theme import account_theme_css
+from tap.account_theme import account_theme_css, workspace_theme_css
+from tap.account_navigation import ACCOUNT_MENU_KEY, render_workspace_header, section_label
 
 
 TOKEN_KEY = "_tap_account_session"
@@ -131,38 +132,36 @@ def render_portal() -> None:
         st.error("계정 상태를 확인하지 못했습니다. 잠시 후 새로고침해 주세요.")
         st.stop()
     role = principal["role"]
-    with st.sidebar:
-        st.markdown(brand_html(compact=True), unsafe_allow_html=True)
-        st.write(f"{principal['display_name']} · {ROLE_LABELS.get(role, '')}")
-        st.caption(principal["login_id"])
-        if st.button("로그아웃", key="_tap_logout", use_container_width=True):
-            try:
-                store.logout(token)
-            except Exception:
-                st.error("로그아웃을 처리하지 못했습니다. 다시 시도해 주세요.")
-                st.stop()
-            clear_identity()
-            st.rerun()
-        if not principal["must_change_password"]:
-            account_menu = st.radio("내 계정", ["업무 화면", "비밀번호 변경"], key="_tap_account_menu")
-        else:
-            account_menu = "비밀번호 변경"
-        st.caption("브라우저를 새로 열거나 새로고침하면 다시 로그인이 필요할 수 있습니다.")
-    if principal["must_change_password"] or account_menu == "비밀번호 변경":
-        _password_change(store, token, bool(principal["must_change_password"]))
+    if role not in ROLE_LABELS:
+        st.error("접근 권한을 확인해 주세요.")
         return
-    try:
-        if role in {"kma", "company"}:
-            from tap.account_admin_ui import render_admin
 
-            render_admin(store, token, principal)
-        elif role == "participant":
-            from tap.account_assessment_ui import render_participant
+    def logout() -> None:
+        try:
+            store.logout(token)
+        except Exception:
+            st.error("로그아웃을 처리하지 못했습니다. 다시 시도해 주세요.")
+            st.stop()
+        clear_identity()
+        st.rerun()
 
-            render_participant(store, token, principal)
-        else:
-            st.error("접근 권한을 확인해 주세요.")
-    except AccountError as exc:
-        st.error(str(exc))
-    except Exception:
-        st.error("요청을 처리하지 못했습니다. 저장 여부를 확인한 뒤 다시 시도해 주세요.")
+    st.html(workspace_theme_css())
+    section = render_workspace_header(principal, logout)
+    with st.container(key="tap_workspace_main"):
+        password_screen = bool(principal["must_change_password"]) or st.session_state[ACCOUNT_MENU_KEY] == "비밀번호 변경"
+        label = "비밀번호 변경" if password_screen else section_label(role, section)
+        st.caption(f"워크스페이스 / {label}")
+        if password_screen:
+            _password_change(store, token, bool(principal["must_change_password"]))
+            return
+        try:
+            if role in {"kma", "company"}:
+                from tap.account_admin_ui import render_admin
+                render_admin(store, token, principal, section=section)
+            elif role == "participant":
+                from tap.account_assessment_ui import render_participant
+                render_participant(store, token, principal)
+        except AccountError as exc:
+            st.error(str(exc))
+        except Exception:
+            st.error("요청을 처리하지 못했습니다. 저장 여부를 확인한 뒤 다시 시도해 주세요.")

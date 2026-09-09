@@ -16,17 +16,25 @@ def render_account_guide():
             st.subheader("처음 로그인할 때")
             st.write("발급받은 로그인 ID 전체와 임시 비밀번호를 입력하세요. 교육담당자는 지정 ID를, 참여자는 회사 식별정보가 앞에 포함된 발급 ID를 그대로 사용합니다. 이메일은 필요하지 않습니다. 처음 접속하면 본인만 아는 3~128자의 비밀번호로 바꾼 뒤 이용할 수 있습니다.")
 
+            st.write("로그인 후 화면 상단 메뉴로 업무 화면을 이동합니다. 우측 상단 프로필을 열면 비밀번호 변경과 로그아웃을 이용할 수 있습니다.")
+
         roles = [
             ("kma", "KMA 관리자", "회원사의 사업자등록번호 10자리를 등록하고 해당 회사의 교육담당자 계정을 발급합니다. 교육담당자 임시 비밀번호는 kma이며 첫 로그인 때 변경합니다. 회사별 프로젝트와 참여 현황을 확인할 수 있습니다."),
             ("company", "교육담당자", "교육 일정과 측정역량을 정해 프로젝트를 만듭니다. 참여자 계정을 단건 또는 CSV로 발급하고 프로젝트에 배정합니다. 부서·직급·이메일·연락처를 함께 저장할 수 있습니다. 참여자 ID 앞에는 회사 식별정보(신규 회사는 사업자등록번호)가 자동으로 붙으며 임시 비밀번호는 kma입니다. 발급한 로그인 정보를 해당 참여자에게 전달하고 전달 완료 버튼을 누르세요."),
             ("participant", "참여자", "로그인하면 배정된 교육이 표시됩니다. 교육이 여러 개라면 참여할 교육을 선택하세요. 검사 기간에 사전검사를 마치고, 교육 후 사후검사에 참여하면 본인의 변화를 볼 수 있습니다."),
         ]
+        role_menus = {
+            "kma": "회원사 · 계정 관리 · 프로젝트",
+            "company": "프로젝트 · 프로젝트 만들기 · 참여자 계정",
+            "participant": "내 교육",
+        }
         with st.container(key="tap_guide_roles"):
             for column, (role, title, description) in zip(st.columns(3), roles):
                 with column:
                     with st.container(border=True, key=f"tap_guide_role_{role}"):
                         st.subheader(title)
                         st.write(description)
+                        st.caption("상단 메뉴: " + role_menus[role])
 
         with st.container(border=True, key="tap_guide_results"):
             st.subheader("검사 결과 저장과 비교")

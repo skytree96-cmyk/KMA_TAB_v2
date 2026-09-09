@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import csv
 import hashlib
+from html import escape
 import io
 import logging
 import re
@@ -21,6 +22,11 @@ PREFIX = "account_admin_"
 ROLE_LABELS = {"kma": "KMA 관리자", "company": "교육담당자", "participant": "참여자"}
 LEVEL_LABELS = {"staff": "실무자", "manager": "관리자·리더", "executive": "임원"}
 MAX_BATCH_ROWS = 200
+WORKSPACE_PAGE_SIZE = 12
+WORKSPACE_SECTIONS = {
+    "kma": {"companies": "회원사", "accounts": "계정 관리", "projects": "프로젝트"},
+    "company": {"projects": "프로젝트", "create_project": "프로젝트 만들기", "accounts": "참여자 계정"},
+}
 MAX_CSV_BYTES = 256 * 1024
 PROFILE_FIELDS = {"department": ("부서", 100), "job_title": ("직급", 80), "email": ("이메일", 254), "phone": ("연락처", 40)}
 
@@ -243,8 +249,9 @@ def build_project_config(
     }
 
 
-def _render_companies(store: Any, token: str, companies: list[dict[str, Any]]) -> None:
-    st.subheader("회원사")
+def _render_companies(store: Any, token: str, companies: list[dict[str, Any]], *, show_heading: bool = True) -> None:
+    if show_heading:
+        st.subheader("회원사")
     if companies:
         st.dataframe([{"회사명": row["name"], "사업자등록번호": _company_registration_label(row), "상태": "사용 중" if row.get("active", True) else "중지"} for row in companies], hide_index=True, width="stretch")
     else:
@@ -403,6 +410,11 @@ def _render_manage_users(store: Any, token: str, principal: Mapping[str, Any], u
     if selected is None:
         return
     user = by_id[selected]
+    _render_user_actions(store, token, principal, user)
+
+
+def _render_user_actions(store: Any, token: str, principal: Mapping[str, Any], user: Mapping[str, Any]) -> None:
+    selected = _identifier(user)
     st.caption("임시 비밀번호를 kma로 재발급합니다. 다시 로그인할 때 새 비밀번호로 변경해야 합니다.")
     left, right = st.columns(2)
     with left:
@@ -548,13 +560,187 @@ def _render_projects(store: Any, token: str, principal: Mapping[str, Any], proje
     render_project_report(store, token, project)
 
 
-def render_admin(store: Any, token: str, principal: Mapping[str, Any]) -> None:
+
+def _workspace_fields(fields: list[tuple[str, Any]]) -> None:
+    """Render compact detail labels without treating account data as markup."""
+    st.html('<dl class="tap-workspace-fields">' + ''.join(
+        f"<dt>{escape(label)}</dt><dd>{escape(str(value or '미등록'))}</dd>"
+        for label, value in fields
+    ) + '</dl>')
+
+
+def _workspace_page(selection_key: str, page_key: str, page: int) -> None:
+    # A different page must not leave destructive buttons aimed at a hidden row.
+    st.session_state[page_key] = page
+    st.session_state[selection_key] = None
+
+
+def _workspace_pick(
+    rows: list[dict[str, Any]], *, selection_key: str, search_key: str,
+    search_label: str, placeholder: str, label: str, unit: str,
+    search_values: Callable[[Mapping[str, Any]], list[Any]],
+    title: Callable[[Mapping[str, Any]], str], caption: Callable[[Mapping[str, Any]], str],
+) -> Mapping[str, Any] | None:
+    query = st.text_input(
+        search_label, key=search_key, placeholder=placeholder,
+        help="일부 글자로 검색할 수 있습니다. 영문 대소문자는 구분하지 않습니다.",
+        persist_state="session",
+    ).strip().casefold()
+    matched = [row for row in rows if not query or any(
+        query in str(value or "").casefold() for value in search_values(row)
+    )]
+    by_id = {_identifier(row): row for row in matched}
+    if st.session_state.get(selection_key) not in by_id:
+        st.session_state[selection_key] = None
+    page_key = selection_key + "_page"
+    query_key = search_key + "_previous"
+    if st.session_state.get(query_key) != query:
+        st.session_state[page_key] = 0
+        st.session_state[query_key] = query
+    pages = max(1, (len(matched) + WORKSPACE_PAGE_SIZE - 1) // WORKSPACE_PAGE_SIZE)
+    page = max(0, min(int(st.session_state.get(page_key, 0)), pages - 1))
+    st.session_state[page_key] = page
+    st.caption(f"검색 결과 {len(matched)}{unit} · 전체 {len(rows)}{unit}")
+    if not matched:
+        st.info("검색 결과가 없습니다. 검색어를 다시 입력해 주세요." if rows else f"등록된 {label}이 없습니다.")
+        return None
+    visible = list(by_id)[page * WORKSPACE_PAGE_SIZE:(page + 1) * WORKSPACE_PAGE_SIZE]
+    if st.session_state.get(selection_key) not in visible:
+        st.session_state[selection_key] = None
+    selected = st.radio(
+        label, visible, format_func=lambda value: title(by_id[value]),
+        captions=[caption(by_id[value]) for value in visible],
+        key=selection_key, index=None, label_visibility="collapsed",
+        width="stretch", persist_state="session",
+    )
+    if pages > 1:
+        left, center, right = st.columns([1, 1, 1], vertical_alignment="center")
+        with left:
+            st.button("이전", key=selection_key + "_previous_page", disabled=page == 0,
+                      on_click=_workspace_page, args=(selection_key, page_key, page - 1))
+        with center:
+            st.caption(f"{page + 1} / {pages} 페이지")
+        with right:
+            st.button("다음", key=selection_key + "_next_page", disabled=page == pages - 1,
+                      on_click=_workspace_page, args=(selection_key, page_key, page + 1))
+    return by_id.get(selected)
+
+
+def _render_workspace_users(store: Any, token: str, principal: Mapping[str, Any], users: list[dict[str, Any]]) -> None:
+    allowed = [row for row in users if row.get("role") in {"company", "participant"} and _identifier(row) != _identifier(principal)]
+    if principal.get("role") == "company":
+        allowed = [row for row in allowed if row.get("role") == "participant" and row.get("company_id") == principal.get("company_id")]
+    with st.container(key="tap_workspace_split"):
+        left, right = st.columns([1.4, 1], gap="large")
+        with left, st.container(border=True, key="tap_workspace_account_list"):
+            user = _workspace_pick(
+                allowed, selection_key=PREFIX + "manage_user", search_key=PREFIX + "manage_user_search",
+                search_label="계정 검색", placeholder="이름, 아이디, 회사명으로 검색", label="관리할 계정", unit="명",
+                search_values=lambda row: [row.get(field) for field in ("display_name", "login_id", "company_name")],
+                title=lambda row: f"{row.get('display_name', '')} · {row.get('login_id', '')}",
+                caption=lambda row: " · ".join(part for part in (
+                    str(row.get("company_name") or ""), ROLE_LABELS.get(row["role"], ""),
+                    "사용 중" if row.get("active", True) else "중지",
+                ) if part),
+            )
+        with right, st.container(border=True, key="tap_workspace_account_detail"):
+            if user is None:
+                st.subheader("계정 상세")
+                st.info("목록에서 관리할 계정을 선택해 주세요.")
+            else:
+                st.caption("계정 상세")
+                st.subheader(str(user.get("display_name") or "계정"))
+                _workspace_fields([
+                    ("아이디", user.get("login_id")), ("회사", user.get("company_name")),
+                    ("역할", ROLE_LABELS.get(str(user.get("role")), "")),
+                    ("상태", "사용 중" if user.get("active", True) else "중지"),
+                    *((label, user.get(key)) for key, (label, _) in PROFILE_FIELDS.items()),
+                ])
+                _render_user_actions(store, token, principal, user)
+
+
+def _render_workspace_projects(store: Any, token: str, principal: Mapping[str, Any], projects: list[dict[str, Any]], users: list[dict[str, Any]]) -> None:
+    if principal.get("role") == "company":
+        projects = [row for row in projects if row.get("company_id") == principal.get("company_id")]
+    with st.container(key="tap_workspace_split"):
+        left, right = st.columns([1.4, 1], gap="large")
+        with left, st.container(border=True, key="tap_workspace_project_list"):
+            project = _workspace_pick(
+                projects, selection_key=PREFIX + "project_select", search_key=PREFIX + "project_search",
+                search_label="프로젝트 검색", placeholder="회사명, 프로젝트명, 교육명으로 검색", label="프로젝트", unit="개",
+                search_values=lambda row: [row.get("company_name"), row.get("name") or row.get("project_name"), (row.get("config") or {}).get("course_name")],
+                title=lambda row: str(row.get("name") or row.get("project_name") or "교육평가 프로젝트"),
+                caption=lambda row: " · ".join(str(part) for part in (row.get("company_name"), (row.get("config") or {}).get("course_name")) if part),
+            )
+        with right, st.container(border=True, key="tap_workspace_project_detail"):
+            if project is None:
+                st.subheader("프로젝트 상세")
+                st.info("목록에서 프로젝트를 선택해 주세요.")
+            else:
+                st.caption("프로젝트 상세")
+                st.subheader(str(project.get("name") or project.get("project_name") or "교육평가 프로젝트"))
+                config = project.get("config") or {}
+                _workspace_fields([
+                    ("회사", project.get("company_name")), ("교육명", config.get("course_name")),
+                    ("교육일", config.get("training_date") or "미설정"),
+                    ("사전검사", f"{config.get('pre_start_date', '미설정')} ~ {config.get('pre_end_date', '미설정')}"),
+                    ("사후검사", f"{config.get('post_start_date', '미설정')} ~ {config.get('post_end_date', '미설정')}"),
+                ])
+                from tap.account_reports import render_project_report
+                render_project_report(store, token, project)
+    if project is not None and principal.get("role") == "company":
+        with st.container(border=True, key="tap_workspace_assignments"):
+            _render_assignments(store, token, project, users)
+
+
+def _render_workspace(
+    store: Any, token: str, principal: Mapping[str, Any], section: str,
+    companies: list[dict[str, Any]], users: list[dict[str, Any]], projects: list[dict[str, Any]],
+) -> None:
+    role = principal["role"]
+    company = next((row for row in companies if _identifier(row) == str(principal.get("company_id"))), None)
+    if role == "company" and company is None:
+        st.error("계정에 연결된 회사를 확인하지 못했습니다. KMA 관리자에게 문의해 주세요.")
+        return
+    if section == "companies":
+        _render_companies(store, token, companies, show_heading=False)
+    elif section == "projects":
+        _render_workspace_projects(store, token, principal, projects, users)
+    elif section == "create_project":
+        _render_project_create(store, token)
+    elif section == "accounts":
+        issuance_label = "교육담당자 계정 발급" if role == "kma" else "참여자 계정 발급"
+        with st.expander(issuance_label, key=PREFIX + f"workspace_issue_{role}", on_change="rerun"):
+            if role == "kma":
+                active_companies = {_identifier(row): row for row in companies if row.get("active", True)}
+                if active_companies:
+                    issue_key = PREFIX + "issue_company"
+                    if st.session_state.get(issue_key) not in active_companies:
+                        st.session_state.pop(issue_key, None)
+                    company_id = st.selectbox(
+                        "계정을 발급할 회사", list(active_companies),
+                        format_func=lambda value: f"{active_companies[value]['name']} · {_company_registration_label(active_companies[value])}",
+                        key=issue_key, persist_state="session",
+                    )
+                    _render_create_user(store, token, principal, active_companies[company_id], "company")
+                else:
+                    st.info("먼저 회원사를 등록해 주세요.")
+            else:
+                _render_create_user(store, token, principal, company, "participant")
+                _render_batch(store, token, principal, company, users)
+        _render_workspace_users(store, token, principal, users)
+
+
+def render_admin(store: Any, token: str, principal: Mapping[str, Any], *, section: str | None = None) -> None:
     """Render administrative controls; AccountStore enforces every permission."""
     role = principal.get("role")
     if role not in {"kma", "company"}:
         st.error("관리자 계정으로 로그인해 주세요.")
         return
-    st.title("회원사·계정 관리" if role == "kma" else "교육 운영 관리")
+    if section is not None and section not in WORKSPACE_SECTIONS[role]:
+        st.error("이 계정에서 사용할 수 없는 메뉴입니다.")
+        return
+    st.title(WORKSPACE_SECTIONS[role][section] if section is not None else ("회원사·계정 관리" if role == "kma" else "교육 운영 관리"))
     if notice := st.session_state.pop(PREFIX + "notice", None):
         st.success(notice)
     if failures := st.session_state.pop(PREFIX + "batch_failures", None):
@@ -573,6 +759,10 @@ def render_admin(store: Any, token: str, principal: Mapping[str, Any]) -> None:
         return
     company_names = {_identifier(row): str(row["name"]) for row in companies}
     projects = [{**row, "company_name": company_names.get(str(row.get("company_id")), "")} for row in projects]
+    users = [{**row, "company_name": company_names.get(str(row.get("company_id")), str(row.get("company_name") or ""))} for row in users]
+    if section is not None:
+        _render_workspace(store, token, principal, section, companies, users, projects)
+        return
     if role == "kma":
         company_tab, user_tab, project_tab = st.tabs(["회원사", "교육담당자·계정", "프로젝트 현황"], key=PREFIX + "kma_tabs", on_change="rerun")
         with company_tab:

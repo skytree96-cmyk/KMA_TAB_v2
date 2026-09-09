@@ -7,3 +7,9 @@ from pathlib import Path
 def account_theme_css() -> str:
     css = (Path(__file__).resolve().parents[1] / "assets" / "account-ui.css").read_text(encoding="utf-8")
     return "<style>" + css + "</style>"
+
+
+@lru_cache(maxsize=1)
+def workspace_theme_css() -> str:
+    css = (Path(__file__).resolve().parents[1] / "assets" / "workspace-ui.css").read_text(encoding="utf-8")
+    return "<style>" + css + "</style>"
