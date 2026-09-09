@@ -155,7 +155,13 @@ def render_portal() -> None:
             _password_change(store, token, bool(principal["must_change_password"]))
             return
         try:
-            if role in {"kma", "company"}:
+            if section == "dashboard" and role in {"kma", "company"}:
+                from tap.account_dashboard import render_dashboard
+                render_dashboard(store, token, principal)
+            elif section == "question_bank" and role == "kma":
+                from tap.account_question_bank import render_question_bank
+                render_question_bank(store, token, principal)
+            elif role in {"kma", "company"}:
                 from tap.account_admin_ui import render_admin
                 render_admin(store, token, principal, section=section)
             elif role == "participant":

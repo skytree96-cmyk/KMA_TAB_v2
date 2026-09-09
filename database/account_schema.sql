@@ -50,3 +50,9 @@ CREATE INDEX IF NOT EXISTS tap_sessions_user_idx ON tap_sessions(user_id);
 CREATE INDEX IF NOT EXISTS tap_users_company_idx ON tap_users(company_id);
 CREATE INDEX IF NOT EXISTS tap_projects_company_idx ON tap_projects(company_id);
 CREATE INDEX IF NOT EXISTS tap_assignments_user_idx ON tap_assignments(user_id);
+
+CREATE TABLE IF NOT EXISTS tap_question_overrides (
+ question_code TEXT PRIMARY KEY, item_text TEXT NOT NULL,
+ revision INTEGER NOT NULL CHECK (revision >= 1), updated_at DOUBLE PRECISION NOT NULL,
+ updated_by TEXT NOT NULL REFERENCES tap_users(id)
+);

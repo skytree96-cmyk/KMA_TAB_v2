@@ -84,6 +84,25 @@ class AccountWorkspaceTests(unittest.TestCase):
                 self.assertTrue(app.error)
                 self.assertNotIn("reads", app.session_state.filtered_state)
 
+    def test_each_section_only_loads_required_lists(self):
+        for role, section, reads in (
+            ("kma", "companies", ["companies"]),
+            ("company", "create_project", ["companies"]),
+            ("kma", "accounts", ["companies", "users"]),
+            ("company", "accounts", ["companies", "users"]),
+            ("kma", "projects", ["companies", "projects"]),
+            ("company", "projects", ["companies", "users", "projects"]),
+        ):
+            with self.subTest(role=role, section=section):
+                self.assertEqual(self.app(section, role).session_state["reads"], reads)
+        app = AppTest.from_string(APP.replace('"company_id":"co1"}, section=', '"company_id":"missing"}, section='))
+        app.session_state["role"] = "company"
+        app.session_state["section"] = "create_project"
+        app.run(timeout=30)
+        self.assertEqual(app.session_state["reads"], ["companies"])
+        self.assertTrue(app.error)
+        self.assertFalse(any(button.label == "프로젝트 등록" for button in app.button))
+
     def test_project_search_selects_actual_project_and_never_auto_selects_new_match(self):
         app = self.app()
         self.assertIsNone(app.radio(key="account_admin_project_select").value)
@@ -182,7 +201,7 @@ class AccountWorkspaceTests(unittest.TestCase):
         self.assertIsNone(app.radio(key="account_admin_project_select").value)
         self.assertEqual(app.session_state["account_admin_project_select_page"], 0)
 
-    def test_account_issuance_keeps_company_prefix_profile_and_credential_receipt(self):
+    def test_account_issuance_keeps_custom_id_profile_and_credential_receipt(self):
         app = self.app("accounts", "company")
         values = {"아이디":"NewUser", "이름":"새 참여자", "부서":"개발팀", "직급":"과장", "이메일":"new@example.com", "연락처":"010-9876-5432"}
         for label, value in values.items():
@@ -190,7 +209,7 @@ class AccountWorkspaceTests(unittest.TestCase):
         next(button for button in app.button if button.label == "참여자 계정 발급").click()
         rerun(app)
         self.assertEqual(list(app.exception), [])
-        self.assertEqual(app.session_state["issued"], {"login_id":"0123456789-newuser", "role":"participant", "company_id":"co1", "password":"kma", "profile":{"department":"개발팀", "job_title":"과장", "email":"new@example.com", "phone":"010-9876-5432"}})
+        self.assertEqual(app.session_state["issued"], {"login_id":"newuser", "role":"participant", "company_id":"co1", "password":"kma", "profile":{"department":"개발팀", "job_title":"과장", "email":"new@example.com", "phone":"010-9876-5432"}})
         self.assertTrue(any(button.key == "account_admin_credentials_clear" for button in app.button))
         self.assertTrue(any(item.label == "CSV로 참여자 일괄 등록" for item in app.expander))
         app.button(key="account_admin_credentials_clear").click()

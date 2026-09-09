@@ -303,3 +303,20 @@ class AccountAssessmentTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class FrozenQuestionTextTests(unittest.TestCase):
+    def test_assigned_edited_text_is_used_and_tampering_rejected(self):
+        from copy import deepcopy
+        config = project_config()
+        questions = deepcopy(questions_for_factors(config["selected_factors"]))
+        questions[0]["revised_text"] = "새 프로젝트에 확정된 운영 문구입니다."
+        config["question_snapshot"] = questions
+        snapshot = sorted((q["question_code"], q["revised_text"], q.get("scoring_direction", "direct")) for q in questions)
+        digest = hashlib.sha256("\n".join("|".join(row) for row in snapshot).encode()).hexdigest()
+        config["question_snapshot_hash"] = digest
+        config["assessment_version"] = "TAP-1.0+" + digest[:12]
+        self.assertEqual(_project_questions(config)[0]["revised_text"], questions[0]["revised_text"])
+        questions[0]["revised_text"] = "해시와 다른 문구"
+        with self.assertRaises(ValueError):
+            _project_questions(config)

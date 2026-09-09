@@ -14,11 +14,14 @@ PROFILE_KEY = "_tap_profile_popover"
 ROLE_LABELS = {"kma": "KMA 관리자", "company": "교육담당자", "participant": "참여자"}
 MENUS = {
     "kma": (
+        ("dashboard", "대시보드", ":material/dashboard:"),
         ("companies", "회원사", ":material/apartment:"),
         ("accounts", "계정 관리", ":material/group:"),
         ("projects", "프로젝트", ":material/folder_open:"),
+        ("question_bank", "문항은행·검수", ":material/library_books:"),
     ),
     "company": (
+        ("dashboard", "대시보드", ":material/dashboard:"),
         ("projects", "프로젝트", ":material/folder_open:"),
         ("create_project", "프로젝트 만들기", ":material/add_circle:"),
         ("accounts", "참여자 계정", ":material/group:"),

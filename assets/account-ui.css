@@ -269,3 +269,9 @@
   .stApp .st-key-tap_guide_roles [data-testid="stHorizontalBlock"] {flex-direction:column;gap:1rem;}
   .stApp .st-key-tap_guide_roles [data-testid="stHorizontalBlock"] > [data-testid="stColumn"] {width:100%;flex:1 1 100%;min-width:0;}
 }
+
+/* Reading scale for login, guide and profile menus. */
+.stApp :is(.st-key-tap_login_card,.st-key-tap_guide_shell) [data-testid="stMarkdownContainer"] p {font-size:18px;}
+.stApp :is(.st-key-tap_login_card,.st-key-tap_guide_shell) [data-testid="stCaptionContainer"] p {font-size:16px;}
+.stApp .st-key-tap_login_card :is(input,button) {font-size:18px;}
+[data-testid="stPopoverBody"] [data-testid="stMarkdownContainer"] p {font-size:16px;}

@@ -65,9 +65,9 @@ def _login_id(value: str, company_prefix: str | None = None) -> str:
         raise ValueError("아이디를 입력해 주세요.")
     if company_prefix:
         company_prefix = company_prefix.strip().lower()
-        if not value.startswith(company_prefix + "-"):
+        if re.fullmatch(r"user[0-9]*", value):
             value = f"{company_prefix}-{value}"
-        if len(value) <= len(company_prefix) + 1:
+        if value == company_prefix + "-":
             raise ValueError("회사 식별정보 뒤에 사용할 아이디를 입력해 주세요.")
     if not re.fullmatch(r"[a-z0-9][a-z0-9._-]{2,63}", value):
         raise ValueError("아이디는 영문 소문자·숫자로 시작하는 3~64자의 영문·숫자·점·밑줄·하이픈으로 입력해 주세요.")
@@ -211,8 +211,8 @@ def build_project_config(
         raise ValueError("응답 대상을 선택해 주세요.")
     if pre_end < pre_start or post_end < post_start:
         raise ValueError("검사 마감일은 시작일보다 빠를 수 없습니다.")
-    if pre_end >= training_date or post_start <= training_date:
-        raise ValueError("교육 전 검사는 교육일 전에 마감하고, 교육 후 검사는 교육일 다음 날부터 시작해야 합니다.")
+    if pre_end > training_date or post_start < training_date:
+        raise ValueError("교육 전 검사 마감일은 교육일과 같거나 빨라야 하며, 교육 후 검사 시작일은 교육일과 같거나 늦어야 합니다.")
     rows = load_competencies()
     available = {row["factor_code"]: row for row in rows if row["active_for_scoring"] and applicable_to_level(row, target_level)}
     optional_factors = list(dict.fromkeys(optional_factors))
@@ -300,7 +300,7 @@ def _render_create_user(store: Any, token: str, principal: Mapping[str, Any], co
     st.subheader(f"{label} 계정 발급")
     st.caption(f"회사: {company['name']} · 사업자등록번호: {_company_registration_label(company)}")
     if role == "participant":
-        st.caption(f"참여자 아이디 앞에는 회사 식별정보 {company['slug']}-가 자동으로 붙습니다. 이미 붙여 입력한 경우에는 한 번만 사용합니다.")
+        st.caption(f"user 또는 user001처럼 user 뒤에 숫자만 붙인 기본 예시 아이디에는 회사 식별정보 {company['slug']}-가 자동으로 붙습니다. 직접 정한 아이디와 회사 식별정보가 이미 붙은 아이디는 그대로 사용합니다.")
     else:
         st.caption("교육담당자는 입력한 아이디로 로그인합니다. 아이디는 전체 회원사에서 중복 없이 사용합니다.")
     st.caption("영문 대문자는 소문자로 저장됩니다. 로그인에는 이메일을 사용하지 않습니다.")
@@ -336,7 +336,7 @@ def _render_create_user(store: Any, token: str, principal: Mapping[str, Any], co
 
 def _render_batch(store: Any, token: str, principal: Mapping[str, Any], company: Mapping[str, Any], users: list[dict[str, Any]]) -> None:
     with st.expander("CSV로 참여자 일괄 등록", key=PREFIX + f"batch_expander_{_identifier(company)}", on_change="rerun"):
-        st.caption(f"UTF-8 CSV · 한 번에 최대 {MAX_BATCH_ROWS}명 · 아이디·이름은 필수이며 부서·직급·이메일·연락처는 선택입니다. 기존 아이디·이름 2열 양식도 사용할 수 있습니다. 참여자 아이디 앞에는 회사 식별정보가 자동으로 붙습니다. 임시 비밀번호는 모두 kma이며, 첫 로그인 때 변경해야 합니다.")
+        st.caption(f"UTF-8 CSV · 한 번에 최대 {MAX_BATCH_ROWS}명 · 아이디·이름은 필수이며 부서·직급·이메일·연락처는 선택입니다. 기존 아이디·이름 2열 양식도 사용할 수 있습니다. user 또는 user001처럼 user 뒤에 숫자만 붙인 기본 예시 아이디에만 회사 식별정보가 자동으로 붙습니다. 직접 정한 아이디와 회사 식별정보가 이미 붙은 아이디는 그대로 사용합니다. 임시 비밀번호는 모두 kma이며, 첫 로그인 때 변경해야 합니다.")
         st.download_button("CSV 양식 내려받기", "\ufefflogin_id,display_name,department,job_title,email,phone\nuser001,참여자1,,,,\nuser002,참여자2,,,,\n".encode("utf-8"), "tap_participants_template.csv", "text/csv", key=PREFIX + "batch_template")
         upload = st.file_uploader("참여자 CSV", type=["csv"], key=PREFIX + "batch_upload")
         if upload is None:
@@ -460,7 +460,7 @@ def _render_project_create(store: Any, token: str) -> None:
         with right:
             pre_end = st.date_input("교육 전 검사 마감일", today + timedelta(days=7))
             post_end = st.date_input("교육 후 검사 마감일", today + timedelta(days=71))
-        st.caption("검사 기간은 한국시간 기준입니다. 교육 후 검사는 교육 8~10주 후 시작을 권장합니다.")
+        st.caption("교육 후 검사는 교육 8~10주 후 시작을 권장합니다.")
         target_mean = st.slider("조직 기대 행동빈도", 1.0, 5.0, 3.5, 0.1, help="교육 우선순위 논의를 위한 운영 목표이며 표준 규준이 아닙니다.")
         priorities = st.multiselect("조직 우선역량 · 최대 3개", selected, format_func=labels.get, max_selections=3)
         delivery = st.radio("선호 교육방식", ["all", "offline", "online"], format_func={"all": "무관", "offline": "집합", "online": "온라인"}.get, horizontal=True)
@@ -477,29 +477,71 @@ def _render_project_create(store: Any, token: str) -> None:
             st.rerun()
 
 
+def _participant_matches(row: Mapping[str, Any], query: str) -> bool:
+    return not query or any(
+        query in str(row.get(field) or "").casefold()
+        for field in ("display_name", "user_name", "login_id", "department", "job_title")
+    )
+
+
 def _render_assignments(store: Any, token: str, project: Mapping[str, Any], users: list[dict[str, Any]]) -> None:
     project_id = _identifier(project)
     ok, assignments = _attempt(lambda: store.list_assignments(token, project_id))
     if not ok:
         return
     st.subheader("참여자 배정")
+    participants = {_identifier(row): row for row in users if row.get("role") == "participant" and str(row.get("company_id")) == str(project.get("company_id"))}
+    # Assignments remain scoped by the store; profile search uses this company's users only.
+    assignments = [{**row, **{
+        field: row.get(field) or participants.get(str(row["user_id"]), {}).get(field, "")
+        for field in ("department", "job_title")
+    }} for row in assignments]
+    change_key = PREFIX + f"assignment_change_{project_id}"
     if assignments:
-        st.dataframe([{"이름": row.get("user_name", ""), "로그인 아이디": row.get("login_id", ""), "배정 상태": "배정 중" if row.get("active", True) else "배정 해제", "교육 전 검사": "완료" if row.get("pre_completed") else "미완료", "교육 후 검사": "완료" if row.get("post_completed") else "미완료"} for row in assignments], hide_index=True, width="stretch")
-        with st.expander("참여자 배정 변경"):
-            by_assignment = {str(row["id"]): row for row in assignments}
-            assignment_id = st.selectbox("배정을 변경할 참여자", list(by_assignment), format_func=lambda value: f"{by_assignment[value].get('user_name', '')} · {by_assignment[value].get('login_id', '')}", key=PREFIX + f"assignment_change_{project_id}")
-            active = bool(by_assignment[assignment_id].get("active", True))
-            if st.button("프로젝트 배정 해제" if active else "프로젝트 다시 배정", key=PREFIX + f"assignment_toggle_{project_id}"):
-                ok, _ = _attempt(lambda: store.set_assignment_active(token, assignment_id, not active))
-                if ok:
-                    _notice("프로젝트 배정을 해제했습니다. 기존 검사 결과는 보존됩니다." if active else "프로젝트에 다시 배정했습니다.")
-                    st.rerun()
+        query = st.text_input(
+            "배정된 참여자 검색", key=PREFIX + f"assignment_search_{project_id}",
+            placeholder="이름, 아이디, 부서, 직급으로 검색",
+            help="이름·아이디·부서·직급의 일부로 검색할 수 있습니다. 영문 대소문자는 구분하지 않습니다.",
+        ).strip().casefold()
+        matched = [row for row in assignments if _participant_matches(row, query)]
+        by_assignment = {str(row["id"]): row for row in matched}
+        if st.session_state.get(change_key) not in by_assignment:
+            st.session_state[change_key] = None
+        st.caption(f"검색 결과 {len(matched)}명 · 배정된 참여자 {len(assignments)}명")
+        if matched:
+            st.dataframe([{"이름": row.get("user_name", ""), "로그인 아이디": row.get("login_id", ""), "부서": row.get("department", ""), "직급": row.get("job_title", ""), "배정 상태": "배정 중" if row.get("active", True) else "배정 해제", "교육 전 검사": "완료" if row.get("pre_completed") else "미완료", "교육 후 검사": "완료" if row.get("post_completed") else "미완료"} for row in matched], hide_index=True, width="stretch")
+            with st.expander("참여자 배정 변경"):
+                assignment_id = st.selectbox("배정을 변경할 참여자", list(by_assignment), format_func=lambda value: f"{by_assignment[value].get('user_name', '')} · {by_assignment[value].get('login_id', '')}", key=change_key, index=None, placeholder="참여자를 선택하세요")
+                if assignment_id is not None:
+                    active = bool(by_assignment[assignment_id].get("active", True))
+                    if st.button("프로젝트 배정 해제" if active else "프로젝트 다시 배정", key=PREFIX + f"assignment_toggle_{project_id}"):
+                        ok, _ = _attempt(lambda: store.set_assignment_active(token, assignment_id, not active))
+                        if ok:
+                            _notice("프로젝트 배정을 해제했습니다. 기존 검사 결과는 보존됩니다." if active else "프로젝트에 다시 배정했습니다.")
+                            st.rerun()
+        else:
+            st.info("배정된 참여자 검색 결과가 없습니다. 검색어를 다시 입력해 주세요.")
+    else:
+        st.session_state[change_key] = None
     assigned = {str(row["user_id"]) for row in assignments}
-    candidates = {_identifier(row): row for row in users if row.get("role") == "participant" and row.get("active", True) and _identifier(row) not in assigned and str(row.get("company_id")) == str(project.get("company_id"))}
+    candidates = {user_id: row for user_id, row in participants.items() if row.get("active", True) and user_id not in assigned}
+    assign_key = PREFIX + f"assign_{project_id}"
     if not candidates:
+        st.session_state[assign_key] = []
         st.info("배정할 새 참여자가 없습니다. 참여자 계정을 발급하거나 기존 배정 현황을 확인해 주세요.")
         return
-    selected = st.multiselect("추가할 참여자", list(candidates), format_func=lambda value: f"{candidates[value]['display_name']} · {candidates[value]['login_id']}", key=PREFIX + f"assign_{project_id}")
+    query = st.text_input(
+        "추가할 참여자 검색", key=PREFIX + f"assign_search_{project_id}",
+        placeholder="이름, 아이디, 부서, 직급으로 검색",
+        help="이름·아이디·부서·직급의 일부로 검색할 수 있습니다. 영문 대소문자는 구분하지 않습니다.",
+    ).strip().casefold()
+    matched_candidates = {user_id: row for user_id, row in candidates.items() if _participant_matches(row, query)}
+    st.session_state[assign_key] = [user_id for user_id in st.session_state.get(assign_key, []) if user_id in matched_candidates]
+    st.caption(f"검색 결과 {len(matched_candidates)}명 · 배정 가능한 참여자 {len(candidates)}명")
+    if not matched_candidates:
+        st.info("추가할 참여자 검색 결과가 없습니다. 검색어를 다시 입력해 주세요.")
+        return
+    selected = st.multiselect("추가할 참여자", list(matched_candidates), format_func=lambda value: f"{matched_candidates[value]['display_name']} · {matched_candidates[value]['login_id']}", key=assign_key)
     if st.button(f"선택한 {len(selected)}명 배정", disabled=not selected, key=PREFIX + f"assign_save_{project_id}"):
         count = 0
         for user_id in selected:
@@ -751,12 +793,16 @@ def render_admin(store: Any, token: str, principal: Mapping[str, Any], *, sectio
     ok, companies = _attempt(lambda: store.list_companies(token))
     if not ok:
         return
-    ok, users = _attempt(lambda: store.list_users(token))
-    if not ok:
-        return
-    ok, projects = _attempt(lambda: store.list_projects(token))
-    if not ok:
-        return
+    users: list[dict[str, Any]] = []
+    if section is None or section == "accounts" or (section == "projects" and role == "company"):
+        ok, users = _attempt(lambda: store.list_users(token))
+        if not ok:
+            return
+    projects: list[dict[str, Any]] = []
+    if section is None or section == "projects":
+        ok, projects = _attempt(lambda: store.list_projects(token))
+        if not ok:
+            return
     company_names = {_identifier(row): str(row["name"]) for row in companies}
     projects = [{**row, "company_name": company_names.get(str(row.get("company_id")), "")} for row in projects]
     users = [{**row, "company_name": company_names.get(str(row.get("company_id")), str(row.get("company_name") or ""))} for row in users]

@@ -21,7 +21,7 @@ import time
 from typing import Any
 import uuid
 
-from tap.data import load_competencies, questions_for_factors
+from tap.data import load_competencies, load_questions, questions_for_factors
 from tap.selection import applicable_to_level, selection_errors
 
 
@@ -306,6 +306,56 @@ class AccountStore:
             self._audit(conn, user["id"], "change_password", user["id"])
             return self._new_session(conn, user["id"])
 
+    def dashboard_summary(self, token: str) -> dict:
+        """Aggregate operational counts without loading assessment payloads."""
+        with self._transaction() as conn:
+            actor = self._require(conn, token, {"kma", "company"})
+            scoped = actor["role"] == "company"
+            params = (actor["company_id"],) if scoped else ()
+            companies = self._one(conn, "SELECT COUNT(*) AS total FROM tap_companies" + (" WHERE id=?" if scoped else ""), params)
+            users = self._all(conn, "SELECT role,COUNT(*) AS total FROM tap_users WHERE role IN ('company','participant')" + (" AND company_id=?" if scoped else "") + " GROUP BY role", params)
+            counts = {row["role"]: row["total"] for row in users}
+            projects = self._all(conn, "SELECT p.id,p.company_id,c.name AS company_name,p.name,p.created_at,p.config_json,COALESCE(a.assigned,0) AS assigned,COALESCE(a.pre_completed,0) AS pre_completed,COALESCE(a.post_completed,0) AS post_completed FROM tap_projects p JOIN tap_companies c ON c.id=p.company_id LEFT JOIN (SELECT a.project_id,COUNT(*) AS assigned,SUM(CASE WHEN pre.completed=1 THEN 1 ELSE 0 END) AS pre_completed,SUM(CASE WHEN post.completed=1 THEN 1 ELSE 0 END) AS post_completed FROM tap_assignments a LEFT JOIN tap_assessments pre ON pre.assignment_id=a.id AND pre.phase='pre' LEFT JOIN tap_assessments post ON post.assignment_id=a.id AND post.phase='post' WHERE a.active=1 GROUP BY a.project_id) a ON a.project_id=p.id" + (" WHERE p.company_id=?" if scoped else "") + " ORDER BY p.created_at,p.id", params)
+            for project in projects:
+                project["config"] = json.loads(project.pop("config_json"))
+            return {"companies_count": companies["total"], "company_users_count": counts.get("company", 0), "participant_users_count": counts.get("participant", 0), "projects": projects}
+
+    def _question_bank(self, conn) -> list[dict]:
+        overrides = {row["question_code"]: row for row in self._all(conn, "SELECT o.question_code,o.item_text,o.revision,o.updated_at,u.login_id AS updated_by FROM tap_question_overrides o JOIN tap_users u ON u.id=o.updated_by")}
+        rows = []
+        for original in load_questions():
+            row = {**original, "revision": 0, "updated_at": None, "updated_by": None}
+            override = overrides.get(row["question_code"])
+            if override:
+                row.update(revised_text=override["item_text"], revision=override["revision"], updated_at=override["updated_at"], updated_by=override["updated_by"])
+            rows.append(row)
+        return rows
+
+    def list_question_bank(self, token: str) -> list[dict]:
+        with self._transaction() as conn:
+            self._require(conn, token, {"kma"})
+            return self._question_bank(conn)
+
+    def save_question_text(self, token: str, question_code: str, text: str, expected_revision: int) -> dict:
+        with self._transaction() as conn:
+            actor = self._require(conn, token, {"kma"})
+            if type(expected_revision) is not int or expected_revision < 0:
+                raise ValidationError("문항 수정 버전을 확인하세요.")
+            if not isinstance(question_code, str) or question_code not in {row["question_code"] for row in load_questions()}:
+                raise ValidationError("수정할 문항을 확인하세요.")
+            item_text = _text(text, "문항 문구", 2000)
+            current = self._one(conn, "SELECT revision FROM tap_question_overrides WHERE question_code=?", (question_code,), lock=True)
+            revision = current["revision"] if current else 0
+            if revision != expected_revision:
+                raise ConflictError("다른 수정 내용이 저장되었습니다. 문항을 새로 불러온 뒤 다시 수정하세요.")
+            now = self._clock()
+            if current:
+                self._execute(conn, "UPDATE tap_question_overrides SET item_text=?,revision=?,updated_at=?,updated_by=? WHERE question_code=? AND revision=?", (item_text, revision + 1, now, actor["id"], question_code, revision))
+            else:
+                self._execute(conn, "INSERT INTO tap_question_overrides(question_code,item_text,revision,updated_at,updated_by) VALUES (?,?,?,?,?)", (question_code, item_text, 1, now, actor["id"]))
+            self._audit(conn, actor["id"], "save_question_text", question_code)
+            return next(row for row in self._question_bank(conn) if row["question_code"] == question_code)
+
     def list_companies(self, token: str) -> list[dict]:
         with self._transaction() as conn:
             user = self._require(conn, token, {"kma", "company"})
@@ -388,8 +438,6 @@ class AccountStore:
             company = self._one(conn, "SELECT * FROM tap_companies WHERE id=? AND active=1", (company_id,))
             if not company:
                 raise ValidationError("회사를 확인하세요.")
-            if role == "participant" and (not login_id.startswith(company["slug"] + "-") or len(login_id) <= len(company["slug"]) + 1):
-                raise ValidationError(f"참여자 로그인 ID는 {company['slug']}-로 시작해야 합니다.")
             user_id = str(uuid.uuid4())
             self._execute(conn, "INSERT INTO tap_users(id,login_id,display_name,role,company_id,password_hash,created_at,department,job_title,email,phone) VALUES (?,?,?,?,?,?,?,?,?,?,?)", (user_id, login_id, display_name, role, company_id, hash_password(temp_password), self._clock(), profile["department"], profile["job_title"], profile["email"], profile["phone"]))
             self._audit(conn, actor["id"], "create_user", user_id)
@@ -422,7 +470,7 @@ class AccountStore:
             self._audit(conn, actor["id"], "activate_user" if active else "deactivate_user", target["id"])
 
     @staticmethod
-    def _project_config(config: dict) -> dict:
+    def _project_config(config: dict, question_overrides: dict | None = None) -> dict:
         if not isinstance(config, dict):
             raise ValidationError("프로젝트 설정을 확인하세요.")
         config = json.loads(_json(config))
@@ -438,7 +486,10 @@ class AccountStore:
             raise ValidationError("대상 직급을 확인하세요.")
         if errors or any(not selected.get(f, {}).get("active_for_scoring") or not applicable_to_level(selected[f], level) for f in factors):
             raise ValidationError("선택할 수 없는 검사 역량입니다. " + " ".join(errors))
-        questions = questions_for_factors(factors)
+        questions = [dict(row) for row in questions_for_factors(factors)]
+        for question in questions:
+            if question_overrides and question["question_code"] in question_overrides:
+                question["revised_text"] = question_overrides[question["question_code"]]
         if not questions:
             raise ValidationError("검사 문항이 없습니다.")
         config["target_level"] = level
@@ -458,8 +509,8 @@ class AccountStore:
                         raise ValueError
                 except (ValueError, TypeError) as exc:
                     raise ValidationError("검사 일정은 YYYY-MM-DD 형식이어야 합니다.") from exc
-        if len(dates) != 5 or not (dates["pre_start_date"] <= dates["pre_end_date"] < dates["training_date"] < dates["post_start_date"] <= dates["post_end_date"]):
-            raise ValidationError("일정은 사전 시작≤사전 종료<교육일<사후 시작≤사후 종료 순서여야 합니다.")
+        if len(dates) != 5 or not (dates["pre_start_date"] <= dates["pre_end_date"] <= dates["training_date"] <= dates["post_start_date"] <= dates["post_end_date"]):
+            raise ValidationError("일정은 사전 시작≤사전 종료≤교육일≤사후 시작≤사후 종료 순서여야 합니다.")
         _json(config)
         return config
 
@@ -474,7 +525,8 @@ class AccountStore:
                 raise AuthorizationError("담당 회사에만 프로젝트를 만들 수 있습니다.")
             if not self._one(conn, "SELECT id FROM tap_companies WHERE id=? AND active=1", (company_id,)):
                 raise ValidationError("회사를 선택하세요.")
-            config = self._project_config(config)
+            overrides = {row["question_code"]: row["item_text"] for row in self._all(conn, "SELECT question_code,item_text FROM tap_question_overrides")}
+            config = self._project_config(config, overrides)
             project_id = str(uuid.uuid4())
             self._execute(conn, "INSERT INTO tap_projects(id,company_id,name,config_json,created_by,created_at) VALUES (?,?,?,?,?,?)", (project_id, company_id, name, _json(config), actor["id"], self._clock()))
             self._audit(conn, actor["id"], "create_project", project_id)
@@ -626,7 +678,8 @@ class AccountStore:
                 if completed and old["payload_json"] == encoded:
                     return self._assessment(old)
                 raise ConflictError("제출된 검사는 변경할 수 없습니다.")
-            if hashlib.sha256(_json(questions_for_factors(config["selected_factors"])).encode()).hexdigest() != config["full_question_snapshot_hash"]:
+            snapshot = config.get("question_snapshot")
+            if not isinstance(snapshot, list) or not snapshot or hashlib.sha256(_json(snapshot).encode()).hexdigest() != config["full_question_snapshot_hash"]:
                 raise ConflictError("검사 문항 버전이 변경되었습니다. 교육담당자에게 문의하세요.")
             today = datetime.fromtimestamp(self._clock(), KST).date()
             if config.get(f"{phase}_start_date") and not date.fromisoformat(config[f"{phase}_start_date"]) <= today <= date.fromisoformat(config[f"{phase}_end_date"]):
@@ -647,8 +700,9 @@ class AccountStore:
             actor = self._require(conn, token, {"kma", "company"})
             self._project(conn, actor, project_id)
             rows = self._assignments(conn, "a.project_id=?", (project_id,))
+            completed = self._all(conn, "SELECT s.assignment_id,s.phase,s.payload_json FROM tap_assessments s JOIN tap_assignments a ON a.id=s.assignment_id WHERE a.project_id=? AND s.completed=1", (project_id,))
+            payloads = {(row["assignment_id"], row["phase"]): json.loads(row["payload_json"]) for row in completed}
             for row in rows:
                 for phase in ("pre", "post"):
-                    result = self._one(conn, "SELECT payload_json FROM tap_assessments WHERE assignment_id=? AND phase=? AND completed=1", (row["id"], phase))
-                    row[phase + "_payload"] = json.loads(result["payload_json"]) if result else None
+                    row[phase + "_payload"] = payloads.get((row["id"], phase))
             return rows

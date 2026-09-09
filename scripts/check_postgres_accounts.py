@@ -188,7 +188,10 @@ def _exercise(scoped_url: str) -> None:
     _denied(AuthorizationError, store.set_company_registration_number, other_company_token, company_a["id"], "2222222222")
     _denied(ConflictError, store.create_company, admin, "Duplicate Check", "0000000001")
     _denied(ConflictError, store.create_user, admin, "manager001", "Duplicate Account", "company", company_a["id"], initial)
-    _denied(ValidationError, store.create_user, admin, "participant001", "Missing Prefix", "participant", company_a["id"], initial)
+    custom = store.create_user(admin, "participant001", "Custom ID", "participant", company_a["id"], initial)
+    _check(custom["login_id"] == "participant001" and custom["company_id"] == company_a["id"])
+    _denied(ConflictError, store.create_user, admin, "participant001", "Duplicate Custom ID", "participant", company_b["id"], initial)
+    _denied(AuthorizationError, store.create_user, other_company_token, "another.custom", "Wrong Company", "participant", company_a["id"], initial)
     codes = project["config"]["question_snapshot_codes"]
     _check(len(codes) == 4)
     own = store.list_assignments(participant_token)
@@ -199,6 +202,27 @@ def _exercise(scoped_url: str) -> None:
     _denied(AuthorizationError, store.project_results, participant_token, project["id"])
     _denied(AuthorizationError, store.load_assessment, peer_token, assignment_id, "pre")
 
+    # Catalog overrides persist independently of already-created instruments.
+    bank = {row["question_code"]: row for row in store.list_question_bank(admin)}
+    _check(bank[codes[0]]["revision"] == 0)
+    _denied(AuthorizationError, store.list_question_bank, other_company_token)
+    _denied(AuthorizationError, store.save_question_text, participant_token, codes[0], "Denied edit", 0)
+    edited = store.save_question_text(admin, codes[0], "Synthetic revised question", 0)
+    _check(edited["revision"] == 1 and edited["updated_by"] == "check-admin")
+    _denied(ConflictError, store.save_question_text, admin, codes[0], "Stale edit", 0)
+    newer = store.create_project(admin, "New instrument", {**project["config"], "company_id": company_a["id"]})
+    _check(newer["config"]["question_snapshot"][0]["revised_text"] == "Synthetic revised question")
+    _check(newer["config"]["question_snapshot_hash"] != project["config"]["question_snapshot_hash"])
+    projects = {row["id"]: row for row in store.list_projects(admin)}
+    _check(projects[project["id"]]["config"] == project["config"])
+    summary = store.dashboard_summary(admin)
+    _check((summary["companies_count"], summary["company_users_count"], summary["participant_users_count"]) == (2, 1, 3))
+    _check(len(summary["projects"]) == 2)
+    foreign_summary = store.dashboard_summary(other_company_token)
+    _check(foreign_summary["companies_count"] == 1 and foreign_summary["projects"] == [])
+    _check(foreign_summary["participant_users_count"] == 0)
+    _denied(AuthorizationError, store.dashboard_summary, participant_token)
+
     draft = {"responses": {codes[0]: 0}, "current_question": 1,
              "started_at": now[0], "duration_seconds": 12}
     _denied(AuthorizationError, store.save_assessment, peer_token, assignment_id, "pre", draft, False)
@@ -208,6 +232,8 @@ def _exercise(scoped_url: str) -> None:
     # A fresh store and fresh connections must recover the server draft.
     store = AccountStore(scoped_url, clock=lambda: now[0])
     _check({key: store.principal(participant_token)[key] for key in profile} == profile)
+    restored_bank = {row["question_code"]: row for row in store.list_question_bank(admin)}
+    _check(restored_bank[codes[0]] == edited)
     restored = store.load_assessment(participant_token, assignment_id, "pre")
     _check(restored is not None and restored["payload"] == draft and not restored["completed"])
     pre = {"responses": {code: 0 if index == 0 else 3 for index, code in enumerate(codes)},
@@ -235,6 +261,8 @@ def _exercise(scoped_url: str) -> None:
     report = store.project_results(admin, project["id"])
     _check(len(report) == 1 and report[0]["user_id"] == participant["id"])
     _check(report[0]["pre_payload"] == pre and report[0]["post_payload"] == post)
+    progress = {row["id"]: row for row in store.dashboard_summary(admin)["projects"]}
+    _check((progress[project["id"]]["assigned"], progress[project["id"]]["pre_completed"], progress[project["id"]]["post_completed"]) == (1, 1, 1))
     comparison = score_pre_post_responses(questions_for_factors(["CORE-CO"]), pre["responses"], post["responses"])
     _check(len(comparison) == 1 and comparison[0]["paired_valid_items"] == 3
            and comparison[0]["self_reported_change"] == 1.0)
@@ -272,7 +300,7 @@ def main(argv: list[str] | None = None) -> int:
         stage = exc.stage if isinstance(exc, _StageFailure) else "configuration"
         print(f"POSTGRES ACCOUNT CHECK FAILED: {error_type}; stage={stage}", flush=True)
         return 1
-    print("POSTGRES ACCOUNT CHECK PASSED: pre/post persistence, tenant isolation, immutable submissions, reset/revocation, isolated schema cleaned", flush=True)
+    print("POSTGRES ACCOUNT CHECK PASSED: pre/post persistence, tenant isolation, immutable submissions, question catalog, dashboard scope, reset/revocation, isolated schema cleaned", flush=True)
     return 0
 
 

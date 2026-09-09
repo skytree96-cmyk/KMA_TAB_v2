@@ -67,7 +67,7 @@
   justify-content: center;
 }
 .stApp:has(.st-key-tap_workspace_topbar) .st-key-tap_workspace_brand .tap-ci-wordmark {
-  font-size: 28px;
+  font-size: 32px;
   letter-spacing: -.065em;
 }
 .stApp:has(.st-key-tap_workspace_topbar) .st-key-tap_workspace_brand .tap-ci-tap {margin-left: .08em;}
@@ -95,14 +95,14 @@
   border-radius: 0;
   background: transparent;
   color: var(--tap-muted);
-  font-size: 14px;
+  font-size: 18px;
   font-weight: 500;
   white-space: nowrap;
   box-shadow: none;
   transform: none;
 }
 .stApp:has(.st-key-tap_workspace_topbar) .st-key-tap_workspace_nav [data-testid="stButton"] button p {
-  font-size: 14px;
+  font-size: 18px;
   line-height: 1.4;
   white-space: nowrap;
 }
@@ -139,7 +139,7 @@
   transform: none;
 }
 .stApp:has(.st-key-tap_workspace_topbar) .st-key-tap_workspace_profile button p {
-  font-size: 12px;
+  font-size: 16px;
   line-height: 1.45;
 }
 .stApp:has(.st-key-tap_workspace_topbar) .st-key-tap_workspace_profile button:hover,
@@ -155,32 +155,32 @@
   gap: 20px;
 }
 .stApp:has(.st-key-tap_workspace_topbar) .st-key-tap_workspace_main h1 {
-  font-size: 28px;
+  font-size: 32px;
   font-weight: 800;
   line-height: 1.35;
   padding: 0;
   letter-spacing: -.045em;
 }
 .stApp:has(.st-key-tap_workspace_topbar) .st-key-tap_workspace_main h2 {
-  font-size: 23px;
+  font-size: 27px;
   line-height: 1.4;
   padding: 0;
 }
 .stApp:has(.st-key-tap_workspace_topbar) .st-key-tap_workspace_main h3 {
-  font-size: 19px;
+  font-size: 23px;
   line-height: 1.45;
   padding: 0;
 }
 .stApp:has(.st-key-tap_workspace_topbar) .st-key-tap_workspace_main p {
-  font-size: 14px;
+  font-size: 18px;
   line-height: 1.75;
 }
 .stApp:has(.st-key-tap_workspace_topbar) .st-key-tap_workspace_main [data-testid="stCaptionContainer"] p {
-  font-size: 12px;
+  font-size: 16px;
   line-height: 1.75;
 }
 .stApp:has(.st-key-tap_workspace_topbar) .st-key-tap_workspace_main [data-testid="stWidgetLabel"] p {
-  font-size: 13px;
+  font-size: 17px;
   line-height: 1.6;
 }
 .stApp:has(.st-key-tap_workspace_topbar) .st-key-tap_workspace_split [data-testid="stHorizontalBlock"]:has(.st-key-tap_workspace_project_list),
@@ -230,13 +230,13 @@
 }
 .stApp:has(.st-key-tap_workspace_topbar) :is(.st-key-tap_workspace_project_list,.st-key-tap_workspace_account_list) [data-testid="stRadioOption"] [data-testid="stMarkdownContainer"] p {
   color: var(--tap-ink);
-  font-size: 14px;
+  font-size: 18px;
   font-weight: 500;
   line-height: 1.6;
 }
 .stApp:has(.st-key-tap_workspace_topbar) :is(.st-key-tap_workspace_project_list,.st-key-tap_workspace_account_list) [data-testid="stRadioOption"] [data-testid="stCaptionContainer"] p {
   color: var(--tap-muted);
-  font-size: 12px;
+  font-size: 16px;
   font-weight: 400;
   line-height: 1.75;
 }
@@ -271,7 +271,7 @@
   gap: 10px 12px;
   margin: 0;
   padding: 0;
-  font-size: 13px;
+  font-size: 17px;
   line-height: 1.75;
 }
 .stApp:has(.st-key-tap_workspace_topbar) .tap-workspace-fields dt {
@@ -294,12 +294,12 @@
   box-shadow: none;
 }
 .stApp:has(.st-key-tap_workspace_topbar) .st-key-tap_workspace_main [data-testid="stMetricLabel"] p {
-  font-size: 11px;
+  font-size: 15px;
   line-height: 1.5;
 }
 .stApp:has(.st-key-tap_workspace_topbar) .st-key-tap_workspace_main [data-testid="stMetricValue"] {
   color: var(--tap-ink);
-  font-size: 26px;
+  font-size: 30px;
   font-weight: 500;
   letter-spacing: -.04em;
   font-variant-numeric: tabular-nums;
@@ -318,7 +318,7 @@
   box-shadow: none;
 }
 .stApp:has(.st-key-tap_workspace_topbar) .st-key-tap_workspace_main :is([data-testid="stButton"],[data-testid="stFormSubmitButton"],[data-testid="stDownloadButton"]) button {
-  font-size: 13px;
+  font-size: 17px;
   border-radius: 9px;
 }
 @media (max-width: 1000px) {
@@ -328,7 +328,7 @@
     gap: 16px;
   }
   .stApp:has(.st-key-tap_workspace_topbar) .st-key-tap_workspace_nav [data-testid="stButton"] button {padding: 0 11px;}
-  .stApp:has(.st-key-tap_workspace_topbar) .st-key-tap_workspace_nav [data-testid="stButton"] button p {font-size: 13px;}
+  .stApp:has(.st-key-tap_workspace_topbar) .st-key-tap_workspace_nav [data-testid="stButton"] button p {font-size: 17px;}
   .stApp:has(.st-key-tap_workspace_topbar) .st-key-tap_workspace_nav [data-testid="stButton"] button[kind^="primary"]::after {left: 11px;right: 11px;}
 }
 @media (max-width: 900px) {
@@ -367,7 +367,7 @@
     grid-row: 2;
     border-top: 1px solid var(--tap-workspace-border);
   }
-  .stApp:has(.st-key-tap_workspace_topbar) .st-key-tap_workspace_brand .tap-ci-wordmark {font-size: 26px;}
+  .stApp:has(.st-key-tap_workspace_topbar) .st-key-tap_workspace_brand .tap-ci-wordmark {font-size: 30px;}
   .stApp:has(.st-key-tap_workspace_topbar) .st-key-tap_workspace_nav [data-testid="stHorizontalBlock"] {gap: 0;}
   .stApp:has(.st-key-tap_workspace_topbar) .st-key-tap_workspace_nav [data-testid="stColumn"] {flex: 1 1 0;width: 0;}
   .stApp:has(.st-key-tap_workspace_topbar) .st-key-tap_workspace_nav [data-testid="stButton"] button {
@@ -376,12 +376,12 @@
     padding: 0 8px;
   }
   .stApp:has(.st-key-tap_workspace_topbar) .st-key-tap_workspace_main {padding: 20px 16px 28px;gap: 18px;}
-  .stApp:has(.st-key-tap_workspace_topbar) .st-key-tap_workspace_main h1 {font-size: 25px;}
+  .stApp:has(.st-key-tap_workspace_topbar) .st-key-tap_workspace_main h1 {font-size: 29px;}
   .stApp:has(.st-key-tap_workspace_topbar) :is(.st-key-tap_workspace_project_list,.st-key-tap_workspace_project_detail,.st-key-tap_workspace_account_list,.st-key-tap_workspace_account_detail) {
     padding: 18px;
     border-radius: 14px;
   }
-  .stApp:has(.st-key-tap_workspace_topbar) .st-key-tap_workspace_main [data-testid="stTextInput"] input {font-size: 16px;}
+  .stApp:has(.st-key-tap_workspace_topbar) .st-key-tap_workspace_main [data-testid="stTextInput"] input {font-size: 20px;}
   .stApp:has(.st-key-tap_workspace_topbar) .st-key-tap_workspace_main [data-testid="stForm"] {padding: 18px;}
   .stApp:has(.st-key-tap_workspace_topbar) .st-key-_tap_participant_question_stage [data-testid="stForm"] {padding: 0;}
   .stApp:has(.st-key-tap_workspace_topbar) .tap-workspace-fields {grid-template-columns: 68px minmax(0,1fr);gap: 8px 10px;}
@@ -396,3 +396,32 @@
 .stApp:has(.st-key-tap_workspace_topbar) :is(.st-key-tap_workspace_project_list,.st-key-tap_workspace_project_detail,.st-key-tap_workspace_account_list,.st-key-tap_workspace_account_detail) [data-testid="stAlert"] [data-testid="stMarkdownContainer"] p {
   color: var(--tap-ink);
 }
+
+/* Larger reading scale, including native input and popup controls. */
+.stApp:has(.st-key-tap_workspace_topbar) .st-key-tap_workspace_main :is(input,textarea,[data-testid="stSelectbox"] [role="group"],[data-testid="stMultiSelect"] [role="group"]) {font-size:18px;}
+.stApp:has(.st-key-tap_workspace_topbar) .st-key-tap_workspace_main .tap-workspace-fields {grid-template-columns:90px minmax(0,1fr);}
+@media(max-width:1000px) {
+ .stApp:has(.st-key-tap_workspace_topbar) .st-key-tap_workspace_topbar [data-testid="stHorizontalBlock"]:has(.st-key-tap_workspace_brand) {grid-template-columns:156px minmax(0,1fr) 170px;gap:12px;}
+}
+@media(max-width:900px) {
+ .stApp:has(.st-key-tap_workspace_topbar) .st-key-tap_workspace_topbar [data-testid="stHorizontalBlock"]:has(.st-key-tap_workspace_brand) {grid-template-columns:minmax(0,1fr) 170px;gap:0 8px;}
+ .stApp:has(.st-key-tap_workspace_topbar) .st-key-tap_workspace_topbar [data-testid="stColumn"]:has(.st-key-tap_workspace_brand) {grid-row:1;grid-column:1;}
+ .stApp:has(.st-key-tap_workspace_topbar) .st-key-tap_workspace_topbar [data-testid="stColumn"]:has(.st-key-tap_workspace_profile) {grid-row:1;grid-column:2;}
+ .stApp:has(.st-key-tap_workspace_topbar) .st-key-tap_workspace_topbar [data-testid="stColumn"]:has(.st-key-tap_workspace_nav) {grid-row:2;grid-column:1/-1;overflow-x:auto;}
+ .stApp:has(.st-key-tap_workspace_topbar) .st-key-tap_workspace_nav [data-testid="stButton"] button {min-height:52px;padding:0 10px;}
+ .stApp:has(.st-key-tap_workspace_topbar) .st-key-tap_workspace_nav [data-testid="stButton"] button p {font-size:16px;}
+ .stApp:has(.st-key-tap_workspace_topbar) .st-key-tap_workspace_nav [data-testid="stIconMaterial"] {display:none;}
+}
+
+/* Overflow stays within navigation as administrator destinations grow. */
+.stApp:has(.st-key-tap_workspace_topbar) .st-key-tap_workspace_nav {overflow-x:auto;}
+.stApp:has(.st-key-tap_workspace_topbar) .st-key-tap_workspace_nav [data-testid="stHorizontalBlock"] {width:max-content;min-width:100%;}
+.stApp:has(.st-key-tap_workspace_topbar) .st-key-tap_workspace_nav [data-testid="stColumn"] {flex:0 0 auto;}
+@media(max-width:900px) {
+ .stApp:has(.st-key-tap_workspace_topbar) .st-key-tap_workspace_nav::after {content:"좌우로 밀어 메뉴 보기";display:block;font-size:12px;color:var(--tap-muted);padding:4px 10px;}
+}
+
+.stApp:has(.st-key-tap_workspace_topbar) .st-key-tap_workspace_nav {overflow-y:hidden;}
+.stApp:has(.st-key-tap_workspace_topbar) .st-key-tap_workspace_nav [data-testid="stColumn"],
+.stApp:has(.st-key-tap_workspace_topbar) .st-key-tap_workspace_nav [data-testid="stButton"],
+.stApp:has(.st-key-tap_workspace_topbar) .st-key-tap_workspace_nav [data-testid="stButton"] button {width:max-content;min-width:max-content;max-width:none;}

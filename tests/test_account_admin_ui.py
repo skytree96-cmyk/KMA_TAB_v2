@@ -58,7 +58,13 @@ class AccountAdminInputTests(unittest.TestCase):
 
     def test_manager_id_is_plain_and_participant_prefix_is_added_only_once(self):
         self.assertEqual(_login_id(" Manager001 "), "manager001")
+        self.assertEqual(_login_id("User", "0123456789"), "0123456789-user")
         self.assertEqual(_login_id("User001", "0123456789"), "0123456789-user001")
+        for custom in ("Hong123", "NewUser", "user-team", "usr", "other-user001"):
+            with self.subTest(custom=custom):
+                self.assertEqual(_login_id(custom, "0123456789"), custom.lower())
+        rows = parse_participant_csv(b"login_id,display_name\nNewUser,A\nuser,B\n0123456789-user001,C\n", "0123456789")
+        self.assertEqual([row["login_id"] for row in rows], ["newuser", "0123456789-user", "0123456789-user001"])
         self.assertEqual(_login_id("0123456789-USER001", "0123456789"), "0123456789-user001")
         self.assertEqual(_login_id("acme-existing"), "acme-existing")
         for value in ("", " ", "0123456789-"):
@@ -114,11 +120,22 @@ class AccountAdminInputTests(unittest.TestCase):
         self.assertEqual(config["project_start_date"], config["pre_start_date"])
         self.assertEqual(config["question_snapshot_hash"], self.config(name="다른 이름")["question_snapshot_hash"])
 
+    def test_project_accepts_equal_dates_at_each_schedule_boundary(self):
+        same_day = date(2026, 10, 8)
+        for changes in (
+            {"pre_end": same_day}, {"post_start": same_day},
+            {"pre_start": same_day, "pre_end": same_day, "post_start": same_day, "post_end": same_day},
+        ):
+            with self.subTest(changes=changes):
+                self.assertEqual(self.config(**changes)["training_date"], same_day.isoformat())
+
     def test_project_rejects_incompatible_factors_and_schedules(self):
         for changes in (
             {"optional_factors": ["STRAT_CORE"]},
             {"optional_factors": ["AI_USE", "PLAN_STR", "DATA_ANA", "DX_APPLY"]},
-            {"pre_end": date(2026, 10, 8)},
+            {"pre_end": date(2026, 10, 9)},
+            {"pre_start": date(2026, 10, 8)},
+            {"post_end": date(2026, 12, 2)},
             {"post_start": date(2026, 10, 7)},
             {"priorities": ["missing"]},
         ):
@@ -193,6 +210,9 @@ class Store:
 _render_assignments(Store(), "token", {"id":"p1", "company_id":"co1"}, [{"id":"u2", "role":"participant", "company_id":"co1", "active":True}])
 ''').run(timeout=30)
         self.assertEqual(list(app.exception), [])
+        self.assertFalse(any(item.label == "프로젝트 배정 해제" for item in app.button))
+        app.selectbox(key="account_admin_assignment_change_p1").set_value("a1")
+        run_app(app)
         next(item for item in app.button if item.label == "프로젝트 배정 해제").click()
         run_app(app)
         self.assertEqual(list(app.exception), [])
@@ -202,6 +222,74 @@ _render_assignments(Store(), "token", {"id":"p1", "company_id":"co1"}, [{"id":"u
         run_app(app)
         self.assertEqual(list(app.exception), [])
         self.assertTrue(app.session_state["assignment_active"])
+
+    def test_assignment_search_filters_profiles_and_clears_hidden_action_targets(self):
+        app = AppTest.from_string('''
+import streamlit as st
+from tap.account_admin_ui import _render_assignments
+class Store:
+    def list_assignments(self, token, project_id):
+        return [
+            {"id":"a1", "user_id":"u1", "user_name":"홍길동", "login_id":"alpha-hong", "active":True},
+            {"id":"a2", "user_id":"u2", "user_name":"김다른", "login_id":"beta-other", "active":False},
+        ]
+    def set_assignment_active(self, token, assignment_id, active):
+        st.session_state["changed_assignment"] = (assignment_id, active)
+    def assign_participant(self, token, project_id, user_id):
+        st.session_state["new_assignment"] = (project_id, user_id)
+users = [
+    {"id":"u1", "display_name":"홍길동", "login_id":"alpha-hong", "department":"교육Team", "job_title":"대리"},
+    {"id":"u2", "display_name":"김다른", "login_id":"beta-other", "department":"기획", "job_title":"차장"},
+    {"id":"n1", "display_name":"박새봄", "login_id":"new-one", "department":"개발Team", "job_title":"과장"},
+    {"id":"n2", "display_name":"정하나", "login_id":"new-two", "department":"지원", "job_title":"사원"},
+]
+users = [{"role":"participant", "company_id":"co1", "active":True, **row} for row in users]
+users += [
+    {"id":"foreign", "display_name":"박새봄", "login_id":"new-foreign", "department":"개발Team", "job_title":"과장", "role":"participant", "company_id":"co2", "active":True},
+    {"id":"manager", "display_name":"박새봄", "login_id":"new-manager", "role":"company", "company_id":"co1", "active":True},
+    {"id":"inactive", "display_name":"박새봄", "login_id":"new-inactive", "role":"participant", "company_id":"co1", "active":False},
+]
+_render_assignments(Store(), "token", {"id":"p1", "company_id":"co1"}, users)
+''').run(timeout=30)
+        self.assertEqual(list(app.exception), [])
+        self.assertIsNone(app.selectbox(key="account_admin_assignment_change_p1").value)
+        for query in ("길동", "PHA-HO", "육tEaM", "대리"):
+            app.text_input(key="account_admin_assignment_search_p1").input(query)
+            run_app(app)
+            self.assertEqual(app.selectbox(key="account_admin_assignment_change_p1").options, ["홍길동 · alpha-hong"])
+            self.assertEqual(list(app.dataframe[0].value["이름"]), ["홍길동"])
+        app.selectbox(key="account_admin_assignment_change_p1").set_value("a1")
+        run_app(app)
+        app.text_input(key="account_admin_assignment_search_p1").input("beta")
+        app.button(key="account_admin_assignment_toggle_p1").click()
+        run_app(app)
+        self.assertIsNone(app.selectbox(key="account_admin_assignment_change_p1").value)
+        self.assertNotIn("changed_assignment", app.session_state.filtered_state)
+        self.assertFalse(any(button.key == "account_admin_assignment_toggle_p1" for button in app.button))
+        for query in ("새봄", "NEW-ONE", "발tEaM", "과장"):
+            app.text_input(key="account_admin_assign_search_p1").input(query)
+            run_app(app)
+            self.assertEqual(app.multiselect(key="account_admin_assign_p1").options, ["박새봄 · new-one"])
+        app.multiselect(key="account_admin_assign_p1").set_value(["n1"])
+        run_app(app)
+        app.text_input(key="account_admin_assign_search_p1").input("new-two")
+        app.button(key="account_admin_assign_save_p1").click()
+        run_app(app)
+        self.assertEqual(app.multiselect(key="account_admin_assign_p1").value, [])
+        self.assertNotIn("new_assignment", app.session_state.filtered_state)
+        app.multiselect(key="account_admin_assign_p1").set_value(["n2"])
+        run_app(app)
+        app.button(key="account_admin_assign_save_p1").click()
+        run_app(app)
+        self.assertEqual(app.session_state["new_assignment"], ("p1", "n2"))
+        for key in ("account_admin_assignment_search_p1", "account_admin_assign_search_p1"):
+            app.text_input(key=key).input("검색 결과 없음")
+        run_app(app)
+        self.assertEqual(list(app.exception), [])
+        self.assertFalse(app.selectbox)
+        self.assertFalse(app.multiselect)
+        self.assertIsNone(app.session_state["account_admin_assignment_change_p1"])
+        self.assertEqual(app.session_state["account_admin_assign_p1"], [])
 
     def test_kma_and_manager_render_without_old_role_switch(self):
         for role in ("kma", "company"):

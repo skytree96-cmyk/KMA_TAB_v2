@@ -4,9 +4,9 @@ from datetime import datetime, timezone
 from contextlib import closing
 from pathlib import Path
 import sqlite3
+import json
 import tempfile
 import unittest
-from unittest.mock import patch
 
 from tap.account_store import (AccountStore, AuthenticationError, AuthorizationError,
                                ConflictError, RateLimitError, ValidationError,
@@ -144,15 +144,13 @@ class AccountStoreTests(unittest.TestCase):
         with self.assertRaises(AuthorizationError):
             self.store.create_company(manager, "금지", "2222222222")
 
-    def test_manager_ids_are_plain_and_participants_use_company_registration(self):
+    def test_manager_and_prefixed_participant_ids_remain_unique(self):
         manager, token = self.user("company", suffix="mgr")
         self.assertEqual(manager["login_id"], "mgr")
         self.assertEqual(self.store.principal(token)["login_id"], "mgr")
         for company in (self.a, self.b):
             with self.subTest(company=company["id"]), self.assertRaises(ConflictError):
                 self.store.create_user(self.admin, "mgr", "중복 담당자", "company", company["id"], INITIAL)
-        with self.assertRaises(ValidationError):
-            self.store.create_user(self.admin, "001", "접두어 누락", "participant", self.a["id"], INITIAL)
         participant, participant_token = self.user()
         other, _ = self.user(company=self.b, suffix="001")
         self.assertEqual(participant["login_id"], "0123456789-001")
@@ -160,6 +158,25 @@ class AccountStoreTests(unittest.TestCase):
         self.assertEqual(self.store.principal(participant_token)["login_id"], participant["login_id"])
         with self.assertRaises(ConflictError):
             self.store.create_user(self.admin, participant["login_id"], "중복 참여자", "participant", self.a["id"], INITIAL)
+
+    def test_custom_participant_ids_preserve_uniqueness_and_company_scope(self):
+        _, manager = self.user("company", suffix="mgr")
+        _, outsider = self.user("company", company=self.b, suffix="mgrb")
+        for login_id in ("001", "custom.person"):
+            with self.subTest(login_id=login_id):
+                participant = self.store.create_user(manager, login_id, "직접 지정 참여자", "participant", self.a["id"], INITIAL)
+                self.assertEqual(participant["login_id"], login_id)
+                token = self.store.login(login_id, INITIAL)
+                self.assertEqual(self.store.principal(token)["company_id"], self.a["id"])
+                self.assertIn(participant["id"], {row["id"] for row in self.store.list_users(manager)})
+                self.assertNotIn(participant["id"], {row["id"] for row in self.store.list_users(outsider)})
+                for company in (self.a, self.b):
+                    with self.subTest(company=company["id"]), self.assertRaises(ConflictError):
+                        self.store.create_user(self.admin, login_id, "중복 참여자", "participant", company["id"], INITIAL)
+                with self.assertRaises(AuthorizationError):
+                    self.store.reset_password(outsider, participant["id"], INITIAL)
+        with self.assertRaises(AuthorizationError):
+            self.store.create_user(manager, "other.person", "다른 회사", "participant", self.b["id"], INITIAL)
 
     def test_registration_number_requires_exactly_ten_ascii_digits(self):
         self.assertEqual(self.a["slug"], "0123456789")
@@ -312,7 +329,11 @@ class AccountStoreTests(unittest.TestCase):
             self.store.save_assessment(token, assignment["id"], "pre", self.payload(project), True)
         self.now = datetime(2026, 9, 8, 0, 0, tzinfo=timezone.utc).timestamp()
         token = self.store.login("0123456789-001", CHANGED)
-        with patch("tap.account_store.questions_for_factors", return_value=[]), self.assertRaises(ConflictError):
+        corrupted = {**project["config"], "question_snapshot": []}
+        with closing(sqlite3.connect(self.path)) as conn:
+            conn.execute("UPDATE tap_projects SET config_json=? WHERE id=?", (json.dumps(corrupted), project["id"]))
+            conn.commit()
+        with self.assertRaises(ConflictError):
             self.store.save_assessment(token, assignment["id"], "pre", self.payload(project), True)
 
     def test_project_configuration_validation_and_server_snapshot(self):
@@ -324,6 +345,32 @@ class AccountStoreTests(unittest.TestCase):
         self.assertNotIn("forged", project["config"]["question_snapshot_codes"])
         self.assertEqual(len(project["config"]["question_snapshot_hash"]), 64)
         self.assertFalse(project["config"]["allow_schedule_override"])
+
+    def test_schedule_accepts_equal_boundaries_and_rejects_reversed_dates(self):
+        for overrides in ({"pre_end_date": "2026-09-10"},
+                          {"post_start_date": "2026-09-10"},
+                          {"pre_end_date": "2026-09-10", "post_start_date": "2026-09-10"}):
+            with self.subTest(accepted=overrides):
+                project = self.project(**overrides)
+                self.assertTrue(all(project["config"][key] == value for key, value in overrides.items()))
+        for overrides in ({"pre_start_date": "2026-09-10"},
+                          {"pre_end_date": "2026-09-11"},
+                          {"post_start_date": "2026-09-09"},
+                          {"post_end_date": "2026-09-10"}):
+            with self.subTest(rejected=overrides), self.assertRaises(ValidationError):
+                self.project(**overrides)
+
+    def test_same_day_pre_and_post_require_pre_completion(self):
+        user, token = self.user()
+        day = "2026-09-08"
+        project = self.project(**{key: day for key in ("pre_start_date", "pre_end_date", "training_date", "post_start_date", "post_end_date")})
+        assignment = self.store.assign_participant(self.admin, project["id"], user["id"])
+        with self.assertRaises(AuthorizationError):
+            self.store.save_assessment(token, assignment["id"], "post", self.payload(project, True), True)
+        self.store.save_assessment(token, assignment["id"], "pre", self.payload(project), True)
+        self.store.save_assessment(token, assignment["id"], "post", self.payload(project, True), True)
+        result = self.store.project_results(self.admin, project["id"])[0]
+        self.assertTrue(result["pre_completed"] and result["post_completed"])
 
     def test_assignment_deactivation_preserves_account_and_other_project(self):
         user, token, project, assignment = self.assignment()

@@ -55,12 +55,22 @@ def _reset_scope(state: MutableMapping[str, Any], owner: str, assignment_id: str
 
 
 def _project_questions(config: Mapping[str, Any]) -> list[dict[str, Any]]:
-    """Fail closed if the assigned instrument differs from the local bank."""
+    """Use the assigned immutable text snapshot and verify its identity/hash."""
     selected = config.get("selected_factors")
     codes = config.get("question_snapshot_codes")
     if not isinstance(selected, list) or not selected or len(set(selected)) != len(selected):
         raise ValueError("배정된 프로젝트의 측정역량 설정을 확인해 주세요.")
-    questions = questions_for_factors(selected)
+    base = questions_for_factors(selected)
+    questions = config.get("question_snapshot", base)
+    expected = {str(q["question_code"]): q for q in base}
+    if not isinstance(questions, list) or not questions or len(questions) != len(expected):
+        raise ValueError("배정된 검사 문항 스냅샷을 확인해 주세요.")
+    for question in questions:
+        reference = expected.get(str(question.get("question_code"))) if isinstance(question, Mapping) else None
+        if (reference is None or question.get("factor_code") != reference["factor_code"]
+                or question.get("scoring_direction", "direct") != reference.get("scoring_direction", "direct")
+                or not isinstance(question.get("revised_text"), str) or not question["revised_text"].strip()):
+            raise ValueError("배정된 검사 문항 스냅샷을 확인해 주세요.")
     if {q["factor_code"] for q in questions} != set(selected):
         raise ValueError("현재 문항은행에서 배정된 역량을 찾을 수 없습니다.")
     question_by_code = {str(q["question_code"]): q for q in questions}

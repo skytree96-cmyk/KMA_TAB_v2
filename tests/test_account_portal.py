@@ -139,8 +139,8 @@ class PortalNavigationTests(unittest.TestCase):
 
     def test_topbar_only_exposes_authenticated_role_destinations(self):
         expectations = {
-            "kma": {"_tap_nav_companies": "회원사", "_tap_nav_accounts": "계정 관리", "_tap_nav_projects": "프로젝트"},
-            "company": {"_tap_nav_projects": "프로젝트", "_tap_nav_create_project": "프로젝트 만들기", "_tap_nav_accounts": "참여자 계정"},
+            "kma": {"_tap_nav_dashboard": "대시보드", "_tap_nav_question_bank": "문항은행·검수", "_tap_nav_companies": "회원사", "_tap_nav_accounts": "계정 관리", "_tap_nav_projects": "프로젝트"},
+            "company": {"_tap_nav_dashboard": "대시보드", "_tap_nav_projects": "프로젝트", "_tap_nav_create_project": "프로젝트 만들기", "_tap_nav_accounts": "참여자 계정"},
             "participant": {"_tap_nav_assessments": "내 교육"},
         }
         for role, expected in expectations.items():
@@ -156,6 +156,24 @@ class PortalNavigationTests(unittest.TestCase):
                 else:
                     self.assertEqual(admin.call_args.kwargs["section"], "projects")
                     participant.assert_not_called()
+
+    def test_dashboard_and_bank_routes_keep_role_boundaries(self):
+        for role in ("kma", "company"):
+            with patch("tap.account_dashboard.render_dashboard") as dashboard:
+                with _authenticated_navigation(role, section="dashboard") as (app, store, admin, participant):
+                    self.assert_no_error(app)
+                    dashboard.assert_called_once()
+                    admin.assert_not_called()
+        with patch("tap.account_question_bank.render_question_bank") as bank:
+            with _authenticated_navigation("kma", section="question_bank") as (app, store, admin, participant):
+                self.assert_no_error(app)
+                bank.assert_called_once()
+                admin.assert_not_called()
+            bank.reset_mock()
+            with _authenticated_navigation("company", section="question_bank") as (app, store, admin, participant):
+                self.assert_no_error(app)
+                bank.assert_not_called()
+                self.assertEqual(admin.call_args.kwargs["section"], "projects")
 
     def test_selected_section_persists_through_unrelated_reruns(self):
         with _authenticated_navigation("kma") as (app, store, admin, participant):
