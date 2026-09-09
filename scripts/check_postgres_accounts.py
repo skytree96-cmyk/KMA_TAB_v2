@@ -286,6 +286,21 @@ def _exercise(scoped_url: str) -> None:
     _denied(AuthenticationError, store.principal, reset_token)
 
 
+    from scripts.seed_sundaeguk import seed_company
+    from tap.account_reports import summarize_project
+    fixture = seed_company(store)
+    _check(fixture["created"] and (fixture["total"], fixture["pre_completed"], fixture["post_completed"], fixture["nonparticipants"]) == (15, 5, 5, 10))
+    repeat = seed_company(store)
+    _check(not repeat["created"] and repeat["project_id"] == fixture["project_id"])
+    seeded_project = next(p for p in store.list_projects(admin) if p["id"] == fixture["project_id"])
+    seeded_results = store.project_results(admin, fixture["project_id"])
+    _check(len(seeded_results) == 15)
+    seeded_summary = summarize_project(seeded_project, seeded_results)
+    _check(len(seeded_summary) == 6 and all(row["paired_n"] == 5 and row["pre_mean"] is not None and row["post_mean"] is not None for row in seeded_summary))
+    company_summary = next(row for row in store.dashboard_summary(admin)["company_participation"] if row["company_id"] == fixture["company_id"])
+    _check(company_summary["total"] == 15 and company_summary["participating"] == 5)
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Check accounts in a disposable PostgreSQL schema.")
     parser.add_argument("--render-preflight", action="store_true", help="Use DATABASE_URL only with TAP_POSTGRES_PREFLIGHT=1.")
@@ -308,7 +323,7 @@ def main(argv: list[str] | None = None) -> int:
         stage = exc.stage if isinstance(exc, _StageFailure) else "configuration"
         print(f"POSTGRES ACCOUNT CHECK FAILED: {error_type}; stage={stage}", flush=True)
         return 1
-    print("POSTGRES ACCOUNT CHECK PASSED: pre/post persistence, tenant isolation, immutable submissions, question catalog, dashboard scope, reset/revocation, isolated schema cleaned", flush=True)
+    print("POSTGRES ACCOUNT CHECK PASSED: pre/post persistence, tenant isolation, immutable submissions, question catalog, dashboard scope, synthetic fixture, reset/revocation, isolated schema cleaned", flush=True)
     return 0
 
 

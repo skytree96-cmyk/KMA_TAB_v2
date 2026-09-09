@@ -18,6 +18,11 @@ def main():
     bootstrap_hash=os.environ.get("BOOTSTRAP_ADMIN_PASSWORD_HASH","")
     if bootstrap_hash:
         store.bootstrap_admin(os.environ.get("BOOTSTRAP_ADMIN_LOGIN","kma.admin"),bootstrap_hash)
+    if os.environ.get("TAP_SEED_SUNDAEGUK") == "1":
+        from scripts.seed_sundaeguk import seed_company
+        result = seed_company(store)
+        import json
+        print("SUNDAEGUK FIXTURE READY: " + json.dumps(result, ensure_ascii=False), flush=True)
     print("ACCOUNT DATABASE READY",flush=True)
     os.execv(sys.executable,[sys.executable,"-m","streamlit","run",str(ROOT/"streamlit_app.py"),"--server.address=0.0.0.0","--server.port="+os.environ.get("PORT","8501"),"--client.toolbarMode=minimal"])
 
