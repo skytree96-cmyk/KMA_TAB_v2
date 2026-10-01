@@ -25,7 +25,8 @@ if production_mode():
         if st.session_state.get(TOKEN_KEY):
             render_portal(routed=True)
         else:
-            render_account_landing()
+            # The bare domain is the public service introduction.
+            switch_to_page("open")
 
     def account_login():
         render_portal(routed=True)
@@ -37,7 +38,7 @@ if production_mode():
         page.__name__ = "workspace_" + route
         return st.Page(page, title=f"{title} · KMA TAP", url_path=url_path)
 
-    from tap.account_navigation import ROUTES, register_pages
+    from tap.account_navigation import ROUTES, register_pages, switch_to_page
     from tap.session_cookie import restore_session, sync_cookie
 
     restore_session(TOKEN_KEY)
@@ -46,15 +47,16 @@ if production_mode():
     home = st.Page(account_home, title="KMA TAP", default=True)
     guide = st.Page(render_account_guide, title="이용 안내 · KMA TAP", url_path="guide")
     workspace = {route: workspace_page(route, url_path, title) for route, (url_path, title) in ROUTES.items()}
-    register_pages(home=home, guide=guide, **workspace)
+    # Public service introduction (formerly the Cloudflare open page); always
+    # shows the landing page, even for a signed-in session.
+    open_page = st.Page(render_account_landing, title="서비스 소개 · KMA TAP", url_path="open")
+    register_pages(home=home, guide=guide, open=open_page, **workspace)
     st.navigation([
         home,
         st.Page(account_login, title="로그인 · KMA TAP", url_path="login"),
         *workspace.values(),
         guide,
-        # Public service introduction (formerly the Cloudflare open page); always
-        # shows the landing page, even for a signed-in session.
-        st.Page(render_account_landing, title="서비스 소개 · KMA TAP", url_path="open"),
+        open_page,
     ], position="hidden").run()
     st.stop()
 
