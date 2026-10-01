@@ -1,6 +1,12 @@
 #!/usr/bin/env bash
 # Build the image with Cloud Build and deploy it to Cloud Run. Re-run for every release.
+# Usage: 03_deploy.sh            -> new revision serves all traffic
+#        03_deploy.sh --preview  -> no traffic; reachable only at the tagged preview URL
 source "$(dirname "$0")/common.sh"
+traffic_args=()
+if [[ "${1:-}" == "--preview" ]]; then
+  traffic_args=(--no-traffic --tag=preview)
+fi
 
 image="$REGION-docker.pkg.dev/$PROJECT_ID/$AR_REPO/$SERVICE:$(date +%Y%m%d-%H%M%S)"
 
@@ -28,6 +34,10 @@ gcloud run deploy "$SERVICE" --image="$image" --region="$REGION" \
   --port=8080 --cpu=1 --memory=1Gi --concurrency=80 \
   --min-instances="${MIN_INSTANCES:-1}" --max-instances="${MAX_INSTANCES:-3}" \
   --session-affinity --timeout=3600 --cpu-boost \
-  --allow-unauthenticated
+  --allow-unauthenticated "${traffic_args[@]}"
 
-gcloud run services describe "$SERVICE" --region="$REGION" --format='value(status.url)'
+if [[ ${#traffic_args[@]} -gt 0 ]]; then
+  gcloud run services describe "$SERVICE" --region="$REGION" --format='value(status.traffic[].url)' | tr ';' '\n' | grep preview
+else
+  gcloud run services describe "$SERVICE" --region="$REGION" --format='value(status.url)'
+fi

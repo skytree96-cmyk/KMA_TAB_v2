@@ -292,12 +292,14 @@ def _render_companies(store: Any, token: str, companies: list[dict[str, Any]], *
                     st.rerun()
 
 
-def _render_create_user(store: Any, token: str, principal: Mapping[str, Any], company: Mapping[str, Any], role: str) -> None:
+def _render_create_user(store: Any, token: str, principal: Mapping[str, Any], company: Mapping[str, Any], role: str,
+                        *, show_heading: bool = True) -> None:
     if role not in {"company", "participant"}:
         st.error("교육담당자 또는 참여자 계정만 발급할 수 있습니다.")
         return
     label = ROLE_LABELS[role]
-    st.subheader(f"{label} 계정 발급")
+    if show_heading:
+        st.subheader(f"{label} 계정 발급")
     st.caption(f"회사: {company['name']} · 사업자등록번호: {_company_registration_label(company)}")
     if role == "participant":
         st.caption(f"user 또는 user001처럼 user 뒤에 숫자만 붙인 기본 예시 아이디에는 회사 식별정보 {company['slug']}-가 자동으로 붙습니다. 직접 정한 아이디와 회사 식별정보가 이미 붙은 아이디는 그대로 사용합니다.")
@@ -510,7 +512,7 @@ def _render_assignments(store: Any, token: str, project: Mapping[str, Any], user
         st.caption(f"검색 결과 {len(matched)}명 · 배정된 참여자 {len(assignments)}명")
         if matched:
             st.dataframe([{"이름": row.get("user_name", ""), "로그인 아이디": row.get("login_id", ""), "부서": row.get("department", ""), "직급": row.get("job_title", ""), "배정 상태": "배정 중" if row.get("active", True) else "배정 해제", "교육 전 검사": "완료" if row.get("pre_completed") else "미완료", "교육 후 검사": "완료" if row.get("post_completed") else "미완료"} for row in matched], hide_index=True, width="stretch")
-            with st.expander("참여자 배정 변경"):
+            with st.expander("참여자 배정 변경", key=PREFIX + f"assignment_panel_{project_id}"):
                 assignment_id = st.selectbox("배정을 변경할 참여자", list(by_assignment), format_func=lambda value: f"{by_assignment[value].get('user_name', '')} · {by_assignment[value].get('login_id', '')}", key=change_key, index=None, placeholder="참여자를 선택하세요")
                 if assignment_id is not None:
                     active = bool(by_assignment[assignment_id].get("active", True))
@@ -766,11 +768,11 @@ def _render_workspace(
                         format_func=lambda value: f"{active_companies[value]['name']} · {_company_registration_label(active_companies[value])}",
                         key=issue_key, persist_state="session",
                     )
-                    _render_create_user(store, token, principal, active_companies[company_id], "company")
+                    _render_create_user(store, token, principal, active_companies[company_id], "company", show_heading=False)
                 else:
                     st.info("먼저 회원사를 등록해 주세요.")
             else:
-                _render_create_user(store, token, principal, company, "participant")
+                _render_create_user(store, token, principal, company, "participant", show_heading=False)
                 _render_batch(store, token, principal, company, users)
         _render_workspace_users(store, token, principal, users)
 

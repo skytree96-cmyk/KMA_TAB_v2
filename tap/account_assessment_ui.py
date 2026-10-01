@@ -221,7 +221,7 @@ def _render_results(questions: list[dict[str, Any]], config: Mapping[str, Any], 
                          horizontal=True, height=max(240, len(results) * 64), width="stretch")
         transfer = post["payload"].get("post_transfer_responses", {})
         if transfer:
-            with st.expander("내 현업전이 환경 응답"):
+            with st.expander("내 현업전이 환경 응답", key=PREFIX + "transfer_panel"):
                 for code, label in TRANSFER_ITEMS:
                     st.write(f"{label} — {TRANSFER_LABELS.get(transfer.get(code), '미응답')}")
                 if transfer.get("barriers"):
@@ -259,7 +259,7 @@ def _render_report_download(assignment: Mapping[str, Any], config: Mapping[str, 
 def _render_review(store: Any, token: str, assignment_id: str, phase: str, questions: list[dict[str, Any]], payload: dict[str, Any]) -> None:
     codes = {q["question_code"] for q in questions}
     st.progress(1.0, text=f"{len(questions)}/{len(questions)} 역량문항 응답 완료")
-    with st.expander("제출 전 내 응답 확인", expanded=True):
+    with st.expander("제출 전 내 응답 확인", expanded=True, key=PREFIX + "review_panel"):
         st.dataframe([
             {"문항": i + 1, "질문": q["revised_text"], "응답": LIKERT_OPTIONS[payload["responses"][q["question_code"]]]}
             for i, q in enumerate(questions)
@@ -386,15 +386,21 @@ def render_participant(store: Any, token: str, principal: Mapping[str, Any]) -> 
     pre_complete = bool(assignment.get("pre_completed"))
     post_complete = bool(assignment.get("post_completed"))
     if not st.session_state.get(PREFIX + "focus"):
-        st.subheader(str(assignment["project_name"]))
-        st.caption(f"교육과정: {config.get('course_name', assignment['project_name'])} · 교육일: {config.get('training_date', '미설정')}")
-        st.caption(f"교육 전 {'완료' if pre_complete else '미완료'} · 교육 후 {'완료' if post_complete else '미완료'}")
-        if pre_complete and post_complete:
-            st.button("나의 전·후 리포트 보기", key=PREFIX + "open_report", on_click=_choose_phase,
-                      args=("post",), type="primary", width="stretch")
-        before, after = st.columns(2)
-        before.button("교육 전 검사", key=PREFIX + "enter_pre", on_click=_choose_phase, args=("pre",), type="primary", width="stretch")
-        after.button("교육 후 검사", key=PREFIX + "enter_post", on_click=_choose_phase, args=("post",), width="stretch")
+        with st.container(key=PREFIX + "project_card"):
+            st.subheader(str(assignment["project_name"]))
+            st.caption(f"교육과정: {config.get('course_name', assignment['project_name'])} · 교육일: {config.get('training_date', '미설정')}")
+            st.html('<div class="tap-phase-status">'
+                    + "".join(f'<span class="{"is-done" if done else "is-todo"}">{label} {"완료" if done else "미완료"}</span>'
+                              for label, done in (("교육 전", pre_complete), ("교육 후", post_complete)))
+                    + "</div>")
+            if pre_complete and post_complete:
+                st.button("나의 전·후 리포트 보기", key=PREFIX + "open_report", on_click=_choose_phase,
+                          args=("post",), type="primary", width="stretch")
+            before, after = st.columns(2)
+            before.button("교육 전 검사", key=PREFIX + "enter_pre", on_click=_choose_phase, args=("pre",),
+                          type="secondary" if pre_complete else "primary", width="stretch")
+            after.button("교육 후 검사", key=PREFIX + "enter_post", on_click=_choose_phase, args=("post",),
+                         type="primary" if pre_complete and not post_complete else "secondary", width="stretch")
         return
     phase = st.session_state.get(PREFIX + "phase", "pre")
     if phase not in PHASE_LABELS:
