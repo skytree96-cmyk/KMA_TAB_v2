@@ -30,6 +30,19 @@ MENUS = {
 }
 
 
+# Session state lives only in the websocket session, so in-app links must use
+# st.switch_page; a plain href reload would sign the user out.
+_PAGES: dict[str, Any] = {}
+
+
+def register_pages(**pages: Any) -> None:
+    _PAGES.update(pages)
+
+
+def switch_to_page(name: str) -> None:
+    st.switch_page(_PAGES[name])
+
+
 def _go_to_section(section: str) -> None:
     st.session_state[SECTION_KEY] = section
     st.session_state[ACCOUNT_MENU_KEY] = "업무 화면"
@@ -76,6 +89,9 @@ def render_workspace_header(principal: Mapping[str, Any], logout: Callable[[], N
                 if not required:
                     st.button("비밀번호 변경", key="_tap_account_password_nav", icon=":material/lock:",
                               width="stretch", type="tertiary", on_click=_go_to_password)
+                if "guide" in _PAGES and st.button(
+                        "이용 안내", key="_tap_account_guide_nav", icon=":material/help:", width="stretch", type="tertiary"):
+                    switch_to_page("guide")
                 if st.button("로그아웃", key="_tap_logout", icon=":material/logout:", width="stretch", type="tertiary"):
                     logout()
     return section

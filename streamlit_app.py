@@ -27,10 +27,18 @@ if production_mode():
         else:
             render_account_landing()
 
+    from tap.account_navigation import register_pages
+
+    home = st.Page(account_home, title="KMA TAP", default=True)
+    guide = st.Page(render_account_guide, title="이용 안내 · KMA TAP", url_path="guide")
+    register_pages(home=home, guide=guide)
     st.navigation([
-        st.Page(account_home, title="KMA TAP", default=True),
+        home,
         st.Page(render_portal, title="로그인 · KMA TAP", url_path="login"),
-        st.Page(render_account_guide, title="이용 안내 · KMA TAP", url_path="guide"),
+        guide,
+        # Public service introduction (formerly the Cloudflare open page); always
+        # shows the landing page, even for a signed-in session.
+        st.Page(render_account_landing, title="서비스 소개 · KMA TAP", url_path="open"),
     ], position="hidden").run()
     st.stop()
 
