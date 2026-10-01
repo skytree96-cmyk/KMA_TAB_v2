@@ -99,12 +99,20 @@ class PortalAccessTests(unittest.TestCase):
             app.session_state["_tap_account_menu"]="업무 화면"
             app.query_params["tap_role"]="kma"
             app.run()
+            _stay_on_page(app, "my-assessments")
             app.button(key="_tap_logout").click().run()
             self.assertEqual(len(app.exception),0)
             self.assertEqual(store.logged_out,"opaque-token")
             for key in [account_portal.TOKEN_KEY,"account_admin_credentials","responses","_tap_workspace_section","_tap_account_menu"]:
                 self.assertNotIn(key,app.session_state)
             self.assertNotIn("tap_role",app.query_params)
+
+
+def _stay_on_page(app, url_path):
+    # AppTest renders the st.switch_page target but reruns the original page
+    # next time; a browser stays on the new URL, so pin the page as it would.
+    from streamlit.util import calc_hash
+    app._page_hash = calc_hash(url_path)
 
 
 class _NavigationStore:
@@ -272,6 +280,63 @@ class PortalNavigationTests(unittest.TestCase):
             self.assertNotIn("account_admin_credentials", app.session_state)
             self.assertEqual(admin.call_args.kwargs["section"], "projects")
             self.assertFalse(any(item.label == "현재 비밀번호" for item in app.text_input))
+
+
+@contextmanager
+def _routed_navigation(role, url_path, *, required=False):
+    from tap import account_portal
+    store = _NavigationStore(role, required)
+    with patch.dict(os.environ, {"TAP_APP_MODE": "production", "DATABASE_URL": "postgresql://test.invalid/test"}), patch.object(account_portal, "_configured_store", return_value=store), patch("tap.account_admin_ui.render_admin") as admin, patch("tap.account_assessment_ui.render_participant") as participant:
+        app = AppTest.from_file(str(ROOT / "streamlit_app.py"), default_timeout=30)
+        app.session_state[account_portal.TOKEN_KEY] = "opaque-token"
+        _stay_on_page(app, url_path)
+        app.run()
+        yield app, store, admin, participant
+
+
+class PortalRouteTests(unittest.TestCase):
+    def assert_route(self, app, route):
+        self.assertEqual(len(app.exception), 0)
+        self.assertEqual(app.session_state["_tap_workspace_route"], route)
+
+    def test_section_url_opens_that_menu(self):
+        with _routed_navigation("company", "accounts") as (app, store, admin, participant):
+            self.assert_route(app, "accounts")
+            self.assertEqual(admin.call_args.kwargs["section"], "accounts")
+
+    def test_login_url_moves_signed_in_user_to_default_menu(self):
+        with _routed_navigation("kma", "login") as (app, store, admin, participant):
+            self.assert_route(app, "projects")
+            self.assertEqual(admin.call_args.kwargs["section"], "projects")
+
+    def test_section_url_outside_role_falls_back(self):
+        with _routed_navigation("company", "companies") as (app, store, admin, participant):
+            self.assert_route(app, "projects")
+            self.assertEqual(admin.call_args.kwargs["section"], "projects")
+        with _routed_navigation("participant", "accounts") as (app, store, admin, participant):
+            self.assert_route(app, "assessments")
+            admin.assert_not_called()
+
+    def test_menu_click_changes_url(self):
+        with _routed_navigation("company", "projects") as (app, store, admin, participant):
+            app.button(key="_tap_nav_accounts").click().run()
+            self.assert_route(app, "accounts")
+            self.assertEqual(admin.call_args.kwargs["section"], "accounts")
+
+    def test_required_password_routes_to_password_url(self):
+        with _routed_navigation("company", "dashboard", required=True) as (app, store, admin, participant):
+            self.assert_route(app, "password")
+            admin.assert_not_called()
+
+    def test_password_save_leaves_password_url(self):
+        with _routed_navigation("company", "password") as (app, store, admin, participant):
+            fields = {item.label: item for item in app.text_input}
+            fields["현재 비밀번호"].input("kma")
+            fields["새 비밀번호"].input("new-password")
+            fields["새 비밀번호 확인"].input("new-password")
+            next(button for button in app.button if button.label == "비밀번호 저장").click().run()
+            self.assert_route(app, "projects")
+            self.assertEqual(admin.call_args.kwargs["section"], "projects")
 
 
 if __name__ == "__main__":

@@ -23,11 +23,21 @@ if production_mode():
     # Explicit navigation disables discovery of the legacy demo pages.
     def account_home():
         if st.session_state.get(TOKEN_KEY):
-            render_portal()
+            render_portal(routed=True)
         else:
             render_account_landing()
 
-    from tap.account_navigation import register_pages
+    def account_login():
+        render_portal(routed=True)
+
+    def workspace_page(route: str, url_path: str, title: str):
+        def page():
+            render_portal(route, routed=True)
+
+        page.__name__ = "workspace_" + route
+        return st.Page(page, title=f"{title} · KMA TAP", url_path=url_path)
+
+    from tap.account_navigation import ROUTES, register_pages
     from tap.session_cookie import restore_session, sync_cookie
 
     restore_session(TOKEN_KEY)
@@ -35,10 +45,12 @@ if production_mode():
 
     home = st.Page(account_home, title="KMA TAP", default=True)
     guide = st.Page(render_account_guide, title="이용 안내 · KMA TAP", url_path="guide")
-    register_pages(home=home, guide=guide)
+    workspace = {route: workspace_page(route, url_path, title) for route, (url_path, title) in ROUTES.items()}
+    register_pages(home=home, guide=guide, **workspace)
     st.navigation([
         home,
-        st.Page(render_portal, title="로그인 · KMA TAP", url_path="login"),
+        st.Page(account_login, title="로그인 · KMA TAP", url_path="login"),
+        *workspace.values(),
         guide,
         # Public service introduction (formerly the Cloudflare open page); always
         # shows the landing page, even for a signed-in session.

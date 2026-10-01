@@ -9,7 +9,8 @@ from tap.account_store import AccountError, AccountStore
 from tap.brand import brand_css, brand_html
 from tap.account_theme import account_theme_css, workspace_theme_css
 from tap.account_navigation import (
-    ACCOUNT_MENU_KEY, enter_route, follow_route, render_workspace_header, section_label,
+    ACCOUNT_MENU_KEY, PASSWORD_ROUTE, ROUTE_KEY, enter_route, follow_route,
+    render_workspace_header, section_label,
 )
 
 
@@ -96,6 +97,8 @@ def _password_change(store: AccountStore, token: str, required: bool) -> None:
             clear_identity()
             st.session_state[TOKEN_KEY] = next_token
             st.session_state["_tap_account_notice"] = "비밀번호를 변경했습니다. 다른 로그인 세션은 종료되었습니다."
+            # Mark /password as already entered so the rerun leaves it for work.
+            st.session_state[ROUTE_KEY] = PASSWORD_ROUTE
             st.rerun()
 
 

@@ -1,6 +1,6 @@
 # KMA TAP 계정 서비스
 
-주소 목표: https://kmatap.onrender.com · 배포 브랜치: `codex/production-accounts`.
+서비스 주소: https://tap.kma.or.kr (Google Cloud Run, 도쿄) · 배포 브랜치: `codex/production-accounts`.
 
 ## 계정과 데이터
 

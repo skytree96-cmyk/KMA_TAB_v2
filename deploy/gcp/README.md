@@ -83,7 +83,7 @@ bash deploy/gcp/04_domain.sh
 ## 5. 전환 후 정리
 
 - 새 도메인에서 정상 동작 확인 후 Render 웹서비스 Suspend, 1~2주 뒤 Render DB 삭제
-- 오픈페이지·사용설명서 등 `kmatap.onrender.com` 링크를 새 도메인으로 교체
+- 오픈페이지·사용설명서 등 `kmatap.onrender.com` 링크를 `https://tap.kma.or.kr`로 교체 (2026-10-01 완료)
 
 ## 문제 해결
 
