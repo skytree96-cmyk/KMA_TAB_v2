@@ -74,7 +74,18 @@
 .stApp:has(.st-key-tap_workspace_topbar) .st-key-tap_workspace_brand .tap-ci-description {display: none;}
 .stApp:has(.st-key-tap_workspace_topbar) .st-key-tap_workspace_brand,
 .stApp:has(.st-key-tap_workspace_topbar) .st-key-tap_workspace_nav,
-.stApp:has(.st-key-tap_workspace_topbar) .st-key-tap_workspace_profile {gap: 0;}
+.stApp:has(.st-key-tap_workspace_topbar) .st-key-tap_workspace_profile {
+  flex-direction: row;
+  flex-wrap: nowrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 2px;
+}
+.stApp:has(.st-key-tap_workspace_topbar) .st-key-tap_workspace_profile > div {width: auto; flex: 0 0 auto;}
+@media (max-width: 640px) {
+  /* Icon only on phones so the profile stays on the first row. */
+  .stApp:has(.st-key-tap_workspace_topbar) .st-key-_tap_account_guide_nav button [data-testid="stMarkdownContainer"] {display: none;}
+}
 .stApp:has(.st-key-tap_workspace_topbar) .st-key-tap_workspace_nav [data-testid="stHorizontalBlock"] {
   flex-direction: row;
   flex-wrap: nowrap;

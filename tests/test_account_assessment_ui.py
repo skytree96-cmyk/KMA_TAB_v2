@@ -362,3 +362,30 @@ class FrozenQuestionTextTests(unittest.TestCase):
         questions[0]["revised_text"] = "해시와 다른 문구"
         with self.assertRaises(ValueError):
             _project_questions(config)
+
+
+class ParticipantOwnReportPdfTests(unittest.TestCase):
+    def test_completed_participant_can_download_own_pre_post_pdf(self):
+        store = MemoryStore()
+        codes = store.config["question_snapshot_codes"]
+        for phase, value in (("pre", 3), ("post", 4)):
+            store.records["a", phase] = {"assignment_id": "a", "phase": phase, "completed": True,
+                                         "payload": {"responses": {code: value for code in codes}}}
+        app = participant_app(store, focus=False)
+        click(app, "나의 전·후 리포트 보기")
+        downloads = app.get("download_button")
+        self.assertEqual([button.proto.label for button in downloads], ["내 리포트 PDF 다운로드"])
+
+        from tap.account_reports import individual_report_pdf
+        questions = _project_questions(store.config)
+        pdf = individual_report_pdf({"name": "내 프로젝트", "company_name": "테스트 회사", "config": store.config},
+                                    questions, {c: 3 for c in codes}, {c: 4 for c in codes}, "테스트 참여자 · user001")
+        self.assertTrue(pdf.startswith(b"%PDF"))
+
+    def test_pre_only_participant_has_no_pdf_download(self):
+        store = MemoryStore()
+        store.records["a", "pre"] = {"assignment_id": "a", "phase": "pre", "completed": True,
+                                     "payload": {"responses": {c: 3 for c in store.config["question_snapshot_codes"]}}}
+        app = participant_app(store, focus=False)
+        click(app, "교육 전 검사")
+        self.assertEqual(app.get("download_button"), [])

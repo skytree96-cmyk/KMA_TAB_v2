@@ -28,8 +28,11 @@ def _configured_store(dsn: str, bootstrap_login: str, bootstrap_hash: str) -> Ac
 
 def clear_identity() -> None:
     # Includes old demo responses, participant widgets and newly issued passwords.
+    from tap.session_cookie import forget_restored_cookie
+
     st.session_state.clear()
     st.query_params.clear()
+    forget_restored_cookie()
 
 
 def _notice() -> None:
@@ -79,7 +82,7 @@ def _login(store: AccountStore | None) -> None:
                             st.rerun()
                     st.caption("참여자 계정·비밀번호 문의는 교육담당자에게, 교육담당자 계정 문의는 KMA 관리자에게 요청해 주세요.")
                 with st.container(key="tap_login_links"):
-                    st.html('<nav class="tap-login-navigation" aria-label="서비스 안내"><a href="/" target="_self">서비스 소개</a><span>·</span><a href="/guide" target="_self">이용 안내</a></nav>')
+                    st.html('<nav class="tap-login-navigation" aria-label="서비스 안내"><a href="/open" target="_self">서비스 소개</a></nav>')
 
 
 def _password_change(store: AccountStore, token: str, required: bool) -> None:
@@ -127,7 +130,10 @@ def render_portal() -> None:
     try:
         principal = store.principal(token)
     except AccountError:
+        from tap.session_cookie import sync_cookie
+
         clear_identity()
+        sync_cookie(TOKEN_KEY)
         st.info("로그인이 만료되었거나 계정 상태가 변경되었습니다. 다시 로그인해 주세요.")
         _login(store)
         return

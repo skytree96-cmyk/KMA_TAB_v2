@@ -28,6 +28,10 @@ if production_mode():
             render_account_landing()
 
     from tap.account_navigation import register_pages
+    from tap.session_cookie import restore_session, sync_cookie
+
+    restore_session(TOKEN_KEY)
+    sync_cookie(TOKEN_KEY)
 
     home = st.Page(account_home, title="KMA TAP", default=True)
     guide = st.Page(render_account_guide, title="이용 안내 · KMA TAP", url_path="guide")

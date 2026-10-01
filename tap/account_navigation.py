@@ -79,9 +79,13 @@ def render_workspace_header(principal: Mapping[str, Any], logout: Callable[[], N
                     st.button(label, key="_tap_nav_" + value, icon=icon, width="stretch",
                               type="primary" if active else "tertiary", disabled=required,
                               on_click=_go_to_section, args=(value,))
-        with profile, st.container(key="tap_workspace_profile"):
+        with profile, st.container(key="tap_workspace_profile", horizontal=True, gap="small",
+                                   vertical_alignment="center", horizontal_alignment="right"):
+            if "guide" in _PAGES and st.button("이용 안내", key="_tap_account_guide_nav", icon=":material/help:",
+                                               type="tertiary"):
+                switch_to_page("guide")
             with st.popover(ROLE_LABELS[role], icon=":material/account_circle:", type="tertiary",
-                            width="stretch", key=PROFILE_KEY, on_change="rerun"):
+                            width="content", key=PROFILE_KEY, on_change="rerun"):
                 st.text(str(principal.get("display_name") or ROLE_LABELS[role]))
                 st.caption(str(principal["login_id"]))
                 if principal.get("company_name"):
@@ -89,9 +93,6 @@ def render_workspace_header(principal: Mapping[str, Any], logout: Callable[[], N
                 if not required:
                     st.button("비밀번호 변경", key="_tap_account_password_nav", icon=":material/lock:",
                               width="stretch", type="tertiary", on_click=_go_to_password)
-                if "guide" in _PAGES and st.button(
-                        "이용 안내", key="_tap_account_guide_nav", icon=":material/help:", width="stretch", type="tertiary"):
-                    switch_to_page("guide")
                 if st.button("로그아웃", key="_tap_logout", icon=":material/logout:", width="stretch", type="tertiary"):
                     logout()
     return section

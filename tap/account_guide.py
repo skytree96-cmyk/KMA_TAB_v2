@@ -159,9 +159,10 @@ def _topbar(menus: Iterable[str], active: str, role: str, pins: bool = True) -> 
         _btn(menu, "active" if menu == active else "ghost", pin=index if pins else None)
         for index, menu in enumerate(menus, start=1)
     )
-    profile = _btn(f"👤 {role} ▾", "ghost", pin=len(menus) + 1 if pins else None)
+    guide = _btn("? 이용 안내", "ghost", pin=len(menus) + 1 if pins else None)
+    profile = _btn(f"👤 {role} ▾", "ghost", pin=len(menus) + 2 if pins else None)
     return (f'<div class="tg-nav"><span class="tg-logo">KMA TAP</span>{buttons}'
-            f'<span class="tg-spacer"></span>{profile}</div>')
+            f'<span class="tg-spacer"></span>{guide}{profile}</div>')
 
 
 MANAGER_MENUS = ("대시보드", "프로젝트", "프로젝트 만들기", "참여자 계정")
@@ -178,7 +179,7 @@ def _intro() -> str:
   <div><b>STEP 2</b><strong>비밀번호 설정</strong>
     <p>처음 로그인하면 임시 비밀번호를 본인만 아는 새 비밀번호(3~128자)로 바꿔야 다음 화면으로 이동할 수 있습니다.</p></div>
   <div><b>STEP 3</b><strong>메뉴로 이동</strong>
-    <p>화면 상단 메뉴로 업무 화면을 이동하고, 우측 상단 프로필에서 비밀번호 변경·이용 안내·로그아웃을 이용합니다.</p></div>
+    <p>화면 상단 메뉴로 업무 화면을 이동합니다. 우측 상단 <b style="display:inline;color:#102f36">이용 안내</b>로 이 화면을 열고, 프로필에서 비밀번호 변경·로그아웃을 합니다.</p></div>
 </div>
 """
 
@@ -200,7 +201,8 @@ def _manager_steps() -> list[str]:
             ("프로젝트", "프로젝트를 골라 상세 일정, 참여 현황, 리포트를 확인하고 참여자를 배정합니다."),
             ("프로젝트 만들기", "교육 일정과 측정역량을 정해 새 교육평가 프로젝트를 등록합니다."),
             ("참여자 계정", "참여자 계정을 한 명씩 또는 CSV로 한꺼번에 발급하고, 비밀번호 재발급·사용 중지를 합니다."),
-            ("프로필 (교육담당자 ▾)", "비밀번호 변경, 이용 안내(이 화면), 로그아웃이 있습니다."),
+            ("이용 안내", "언제든 이 안내 화면을 엽니다. ‘업무 화면으로 돌아가기’를 누르면 보던 화면으로 돌아갑니다."),
+            ("프로필 (교육담당자 ▾)", "내 이름·아이디·회사를 확인하고 비밀번호 변경, 로그아웃을 합니다."),
         ],
     ))
 
@@ -464,7 +466,7 @@ def _participant_steps() -> list[str]:
 
     steps.append(_step(
         "STEP 5 · 결과 보기", "나의 교육 전·후 리포트",
-        "교육 전·후 검사를 모두 마치면 내 교육 화면에 리포트 버튼이 생깁니다.",
+        "교육 전·후 검사를 모두 마치면 내 교육 화면에 리포트 버튼이 생기고, PDF로도 내려받을 수 있습니다.",
         _frame("내 교육", (
             '<div class="tg-card"><div class="tg-title">2026 하반기 CS 역량 과정</div>'
             '<div class="tg-row"><span class="tg-tag">교육 전 완료</span><span class="tg-tag">교육 후 완료</span></div>'
@@ -472,11 +474,13 @@ def _participant_steps() -> list[str]:
             '<div class="tg-card"><div class="tg-row">' + _pin(2) + '<b>나의 교육 전·후 리포트</b></div>' +
             _table(("역량", "교육 전", "교육 후", "관찰 변화"),
                    (("고객지향", "3.2", "3.9", "+0.7"), ("협업과 팀워크", "3.6", "3.8", "+0.2"), ("문제해결력", "2.9", "3.4", "+0.5"))) +
-            '<div class="tg-bars"><div>고객지향<p><i style="width:64%"></i><i class="after" style="width:78%"></i></p></div></div></div>'
+            '<div class="tg-bars"><div>고객지향<p><i style="width:64%"></i><i class="after" style="width:78%"></i></p></div></div>'
+            + _btn("⤓ 내 리포트 PDF 다운로드", pin=3) + '</div>'
         )),
         [
             ("나의 전·후 리포트 보기", "교육 전·후 검사를 모두 최종 제출하면 나타납니다. 교육 전 검사만 마친 경우에는 교육 전 결과가 표시됩니다."),
             ("역량별 변화", "같은 문항에 두 번 모두 1~5로 답한 경우만 비교합니다. 공통 유효문항이 부족한 역량은 점수가 표시되지 않습니다."),
+            ("내 리포트 PDF 다운로드", "교육 전·후 결과와 레이더 차트, 업무 적용 가이드가 담긴 내 리포트를 PDF로 저장합니다. 본인 결과만 담기니 보관·공유에 유의해 주세요."),
         ],
         note="교육담당자는 교육 운영을 위해 개인별 전·후 리포트와, 역량별 응답자가 5명 이상일 때의 조직 결과를 확인할 수 있습니다.",
     ))

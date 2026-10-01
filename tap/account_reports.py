@@ -27,6 +27,15 @@ def summarize_project(project: Mapping[str, Any], results: list[dict[str, Any]])
     return aggregate_paired_factor_results(paired, min_group_n=MIN_GROUP_N)
 
 
+def individual_report_pdf(project: Mapping[str, Any], questions: list[dict[str, Any]], pre_responses: Mapping[str, Any],
+                          post_responses: Mapping[str, Any], subject: str) -> bytes:
+    """Build one person's pre/post PDF from responses the caller is already authorized to read."""
+    from tap.account_report_pdf import build_report_pdf
+    scores = score_pre_post_responses(questions, pre_responses, post_responses, (project.get("config") or {}).get("target_means"))
+    rows = [{**row, "change": row["self_reported_change"], "valid_n": row["paired_valid_items"]} for row in scores]
+    return build_report_pdf(project, rows, kind="individual", subject=subject, participant_count=1)
+
+
 def export_report_pdf(store: Any, token: str, project: Mapping[str, Any], assignment_id: str | None = None) -> bytes:
     """Generate on download, rechecking the session and project scope each time."""
     from tap.account_report_pdf import build_report_pdf
@@ -38,11 +47,9 @@ def export_report_pdf(store: Any, token: str, project: Mapping[str, Any], assign
         result = next((row for row in results if str(row["id"]) == assignment_id), None)
         if not result or not result.get("pre_completed") or not result.get("post_completed"):
             raise ValidationError("사전·사후 검사를 완료한 참여자를 선택해 주세요.")
-        scores = score_pre_post_responses(questions, (result.get("pre_payload") or {}).get("responses", {}),
-                                         (result.get("post_payload") or {}).get("responses", {}), config.get("target_means"))
-        rows = [{**row, "change": row["self_reported_change"], "valid_n": row["paired_valid_items"]} for row in scores]
         subject = f"{result.get('user_name') or '참여자'} · {result.get('login_id') or ''}"
-        return build_report_pdf(project, rows, kind="individual", subject=subject, participant_count=1)
+        return individual_report_pdf(project, questions, (result.get("pre_payload") or {}).get("responses", {}),
+                                     (result.get("post_payload") or {}).get("responses", {}), subject)
     summaries = {row["factor_code"]: row for row in summarize_project(project, results)}
     if not any(row["paired_n"] >= MIN_GROUP_N for row in summaries.values()):
         raise ValidationError("조직 리포트는 역량별 전·후 유효응답 5명 이상일 때 다운로드할 수 있습니다.")

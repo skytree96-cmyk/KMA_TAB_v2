@@ -239,6 +239,23 @@ def _render_results(questions: list[dict[str, Any]], config: Mapping[str, Any], 
         st.caption("0(수행 기회 없음)은 점수에 합산하지 않습니다. 유효응답이 부족한 역량은 산출하지 않습니다. 교육 후 검사까지 완료하면 동일 문항의 변화를 확인할 수 있습니다.")
 
 
+def _render_report_download(assignment: Mapping[str, Any], config: Mapping[str, Any], questions: list[dict[str, Any]],
+                            pre: Mapping[str, Any], post: Mapping[str, Any], principal: Mapping[str, Any]) -> None:
+    """Offer the participant's own pre/post PDF, built only from records loaded for this session."""
+    from tap.account_reports import individual_report_pdf
+
+    project = {"name": assignment.get("project_name"), "config": config,
+               "company_name": assignment.get("company_name") or principal.get("company_name")}
+    subject = f"{principal.get('display_name') or '참여자'} · {principal.get('login_id') or ''}"
+    st.download_button(
+        "내 리포트 PDF 다운로드", icon=":material/download:", type="primary",
+        data=lambda: individual_report_pdf(project, questions, pre["payload"]["responses"], post["payload"]["responses"], subject),
+        file_name="KMA_TAP_나의_전후_리포트.pdf", mime="application/pdf", on_click="ignore",
+        key=PREFIX + f"own_report_pdf_{assignment.get('id')}",
+    )
+    st.caption("PDF에는 본인의 교육 전·후 결과만 담깁니다. 개인 결과이므로 보관과 공유에 유의해 주세요.")
+
+
 def _render_review(store: Any, token: str, assignment_id: str, phase: str, questions: list[dict[str, Any]], payload: dict[str, Any]) -> None:
     codes = {q["question_code"] for q in questions}
     st.progress(1.0, text=f"{len(questions)}/{len(questions)} 역량문항 응답 완료")
@@ -419,6 +436,7 @@ def render_participant(store: Any, token: str, principal: Mapping[str, Any]) -> 
                 _show_error("비교 결과를 불러오지 못했습니다.", exc)
                 return
             _render_results(questions, config, pre, active_record)
+            _render_report_download(assignment, config, questions, pre, active_record, principal)
         if phase == "pre" and not post_complete:
             st.button("교육 후 검사 열기", on_click=_choose_phase, args=("post",), key=PREFIX + "open_post", type="primary")
         return
