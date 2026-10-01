@@ -17,10 +17,17 @@ PROJECT = {
 }
 
 
+def _kpis(app):
+    """KPI values ("8 명") from the dashboard's HTML cards, in display order."""
+    import re
+    return [value for node in app.get("html") for value in re.findall(r'data-kpi="([^"]+)"', node.proto.body)]
+
+
 APP = '''
 import streamlit as st
 from tap.account_dashboard import render_dashboard
 from tap.account_store import AuthenticationError, AuthorizationError
+
 class Store:
     def dashboard_summary(self, token):
         st.session_state["reads"] = st.session_state.get("reads", []) + [("dashboard", token)]
@@ -66,7 +73,7 @@ class AccountDashboardTests(unittest.TestCase):
         for role, expected in (("kma", ["2 개사", "9 명", "12 명", "2 개"]), ("company", ["8 명", "8 명", "3 명", "1 개"])):
             with self.subTest(role=role):
                 app = self.app(role)
-                self.assertEqual([metric.value for metric in app.metric], expected)
+                self.assertEqual(_kpis(app), expected)
                 self.assertEqual(app.session_state["reads"], [("dashboard", "session-token")])
                 self.assertEqual([title.value for title in app.title], ["대시보드"])
                 options = app.selectbox(key="account_dashboard_report").options
@@ -87,13 +94,13 @@ class AccountDashboardTests(unittest.TestCase):
             with self.subTest(flag=flag):
                 app = self.app(**{flag: True})
                 self.assertTrue(app.error)
-                self.assertEqual(len(app.metric), 0)
+                self.assertEqual(len(_kpis(app)), 0)
                 self.assertEqual(len(app.dataframe), 0)
                 self.assertNotIn("internal", app.error[0].value)
 
     def test_company_defensively_excludes_other_company_projects(self):
         app = self.app("company", unscoped_fake=True)
-        self.assertEqual(app.metric[3].value, "1 개")
+        self.assertEqual(_kpis(app)[3], "1 개")
         self.assertEqual(len(app.selectbox(key="account_dashboard_report").options), 1)
         self.assertNotIn("Beta", str([frame.value for frame in app.dataframe]))
 
@@ -128,7 +135,7 @@ class AccountDashboardTests(unittest.TestCase):
 
     def test_empty_store_renders_zero_counts_without_demo_or_report(self):
         app = self.app(projects=[])
-        self.assertEqual([metric.value for metric in app.metric], ["0 개사", "0 명", "12 명", "0 개"])
+        self.assertEqual(_kpis(app), ["0 개사", "0 명", "12 명", "0 개"])
         self.assertTrue(any("등록된 프로젝트가 없습니다" in item.value for item in app.info))
         self.assertEqual(len(app.dataframe), 0)
         self.assertEqual(app.session_state["reads"], [("dashboard", "session-token")])

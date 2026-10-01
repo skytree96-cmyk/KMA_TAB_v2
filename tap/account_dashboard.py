@@ -170,6 +170,22 @@ def _rate(value: int, total: int) -> str:
     return f"{min(100, value / total * 100):.0f}%" if total else "—"
 
 
+def _kpis(metrics: list[tuple[str, int, str, str, str, str, str]]) -> None:
+    """PAI-style KPI cards: numbered label, tone icon chip, value with unit, status pill and note."""
+    cards = []
+    for index, (label, value, unit, tone, icon, trend, note) in enumerate(metrics, 1):
+        cards.append(
+            f'<article class="tap-kpi tap-kpi--{tone}{" tap-kpi--accent" if index == 1 else ""}" '
+            f'data-kpi="{value:,} {escape(unit)}">'
+            f'<div class="tap-kpi__head"><span>{"①②③④⑤⑥"[index - 1]} {escape(label)}</span>'
+            f'<span class="tap-kpi__icon" aria-hidden="true">{icon}</span></div>'
+            f'<div class="tap-kpi__value"><strong>{value:,}</strong><span>{escape(unit)}</span></div>'
+            f'<p><span class="tap-trend">{escape(trend)}</span>{escape(note)}</p></article>'
+        )
+    with st.container(key=PREFIX + "metrics"):
+        st.html('<section class="tap-kpi-grid" aria-label="운영 지표">' + "".join(cards) + "</section>")
+
+
 def _rings(total: int, values: list[tuple[str, int, str]]) -> None:
     cards = []
     for label, value, color in values:
@@ -243,15 +259,23 @@ def render_dashboard(store: Any, token: str, principal: Mapping[str, Any]) -> No
     total = _count(summary, "participant_users_count")
     participating = _count(summary, "participating_users_count")
     pre, post = _count(summary, "pre_completed_users_count"), _count(summary, "post_completed_users_count")
-    metrics = [("참여 기업", _count(summary, "participating_companies_count"), "개사"),
-               ("검사 참여 인원", participating, "명"), ("전체 등록 참여자", total, "명"), ("운영 프로젝트", len(projects), "개")]
+    companies_count = _count(summary, "companies_count")
     if role == "company":
-        metrics = [("검사 참여 인원", participating, "명"), ("사전검사 완료", pre, "명"),
-                   ("사후검사 완료", post, "명"), ("운영 프로젝트", len(projects), "개")]
-    with st.container(key=PREFIX + "metrics"):
-        for column, (label, value, unit) in zip(st.columns(4, gap="small"), metrics):
-            with column:
-                st.metric(label, f"{value:,} {unit}", border=True)
+        metrics = [
+            ("검사 참여 인원", participating, "명", "brand", "group", f"참여율 {_rate(participating, total)}", f"전체 등록 {total:,}명 중 응답을 시작한 인원"),
+            ("사전검사 완료", pre, "명", "indigo", "task_alt", f"완료율 {_rate(pre, total)}", "교육 전 검사를 최종 제출한 인원"),
+            ("사후검사 완료", post, "명", "violet", "verified", f"완료율 {_rate(post, total)}", "교육 후 검사까지 최종 제출한 인원"),
+            ("운영 프로젝트", len(projects), "개", "amber", "folder_open", "프로젝트", "등록된 교육평가 프로젝트"),
+        ]
+    else:
+        metrics = [
+            ("참여 기업", _count(summary, "participating_companies_count"), "개사", "brand", "apartment",
+             f"전체 {companies_count:,}개사", "참여자가 응답을 시작한 회원사"),
+            ("검사 참여 인원", participating, "명", "indigo", "group", f"참여율 {_rate(participating, total)}", "한 문항 이상 저장한 인원"),
+            ("전체 등록 참여자", total, "명", "violet", "badge", "등록", "미배정·사용 중지 계정 포함"),
+            ("운영 프로젝트", len(projects), "개", "amber", "folder_open", "프로젝트", "전체 회원사의 교육평가 프로젝트"),
+        ]
+    _kpis(metrics)
     scope = f"전체 등록 기업 {_count(summary, 'companies_count'):,}개사 · " if role == "kma" else ""
     st.caption(f"{scope}전체 등록 참여자 {total:,}명 · 교육담당자 {_count(summary, 'company_users_count'):,}명")
     with st.container(key=PREFIX + "overview"):

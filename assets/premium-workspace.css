@@ -1,225 +1,182 @@
-/* Premium layer for the signed-in workspace, loaded after workspace-ui.css. */
+/* Signed-in workspace on the PAI pattern. Loaded after workspace-ui.css. */
 .stApp:has(.st-key-tap_workspace_topbar) {
-  --tap-workspace-surface: var(--p-glass);
-  --tap-workspace-border: var(--p-hair);
-  --tap-workspace-selected: rgba(10,124,118,.08);
-  --tap-workspace-soft: rgba(255,255,255,.55);
-  background:
-    radial-gradient(1100px 620px at 8% -12%, rgba(44,181,168,.08), transparent 62%),
-    radial-gradient(900px 560px at 102% 4%, rgba(123,140,240,.05), transparent 60%),
-    linear-gradient(180deg, #f7f9fa, #f1f4f6);
-  background-attachment: fixed;
+  --tap-workspace-surface: var(--surface);
+  --tap-workspace-border: var(--line);
+  --tap-workspace-selected: var(--brand-pale);
+  --tap-workspace-soft: var(--surface-soft);
+  background: var(--canvas);
 }
 
-/* Top bar: frosted, pinned while scrolling. */
+/* App header: dark brand bar with light navigation, as PAI's .app-header. */
 .stApp:has(.st-key-tap_workspace_topbar) .st-key-tap_workspace_topbar {
   position: sticky;
   top: 0;
-  z-index: 50;
-  background: rgba(255,255,255,.68);
-  backdrop-filter: var(--p-blur);
-  border-bottom: 1px solid rgba(255,255,255,.7);
-  box-shadow: 0 1px 0 var(--p-hair), 0 10px 30px -22px rgba(15,42,48,.35);
+  z-index: 100;
+  border-bottom: 1px solid rgb(255 255 255 / .2);
+  background:
+    radial-gradient(ellipse at 12% 0%, rgb(150 222 212 / .22), transparent 48%),
+    linear-gradient(110deg, #0f8c85, var(--brand) 55%, var(--brand-deep));
+  box-shadow: 0 6px 24px rgb(10 63 60 / .14);
 }
-.stApp:has(.st-key-tap_workspace_topbar) .st-key-tap_workspace_nav [data-testid="stButton"] button[kind^="primary"] {color: var(--tone-teal); font-weight: 650;}
+.stApp:has(.st-key-tap_workspace_topbar) .st-key-tap_workspace_brand .tap-ci {--ci-kma: #fff; --ci-tap: #c8f1ea; --ci-caption: #d3ebe7;}
+.stApp:has(.st-key-tap_workspace_topbar) .st-key-tap_workspace_nav [data-testid="stButton"] button {
+  color: #d3ebe7;
+  font-weight: 600;
+}
+.stApp:has(.st-key-tap_workspace_topbar) .st-key-tap_workspace_nav [data-testid="stButton"] button p {font-size: var(--fs-base);}
+.stApp:has(.st-key-tap_workspace_topbar) .st-key-tap_workspace_nav [data-testid="stButton"] button:hover,
+.stApp:has(.st-key-tap_workspace_topbar) .st-key-tap_workspace_nav [data-testid="stButton"] button[kind^="primary"] {
+  color: #fff;
+  background: rgb(255 255 255 / .08);
+}
 .stApp:has(.st-key-tap_workspace_topbar) .st-key-tap_workspace_nav [data-testid="stButton"] button[kind^="primary"]::after {
   height: 3px;
-  background: linear-gradient(90deg, var(--tone-teal), var(--tone-teal-2));
-  box-shadow: 0 -2px 10px rgba(44,181,168,.55);
+  background: var(--canvas);
+  box-shadow: none;
 }
-.stApp:has(.st-key-tap_workspace_topbar) .st-key-tap_workspace_nav [data-testid="stButton"] button:hover {background: rgba(10,124,118,.06);}
+.stApp:has(.st-key-tap_workspace_topbar) .st-key-tap_workspace_profile button {color: #eef8f6; border-color: transparent;}
+.stApp:has(.st-key-tap_workspace_topbar) .st-key-tap_workspace_profile button:hover,
+.stApp:has(.st-key-tap_workspace_topbar) .st-key-tap_workspace_profile button[aria-expanded="true"] {background: rgb(255 255 255 / .1);}
+.stApp:has(.st-key-tap_workspace_topbar) .st-key-tap_workspace_profile [data-testid="stIconMaterial"] {color: inherit;}
 
-/* Page heading */
+/* Page header: small context line and a compact title (PAI .topbar__context). */
+.stApp:has(.st-key-tap_workspace_topbar) .st-key-tap_workspace_main {padding-top: 26px; gap: 18px;}
 .stApp:has(.st-key-tap_workspace_topbar) .st-key-tap_workspace_breadcrumb p {
-  font-size: 13px !important;
-  font-weight: 600;
-  letter-spacing: .06em;
-  color: var(--tone-teal) !important;
+  margin: 0;
+  font-size: var(--fs-xs) !important;
+  font-weight: 500;
+  color: var(--muted) !important;
 }
 .stApp:has(.st-key-tap_workspace_topbar) .st-key-tap_workspace_main h1 {
-  font-size: 34px;
-  font-weight: 760;
-  letter-spacing: -.04em;
-  background: linear-gradient(120deg, var(--p-ink) 30%, #1d5f5c);
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
+  font-size: var(--fs-xl);
+  font-weight: 700;
+  line-height: 1.35;
+  color: var(--ink);
 }
-.stApp:has(.st-key-tap_workspace_topbar) .st-key-tap_workspace_main h3 {font-size: 21px; font-weight: 700;}
+.stApp:has(.st-key-tap_workspace_topbar) .st-key-tap_workspace_main h3 {font-size: var(--fs-lg); font-weight: 700;}
+.stApp:has(.st-key-tap_workspace_topbar) .st-key-tap_workspace_main p {font-size: var(--fs-base); line-height: 1.6;}
+.stApp:has(.st-key-tap_workspace_topbar) .st-key-tap_workspace_main [data-testid="stCaptionContainer"] p {font-size: var(--fs-sm); line-height: 1.55;}
+.stApp:has(.st-key-tap_workspace_topbar) .st-key-tap_workspace_main [data-testid="stWidgetLabel"] p {font-size: var(--fs-sm); font-weight: 600; color: var(--ink-soft);}
 
-/* Glass surfaces: list/detail panels, forms, dashboard panels. */
+/* Surfaces: solid white, 1px line, small shadow, 18px radius. */
 .stApp:has(.st-key-tap_workspace_topbar) :is(
   .st-key-tap_workspace_project_list,.st-key-tap_workspace_project_detail,
   .st-key-tap_workspace_account_list,.st-key-tap_workspace_account_detail,
   .st-key-tap_workspace_project_reports,.st-key-tap_workspace_assignments,
   .st-key-account_dashboard_participation,.st-key-account_dashboard_ranking,.st-key-account_dashboard_trend,
-  .st-key-account_dashboard_schedule,.st-key-account_dashboard_projects),
+  .st-key-account_dashboard_schedule,.st-key-account_dashboard_projects,
+  .st-key-_tap_participant_project_card),
 .stApp:has(.st-key-tap_workspace_topbar) [class*="st-key-account_dashboard_"][data-testid="stVerticalBlockBorderWrapper"],
 .stApp:has(.st-key-tap_workspace_topbar) .st-key-tap_workspace_main [data-testid="stForm"] {
-  border: 1px solid var(--p-edge) !important;
-  border-radius: 22px !important;
-  background: linear-gradient(150deg, rgba(255,255,255,.78), rgba(255,255,255,.55)) !important;
-  backdrop-filter: var(--p-blur);
-  box-shadow: var(--p-shadow) !important;
+  padding: 24px 26px !important;
+  border: 1px solid var(--line) !important;
+  border-radius: var(--radius-lg) !important;
+  background: var(--surface) !important;
+  box-shadow: var(--shadow-sm) !important;
 }
 .stApp:has(.st-key-tap_workspace_topbar) .st-key-_tap_participant_question_stage [data-testid="stForm"] {
-  border: 0 !important; background: transparent !important; box-shadow: none !important; backdrop-filter: none;
+  padding: 0 !important; border: 0 !important; background: transparent !important; box-shadow: none !important;
 }
+.stApp:has(.st-key-tap_workspace_topbar) [class*="st-key-account_dashboard_"] h3 {font-size: var(--fs-lg); font-weight: 700; color: var(--ink);}
 
-/* Metrics: glass tiles with a tone bar per position. */
-.stApp:has(.st-key-tap_workspace_topbar) .st-key-tap_workspace_main [data-testid="stMetric"],
-.stApp:has(.st-key-tap_workspace_topbar) .st-key-account_dashboard_metrics [data-testid="stMetric"] {
-  position: relative;
-  overflow: hidden;
-  border: 1px solid var(--p-edge);
-  border-radius: 20px;
-  background: linear-gradient(150deg, rgba(255,255,255,.82), rgba(255,255,255,.58));
-  backdrop-filter: var(--p-blur);
-  box-shadow: var(--p-shadow);
+/* KPI cards rendered by account_dashboard._kpis (PAI .kpi-card). */
+.tap-kpi-grid {display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px;}
+.tap-kpi {
+  min-width: 0;
+  padding: 20px 22px 18px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
 }
-.stApp:has(.st-key-tap_workspace_topbar) .st-key-account_dashboard_metrics [data-testid="stMetric"]::before {
-  content: "";
-  position: absolute;
-  inset: 0 auto 0 0;
-  width: 4px;
-  background: linear-gradient(180deg, var(--m-tone-2, var(--tone-teal-2)), var(--m-tone, var(--tone-teal)));
+.tap-kpi--accent {border-color: var(--line-strong);}
+.tap-kpi__head {display: flex; align-items: center; justify-content: space-between; gap: 10px; color: var(--ink-soft); font-size: var(--fs-sm); font-weight: 600;}
+.tap-kpi__icon {
+  width: 30px; height: 30px; flex: none;
+  display: grid; place-items: center;
+  border-radius: 9px;
+  font-family: "Material Symbols Rounded"; font-size: 18px; font-feature-settings: "liga"; letter-spacing: normal;
+  color: var(--kpi-tone, var(--brand)); background: var(--kpi-pale, var(--brand-pale));
 }
-.stApp:has(.st-key-tap_workspace_topbar) .st-key-account_dashboard_metrics [data-testid="stColumn"]:nth-child(2) [data-testid="stMetric"] {--m-tone: var(--tone-indigo); --m-tone-2: var(--tone-indigo-2);}
-.stApp:has(.st-key-tap_workspace_topbar) .st-key-account_dashboard_metrics [data-testid="stColumn"]:nth-child(3) [data-testid="stMetric"] {--m-tone: var(--tone-violet); --m-tone-2: var(--tone-violet-2);}
-.stApp:has(.st-key-tap_workspace_topbar) .st-key-account_dashboard_metrics [data-testid="stColumn"]:nth-child(4) [data-testid="stMetric"] {--m-tone: var(--tone-amber); --m-tone-2: var(--tone-amber-2);}
-.stApp:has(.st-key-tap_workspace_topbar) .st-key-account_dashboard_metrics [data-testid="stMetricLabel"] p {font-weight: 600; font-size: 15px; color: var(--p-muted);}
-.stApp:has(.st-key-tap_workspace_topbar) .st-key-account_dashboard_metrics [data-testid="stMetricValue"] p {font-weight: 750; letter-spacing: -.04em; color: var(--p-ink);}
-.stApp:has(.st-key-tap_workspace_topbar) [class*="st-key-account_dashboard_"] h3 {font-weight: 700; color: var(--p-ink);}
-.tap-dash-insight {background: linear-gradient(135deg, rgba(10,124,118,.08), rgba(44,181,168,.03)); border-color: rgba(10,124,118,.14);}
-.tap-dash-track i {background: linear-gradient(90deg, var(--tone-teal), var(--tone-teal-2));}
+.tap-kpi__value {display: flex; align-items: baseline; gap: 6px; margin: 14px 0 6px; color: var(--ink);}
+.tap-kpi__value strong {font-size: var(--fs-2xl); font-weight: 700; line-height: 1.1; letter-spacing: -.01em; font-variant-numeric: tabular-nums;}
+.tap-kpi__value span {color: var(--muted); font-size: var(--fs-sm); font-weight: 600;}
+.tap-kpi p {margin: 0; color: var(--muted); font-size: var(--fs-xs); line-height: 1.55;}
+.tap-trend {display: inline-block; margin-right: 6px; padding: 2px 7px; border-radius: 999px; font-size: var(--fs-xs); font-weight: 700; color: var(--kpi-tone, var(--brand)); background: var(--kpi-pale, var(--brand-pale));}
+.tap-kpi--brand {--kpi-tone: var(--brand); --kpi-pale: var(--brand-pale);}
+.tap-kpi--indigo {--kpi-tone: var(--indigo); --kpi-pale: var(--indigo-pale);}
+.tap-kpi--violet {--kpi-tone: var(--violet); --kpi-pale: var(--violet-pale);}
+.tap-kpi--amber {--kpi-tone: var(--amber); --kpi-pale: var(--amber-pale);}
+@media (max-width: 980px) {.tap-kpi-grid {grid-template-columns: repeat(2, minmax(0, 1fr));}}
+@media (max-width: 520px) {.tap-kpi-grid {gap: 10px;} .tap-kpi {padding: 16px;} .tap-kpi__value strong {font-size: var(--fs-xl);}}
+
+/* Dashboard overview: both panels share the taller panel's height. */
+.stApp:has(.st-key-tap_workspace_topbar) .st-key-account_dashboard_overview [data-testid="stHorizontalBlock"] {align-items: stretch;}
+.stApp:has(.st-key-tap_workspace_topbar) .st-key-account_dashboard_overview [data-testid="stLayoutWrapper"]:has(> :is(.st-key-account_dashboard_participation,.st-key-account_dashboard_ranking)) {flex: 1 1 auto;}
+.tap-dash-insight {background: var(--surface-soft); border-color: var(--line); color: var(--ink-soft);}
+.tap-dash-track i {background: var(--brand);}
+.tap-dash-ring::before {background: var(--surface);}
 
 /* Selectable list rows (account/project pickers). */
-.stApp:has(.st-key-tap_workspace_topbar) :is(.st-key-tap_workspace_project_list,.st-key-tap_workspace_account_list) [data-testid="stRadioGroup"] {border-top: 0; gap: 6px;}
+.stApp:has(.st-key-tap_workspace_topbar) :is(.st-key-tap_workspace_project_list,.st-key-tap_workspace_account_list) [data-testid="stRadioGroup"] {border-top: 1px solid var(--line); gap: 0;}
 .stApp:has(.st-key-tap_workspace_topbar) :is(.st-key-tap_workspace_project_list,.st-key-tap_workspace_account_list) [data-testid="stRadioOption"] {
-  min-height: 70px;
-  padding: 14px 16px;
-  border: 1px solid transparent;
-  border-radius: 14px;
+  min-height: 64px;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--line);
   background: transparent;
-  transition: background .16s ease, border-color .16s ease, box-shadow .16s ease;
 }
-.stApp:has(.st-key-tap_workspace_topbar) :is(.st-key-tap_workspace_project_list,.st-key-tap_workspace_account_list) [data-testid="stRadioOption"]:hover {
-  background: rgba(255,255,255,.7);
-  border-color: var(--p-hair);
-}
-.stApp:has(.st-key-tap_workspace_topbar) :is(.st-key-tap_workspace_project_list,.st-key-tap_workspace_account_list) [data-testid="stRadioOption"][data-selected="true"] {
-  background: linear-gradient(135deg, rgba(10,124,118,.10), rgba(44,181,168,.04));
-  border-color: rgba(10,124,118,.22);
-  box-shadow: 0 6px 16px -10px rgba(10,124,118,.45);
-}
-.stApp:has(.st-key-tap_workspace_topbar) :is(.st-key-tap_workspace_project_list,.st-key-tap_workspace_account_list) [data-testid="stRadioOption"][data-selected="true"]::before {
-  top: 14px; bottom: 14px; left: 0; width: 3px; border-radius: 0 3px 3px 0;
-  background: linear-gradient(180deg, var(--tone-teal-2), var(--tone-teal));
-}
-.stApp:has(.st-key-tap_workspace_topbar) :is(.st-key-tap_workspace_project_list,.st-key-tap_workspace_account_list) [data-testid="stRadioOption"] [data-testid="stMarkdownContainer"] p {font-size: 17px; font-weight: 600;}
-.stApp:has(.st-key-tap_workspace_topbar) :is(.st-key-tap_workspace_project_list,.st-key-tap_workspace_account_list) [data-testid="stRadioOption"] [data-testid="stCaptionContainer"] p {font-size: 14.5px;}
-.stApp:has(.st-key-tap_workspace_topbar) .tap-workspace-fields dt {font-size: 14.5px; font-weight: 600; color: var(--p-muted);}
-.stApp:has(.st-key-tap_workspace_topbar) [data-testid="stDataFrame"] {border: 1px solid var(--p-edge); border-radius: 16px; box-shadow: 0 6px 18px -12px rgba(15,42,48,.3);}
+.stApp:has(.st-key-tap_workspace_topbar) :is(.st-key-tap_workspace_project_list,.st-key-tap_workspace_account_list) [data-testid="stRadioOption"]:hover {background: var(--surface-soft);}
+.stApp:has(.st-key-tap_workspace_topbar) :is(.st-key-tap_workspace_project_list,.st-key-tap_workspace_account_list) [data-testid="stRadioOption"][data-selected="true"] {background: var(--brand-pale);}
+.stApp:has(.st-key-tap_workspace_topbar) :is(.st-key-tap_workspace_project_list,.st-key-tap_workspace_account_list) [data-testid="stRadioOption"][data-selected="true"]::before {background: var(--brand);}
+.stApp:has(.st-key-tap_workspace_topbar) :is(.st-key-tap_workspace_project_list,.st-key-tap_workspace_account_list) [data-testid="stRadioOption"] [data-testid="stMarkdownContainer"] p {font-size: var(--fs-base); font-weight: 600;}
+.stApp:has(.st-key-tap_workspace_topbar) :is(.st-key-tap_workspace_project_list,.st-key-tap_workspace_account_list) [data-testid="stRadioOption"] [data-testid="stCaptionContainer"] p {font-size: var(--fs-xs);}
+.stApp:has(.st-key-tap_workspace_topbar) .tap-workspace-fields {font-size: var(--fs-sm);}
+.stApp:has(.st-key-tap_workspace_topbar) .tap-workspace-fields dt {font-weight: 600; color: var(--muted);}
+.stApp:has(.st-key-tap_workspace_topbar) [data-testid="stDataFrame"] {border: 1px solid var(--line); border-radius: var(--radius-md);}
 
-/* Participant assessment: a calm, focused question card with large answer chips. */
+/* Participant home card and phase badges. */
+.stApp:has(.st-key-tap_workspace_topbar) .st-key-_tap_participant_project_card {gap: 12px;}
+.tap-phase-status {display: flex; gap: 8px; flex-wrap: wrap; margin: 2px 0 6px;}
+.tap-phase-status span {display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px; border-radius: 999px; font-size: var(--fs-xs); font-weight: 700;}
+.tap-phase-status span::before {content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor;}
+.tap-phase-status .is-done {color: var(--green); background: var(--green-pale);}
+.tap-phase-status .is-todo {color: var(--muted); background: var(--surface-soft); box-shadow: inset 0 0 0 1px var(--line);}
+
+/* Participant assessment: white question card, answer chips in a 3-column grid. */
+.stApp:has(.tap-assessment-focus) {background: var(--canvas);}
 .stApp:has(.tap-assessment-focus) .st-key-_tap_participant_question_stage {
-  border: 1px solid var(--p-edge);
-  border-radius: 28px;
-  background: linear-gradient(150deg, rgba(255,255,255,.86), rgba(255,255,255,.62));
-  backdrop-filter: var(--p-blur);
-  box-shadow: var(--p-shadow-lift);
+  padding: 30px 32px;
+  border: 1px solid var(--line);
+  border-radius: 22px;
+  background: var(--surface);
+  box-shadow: var(--shadow-md);
 }
-.stApp:has(.tap-assessment-focus) .st-key-_tap_participant_question_stage h3 {
-  font-size: clamp(22px, 2.6vw, 30px);
-  line-height: 1.45;
-  font-weight: 700;
-  letter-spacing: -.035em;
-}
-.stApp:has(.tap-assessment-focus) [data-testid="stProgressBarTrack"] {
-  height: 8px;
-  border-radius: 99px;
-  background: rgba(10,124,118,.1);
-  overflow: hidden;
-}
-.stApp:has(.tap-assessment-focus) [data-testid="stProgressBarTrack"] > div {
-  border-radius: 99px;
-  background: linear-gradient(90deg, var(--tone-teal), var(--tone-teal-2));
-}
-.stApp:has(.tap-assessment-focus) [data-testid="stProgress"] p {font-size: 14px; font-weight: 600; color: var(--tone-teal);}
-/* Answer scale: full-width grid of large chips (3 per row, 2 on phones). */
+.stApp:has(.tap-assessment-focus) .st-key-_tap_participant_question_stage h3 {font-size: clamp(20px, 2.2vw, 26px); line-height: 1.45; font-weight: 700;}
+.stApp:has(.tap-assessment-focus) [data-testid="stProgressBarTrack"] {height: 6px; border-radius: 99px; background: #e4ebea; overflow: hidden;}
+.stApp:has(.tap-assessment-focus) [data-testid="stProgressBarTrack"] > div {border-radius: 99px; background: var(--brand);}
+.stApp:has(.tap-assessment-focus) [data-testid="stProgress"] p {font-size: var(--fs-xs); font-weight: 700; color: var(--brand);}
 .stApp:has(.tap-assessment-focus) .st-key-_tap_participant_question_stage [data-testid="stElementContainer"]:has([data-testid="stRadio"]),
 .stApp:has(.tap-assessment-focus) .st-key-_tap_participant_question_stage [data-testid="stRadio"],
 .stApp:has(.tap-assessment-focus) .st-key-_tap_participant_question_stage [data-testid="stRadio"] > div {width: 100% !important; max-width: none;}
 .stApp:has(.tap-assessment-focus) .st-key-_tap_participant_question_stage [data-testid="stRadioGroup"] {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 10px;
-  width: 100%;
+  display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; width: 100%;
 }
 .stApp:has(.tap-assessment-focus) .st-key-_tap_participant_question_stage [data-testid="stRadioOption"] {
-  box-sizing: border-box;
-  width: 100%;
-  min-height: 60px;
-  margin: 0;
-  padding: 14px 18px;
-  border: 1px solid var(--p-hair);
-  border-radius: 16px;
-  background: rgba(255,255,255,.78);
-  cursor: pointer;
-  transition: transform .14s ease, border-color .14s ease, box-shadow .14s ease, background .14s ease;
+  box-sizing: border-box; width: 100%; min-height: 56px; margin: 0; padding: 12px 16px;
+  border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface); cursor: pointer;
+  transition: border-color .14s ease, background .14s ease;
 }
-.stApp:has(.tap-assessment-focus) .st-key-_tap_participant_question_stage [data-testid="stRadioOption"]:hover {
-  transform: translateY(-1px);
-  border-color: rgba(10,124,118,.32);
-  box-shadow: 0 8px 18px -12px rgba(15,42,48,.4);
-}
+.stApp:has(.tap-assessment-focus) .st-key-_tap_participant_question_stage [data-testid="stRadioOption"]:hover {border-color: var(--line-strong); background: var(--surface-soft);}
 .stApp:has(.tap-assessment-focus) .st-key-_tap_participant_question_stage [data-testid="stRadioOption"]:is([data-selected="true"],:has(input:checked)) {
-  border-color: transparent;
-  background: linear-gradient(135deg, rgba(10,124,118,.15), rgba(44,181,168,.07));
-  box-shadow: inset 0 0 0 1.5px var(--tone-teal), 0 10px 22px -12px rgba(10,124,118,.6);
+  border-color: var(--brand); background: var(--brand-pale); box-shadow: inset 0 0 0 1px var(--brand);
 }
-.stApp:has(.tap-assessment-focus) .st-key-_tap_participant_question_stage [data-testid="stRadioOption"] p {font-size: 16px; font-weight: 560;}
-.stApp:has(.tap-assessment-focus) .st-key-_tap_participant_question_stage [data-testid="stRadioOption"]:focus-within {outline: 3px solid rgba(44,181,168,.45); outline-offset: 2px;}
+.stApp:has(.tap-assessment-focus) .st-key-_tap_participant_question_stage [data-testid="stRadioOption"] p {font-size: var(--fs-base); font-weight: 600;}
+.stApp:has(.tap-assessment-focus) .st-key-_tap_participant_question_stage [data-testid="stRadioOption"]:focus-within {outline: 2px solid var(--brand); outline-offset: 2px;}
 @media (max-width: 640px) {
+  .stApp:has(.tap-assessment-focus) .st-key-_tap_participant_question_stage {padding: 20px 16px;}
   .stApp:has(.tap-assessment-focus) .st-key-_tap_participant_question_stage [data-testid="stRadioGroup"] {grid-template-columns: repeat(2, minmax(0, 1fr));}
 }
 
 @media (prefers-reduced-motion: reduce) {
   .stApp * {transition: none !important;}
 }
-
-/* Participant home: assigned project as a glass card with phase badges. */
-.stApp:has(.st-key-tap_workspace_topbar) .st-key-_tap_participant_project_card {
-  position: relative;
-  overflow: hidden;
-  padding: 26px 28px;
-  border: 1px solid var(--p-edge);
-  border-radius: 24px;
-  background:
-    radial-gradient(600px 200px at 100% 0%, rgba(44,181,168,.14), transparent 70%),
-    linear-gradient(150deg, rgba(255,255,255,.82), rgba(255,255,255,.58));
-  backdrop-filter: var(--p-blur);
-  box-shadow: var(--p-shadow);
-  gap: 12px;
-}
-.stApp:has(.st-key-tap_workspace_topbar) .st-key-_tap_participant_project_card::before {
-  content: "";
-  position: absolute;
-  inset: 0 0 auto 0;
-  height: 3px;
-  background: linear-gradient(90deg, var(--tone-teal), var(--tone-teal-2));
-}
-.tap-phase-status {display: flex; gap: 8px; flex-wrap: wrap; margin: 2px 0 6px;}
-.tap-phase-status span {
-  display: inline-flex; align-items: center; gap: 6px;
-  padding: 6px 12px;
-  border-radius: 999px;
-  font-size: 14px; font-weight: 650;
-}
-.tap-phase-status span::before {content: ""; width: 7px; height: 7px; border-radius: 50%; background: currentColor;}
-.tap-phase-status .is-done {color: #13704a; background: rgba(31,138,91,.1); box-shadow: inset 0 0 0 1px rgba(31,138,91,.2);}
-.tap-phase-status .is-todo {color: var(--p-muted); background: rgba(15,42,48,.05); box-shadow: inset 0 0 0 1px var(--p-hair);}
-
-/* Dashboard overview: both panels share the taller panel's height. */
-.stApp:has(.st-key-tap_workspace_topbar) .st-key-account_dashboard_overview [data-testid="stHorizontalBlock"] {align-items: stretch;}
-.stApp:has(.st-key-tap_workspace_topbar) .st-key-account_dashboard_overview [data-testid="stLayoutWrapper"]:has(> :is(.st-key-account_dashboard_participation,.st-key-account_dashboard_ranking)) {flex: 1 1 auto;}
