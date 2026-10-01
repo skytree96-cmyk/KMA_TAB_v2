@@ -148,3 +148,27 @@
   color: var(--muted);
 }
 .stApp details[open] > [data-testid="stExpanderDetails"] {padding: 18px 20px 20px; border-top: 1px solid var(--line);}
+
+/* Sign-in: one centered card on the warm canvas (PAI login). */
+.stApp:has(.st-key-tap_login_card) {background: radial-gradient(ellipse at 50% 0%, rgb(8 123 118 / .06), transparent 60%), var(--canvas);}
+.stApp .st-key-tap_login_shell {max-width: 440px; margin: clamp(24px, 8vh, 90px) auto 0;}
+.stApp .st-key-tap_login_card {
+  gap: 10px;
+  padding: 34px 32px 26px;
+  border: 1px solid var(--line);
+  border-radius: 22px;
+  background: var(--surface);
+  box-shadow: var(--shadow-md);
+}
+.tap-login-brand {display: flex; align-items: center; gap: 12px; margin-bottom: 14px;}
+.tap-login-brand .tap-ci {margin: 0; --ci-kma: var(--ink); --ci-tap: var(--brand);}
+.tap-login-brand .tap-ci-wordmark {font-size: 30px;}
+.tap-login-brand .tap-ci-description {display: none;}
+.tap-login-brand > span {padding-left: 12px; border-left: 1px solid var(--line); font-size: var(--fs-xs); line-height: 1.45; color: var(--muted);}
+.stApp .st-key-tap_login_card h1 {font-size: 28px; padding: 0;}
+.stApp .st-key-tap_login_card [data-testid="stWidgetLabel"] p {font-size: var(--fs-sm); font-weight: 600;}
+.stApp .st-key-tap_login_card [data-testid="stFormSubmitButton"] button {min-height: 50px; border-radius: 999px; font-size: var(--fs-base);}
+.tap-login-foot {margin-top: 8px; padding-top: 16px; border-top: 1px solid var(--line); font-size: var(--fs-xs); line-height: 1.6; color: var(--muted);}
+.tap-login-foot a {display: block; width: max-content; margin-top: 8px; color: var(--brand-deep); font-weight: 600; text-decoration: none;}
+.tap-login-foot a:hover {text-decoration: underline;}
+@media (max-width: 520px) {.stApp .st-key-tap_login_card {padding: 26px 20px 20px;}}

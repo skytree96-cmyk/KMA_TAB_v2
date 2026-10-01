@@ -180,3 +180,61 @@
 @media (prefers-reduced-motion: reduce) {
   .stApp * {transition: none !important;}
 }
+
+/* Competency picker: checkbox tiles with a section header and live count. */
+.stApp:has(.st-key-tap_workspace_topbar) .st-key-account_admin_factor_picker {
+  gap: 12px;
+  padding: 24px 26px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+}
+.tap-pick-head {display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; margin-top: 8px;}
+.tap-pick-head b {display: block; font-size: var(--fs-base); color: var(--ink);}
+.tap-pick-head span {font-size: var(--fs-sm); color: var(--muted);}
+.tap-pick-head--form {margin-top: 4px;}
+.tap-pick-count {flex: none; padding: 3px 10px; border-radius: 999px; font-size: var(--fs-xs) !important; font-weight: 700; color: var(--brand) !important; background: var(--brand-pale);}
+.tap-pick-count.is-full {color: var(--amber) !important; background: var(--amber-pale);}
+.tap-pick-total {display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 14px; margin-top: 6px; padding: 14px 16px; border-radius: var(--radius-md); background: var(--surface-soft); color: var(--ink-soft); font-size: var(--fs-sm);}
+.tap-pick-total b {color: var(--brand);}
+.tap-pick-total span {color: var(--muted); font-size: var(--fs-xs);}
+.stApp:has(.st-key-tap_workspace_topbar) :is([class*="st-key-account_admin_factor_base_grid"],[class*="st-key-account_admin_specialty_"],[class*="st-key-account_admin_job_"],.st-key-account_admin_priority_grid) [data-testid="stHorizontalBlock"] {gap: 10px;}
+.stApp:has(.st-key-tap_workspace_topbar) :is([class*="st-key-account_admin_factor_base_grid"],[class*="st-key-account_admin_specialty_"],[class*="st-key-account_admin_job_"],.st-key-account_admin_priority_grid) [data-testid="stColumn"] > div {gap: 10px;}
+.stApp:has(.st-key-tap_workspace_topbar) :is([class*="st-key-account_admin_factor_base_grid"],[class*="st-key-account_admin_specialty_"],[class*="st-key-account_admin_job_"],.st-key-account_admin_priority_grid) [data-testid="stCheckbox"] label {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 52px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  cursor: pointer;
+  transition: border-color .14s ease, background .14s ease;
+}
+.stApp:has(.st-key-tap_workspace_topbar) :is([class*="st-key-account_admin_factor_base_grid"],[class*="st-key-account_admin_specialty_"],[class*="st-key-account_admin_job_"],.st-key-account_admin_priority_grid) [data-testid="stCheckbox"] label:hover {border-color: var(--line-strong); background: var(--surface-soft);}
+.stApp:has(.st-key-tap_workspace_topbar) :is([class*="st-key-account_admin_specialty_"],[class*="st-key-account_admin_job_"],.st-key-account_admin_priority_grid) [data-testid="stCheckbox"] label:has(input:checked) {
+  border-color: var(--brand);
+  background: var(--brand-pale);
+  box-shadow: inset 0 0 0 1px var(--brand);
+}
+.stApp:has(.st-key-tap_workspace_topbar) [class*="st-key-account_admin_factor_base_grid"] [data-testid="stCheckbox"] label {background: var(--surface-soft); cursor: default;}
+.stApp:has(.st-key-tap_workspace_topbar) :is([class*="st-key-account_admin_specialty_"],[class*="st-key-account_admin_job_"]) [data-testid="stCheckbox"] label:has(input:disabled:not(:checked)) {opacity: .5; cursor: not-allowed;}
+.stApp:has(.st-key-tap_workspace_topbar) :is([class*="st-key-account_admin_factor_base_grid"],[class*="st-key-account_admin_specialty_"],[class*="st-key-account_admin_job_"],.st-key-account_admin_priority_grid) [data-testid="stCheckbox"] p {font-size: var(--fs-sm); font-weight: 600; color: var(--ink);}
+@media (max-width: 760px) {
+  .stApp:has(.st-key-tap_workspace_topbar) .st-key-account_admin_factor_picker {padding: 18px 16px;}
+}
+.stApp:has(.st-key-tap_workspace_topbar) :is([class*="st-key-account_admin_factor_base_grid"],[class*="st-key-account_admin_specialty_"],[class*="st-key-account_admin_job_"],.st-key-account_admin_priority_grid) :is([data-testid="stElementContainer"]:has([data-testid="stCheckbox"]),[data-testid="stCheckbox"]) {width: 100% !important; max-width: none;}
+
+/* Empty detail state (PAI-style): icon, title, guidance. */
+.tap-empty {display: flex; flex-direction: column; align-items: flex-start; gap: 8px; padding: 6px 2px;}
+.tap-empty__icon {width: 44px; height: 44px; display: grid; place-items: center; border-radius: 12px; font-family: "Material Symbols Rounded"; font-size: 23px; font-feature-settings: "liga"; letter-spacing: normal; color: var(--brand); background: var(--brand-pale);}
+.tap-empty b {margin-top: 6px; font-size: var(--fs-lg); color: var(--ink);}
+.tap-empty p {margin: 0; font-size: var(--fs-sm) !important; line-height: 1.65 !important; color: var(--muted);}
+
+/* Numbered form sections (project creation). */
+.tap-form-section {display: flex; gap: 12px; align-items: flex-start; margin: 10px 0 2px; padding-top: 14px; border-top: 1px solid var(--line);}
+.stApp [data-testid="stForm"] [data-testid="stVerticalBlock"] > :first-child .tap-form-section {border-top: 0; padding-top: 0; margin-top: 0;}
+.tap-form-section > span {flex: none; padding: 2px 8px; border-radius: 6px; font-size: var(--fs-xs); font-weight: 700; color: var(--brand); background: var(--brand-pale);}
+.tap-form-section b {font-size: var(--fs-base); color: var(--ink);}
+.tap-form-section p {margin: 2px 0 0; font-size: var(--fs-sm) !important; line-height: 1.55 !important; color: var(--muted);}

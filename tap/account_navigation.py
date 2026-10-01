@@ -43,6 +43,45 @@ def switch_to_page(name: str) -> None:
     st.switch_page(_PAGES[name])
 
 
+# Each workspace section has its own URL so links, refresh and browser history
+# land on the same menu. The URL only selects a section; the role check in
+# render_workspace_header still decides whether the section is allowed.
+ROUTE_KEY = "_tap_workspace_route"
+PASSWORD_ROUTE = "password"
+ROUTES = {
+    "dashboard": ("dashboard", "대시보드"),
+    "companies": ("companies", "회원사"),
+    "accounts": ("accounts", "계정 관리"),
+    "projects": ("projects", "프로젝트"),
+    "create_project": ("new-project", "프로젝트 만들기"),
+    "question_bank": ("question-bank", "문항은행·검수"),
+    "assessments": ("my-assessments", "내 교육"),
+    PASSWORD_ROUTE: ("password", "비밀번호 변경"),
+}
+
+
+def enter_route(route: str | None) -> None:
+    """Apply the section named by the URL when the browser arrives at a new page."""
+    if route is None or st.session_state.get(ROUTE_KEY) == route:
+        return
+    st.session_state[ROUTE_KEY] = route
+    if route == PASSWORD_ROUTE:
+        st.session_state[ACCOUNT_MENU_KEY] = "비밀번호 변경"
+    else:
+        st.session_state[SECTION_KEY] = route
+        st.session_state[ACCOUNT_MENU_KEY] = "업무 화면"
+
+
+def follow_route(route: str | None, required: bool) -> None:
+    """Move the URL to the section chosen in-app (menu click, role fallback)."""
+    if required or st.session_state.get(ACCOUNT_MENU_KEY) == "비밀번호 변경":
+        target = PASSWORD_ROUTE
+    else:
+        target = st.session_state.get(SECTION_KEY)
+    if target != route and target in ROUTES and target in _PAGES:
+        st.switch_page(_PAGES[target])
+
+
 def _go_to_section(section: str) -> None:
     st.session_state[SECTION_KEY] = section
     st.session_state[ACCOUNT_MENU_KEY] = "업무 화면"

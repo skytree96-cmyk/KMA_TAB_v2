@@ -437,23 +437,74 @@ def _render_user_actions(store: Any, token: str, principal: Mapping[str, Any], u
     st.caption("비밀번호 재발급 또는 계정 중지 시 기존 로그인은 종료됩니다. 기존 비밀번호는 조회할 수 없습니다.")
 
 
-def _render_project_create(store: Any, token: str) -> None:
-    st.subheader("교육평가 프로젝트 만들기")
+def _empty_state(icon: str, title: str, text: str) -> None:
+    st.html(f'<div class="tap-empty"><span class="tap-empty__icon" aria-hidden="true">{escape(icon)}</span>'
+            f'<b>{escape(title)}</b><p>{escape(text)}</p></div>')
+
+
+def _form_section(number: str, title: str, caption: str) -> None:
+    st.html(f'<div class="tap-form-section"><span>{escape(number)}</span><div><b>{escape(title)}</b>'
+            f'<p>{escape(caption)}</p></div></div>')
+
+
+def _factor_section(title: str, caption: str, chosen: int, limit: int | None, *, show_count: bool = True) -> None:
+    count = "" if not show_count else f'<span class="tap-pick-count{" is-full" if limit and chosen >= limit else ""}">' + (
+        f"{chosen}/{limit} 선택" if limit else f"{chosen}개 자동 포함") + "</span>"
+    st.html(f'<div class="tap-pick-head"><div><b>{escape(title)}</b><span>{escape(caption)}</span></div>{count}</div>')
+
+
+def _factor_checkboxes(rows: list[Mapping[str, Any]], key_prefix: str, limit: int, *, title: str, caption: str) -> list[str]:
+    """Checkbox tiles; once `limit` boxes are ticked the rest are disabled until one is cleared."""
+    keys = {row["factor_code"]: f"{key_prefix}_{row['factor_code']}" for row in rows}
+    chosen = [code for code, key in keys.items() if st.session_state.get(key)]
+    _factor_section(title, caption, len(chosen), limit)
+    with st.container(key=key_prefix + "_grid"):
+        columns = st.columns(3, gap="small")
+        for index, row in enumerate(rows):
+            key = keys[row["factor_code"]]
+            with columns[index % 3]:
+                st.checkbox(row["factor_name_ko"], key=key, help=row.get("definition") or None,
+                            disabled=not st.session_state.get(key) and len(chosen) >= limit)
+    return [code for code, key in keys.items() if st.session_state.get(key)]
+
+
+def _render_project_create(store: Any, token: str, *, show_heading: bool = True) -> None:
+    if show_heading:
+        st.subheader("교육평가 프로젝트 만들기")
     st.caption("교육 전·후 비교에 사용할 일정과 측정역량을 등록합니다. 등록한 검사 구성은 고정됩니다.")
     rows = load_competencies()
-    target_level = st.radio("응답 대상", list(LEVEL_LABELS), format_func=LEVEL_LABELS.get, horizontal=True, key=PREFIX + "target_level")
+    picker = st.container(key=PREFIX + "factor_picker")
+    with picker:
+        _factor_section("응답 대상", "대상에 따라 고를 수 있는 역량이 달라집니다.", 0, None, show_count=False)
+        target_level = st.radio("응답 대상", list(LEVEL_LABELS), format_func=LEVEL_LABELS.get, horizontal=True,
+                                key=PREFIX + "target_level", label_visibility="collapsed")
     available = [row for row in rows if row["active_for_scoring"] and applicable_to_level(row, target_level)]
     base = [row for row in available if row["library_type"] == "base"]
-    st.write("기본역량: " + " · ".join(row["factor_name_ko"] for row in base))
     labels = {row["factor_code"]: row["factor_name_ko"] for row in available}
-    specialty = st.multiselect(f"전문·미래역량 · 최대 {MAX_SPECIALTY}개", [row["factor_code"] for row in available if row["library_type"] == "specialty"], format_func=labels.get, max_selections=MAX_SPECIALTY, key=PREFIX + f"specialty_{target_level}")
-    job = st.multiselect(f"직무역량 · 최대 {MAX_JOB_FUNCTION}개", [row["factor_code"] for row in available if row["library_type"] == "job_function"], format_func=labels.get, max_selections=MAX_JOB_FUNCTION, key=PREFIX + f"job_{target_level}")
-    selected = [row["factor_code"] for row in base] + specialty + job
-    st.caption(f"측정역량 {len(selected)}개 · {len(questions_for_factors(selected))}문항")
+    with picker:
+        _factor_section("기본역량", "모든 프로젝트에 공통으로 측정합니다.", len(base), None)
+        with st.container(key=PREFIX + "factor_base_grid"):
+            columns = st.columns(3, gap="small")
+            for index, row in enumerate(base):
+                with columns[index % 3]:
+                    st.checkbox(row["factor_name_ko"], value=True, disabled=True, help=row.get("definition") or None,
+                                key=PREFIX + f"base_{target_level}_{row['factor_code']}")
+        specialty = _factor_checkboxes(
+            [row for row in available if row["library_type"] == "specialty"], PREFIX + f"specialty_{target_level}",
+            MAX_SPECIALTY, title="전문·미래역량", caption=f"교육 목표에 맞는 역량을 최대 {MAX_SPECIALTY}개 고르세요.")
+        job = _factor_checkboxes(
+            [row for row in available if row["library_type"] == "job_function"], PREFIX + f"job_{target_level}",
+            MAX_JOB_FUNCTION, title="직무역량", caption=f"대상 직무를 최대 {MAX_JOB_FUNCTION}개 고르세요.")
+        selected = [row["factor_code"] for row in base] + specialty + job
+        st.html(f'<div class="tap-pick-total">측정역량 <b>{len(selected)}개</b> · 문항 <b>{len(questions_for_factors(selected))}개</b>'
+                '<span>역량에 마우스를 올리면 정의를 볼 수 있습니다.</span></div>')
     today = datetime.now(ZoneInfo("Asia/Seoul")).date()
     with st.form(PREFIX + "project_create"):
-        name = st.text_input("프로젝트명", max_chars=120)
-        course_name = st.text_input("교육과정명", max_chars=120)
+        _form_section("01", "기본 정보", "참여자 화면과 리포트에 표시되는 이름입니다.")
+        left, right = st.columns(2)
+        name = left.text_input("프로젝트명", max_chars=120, placeholder="예: 2026 하반기 CS 역량 과정")
+        course_name = right.text_input("교육과정명", max_chars=120, placeholder="예: 고객 서비스 역량 향상 교육")
+        _form_section("02", "검사 일정", "기간 밖에는 참여자가 응답할 수 없습니다. 교육 후 검사는 교육 8~10주 후 시작을 권장합니다.")
         training = st.date_input("교육일", today + timedelta(days=8))
         left, right = st.columns(2)
         with left:
@@ -462,12 +513,20 @@ def _render_project_create(store: Any, token: str) -> None:
         with right:
             pre_end = st.date_input("교육 전 검사 마감일", today + timedelta(days=7))
             post_end = st.date_input("교육 후 검사 마감일", today + timedelta(days=71))
-        st.caption("교육 후 검사는 교육 8~10주 후 시작을 권장합니다.")
+        _form_section("03", "리포트 기준", "조직 리포트에서 목표 대비 차이와 우선 확인할 역량을 정합니다.")
         target_mean = st.slider("조직 기대 행동빈도", 1.0, 5.0, 3.5, 0.1, help="교육 우선순위 논의를 위한 운영 목표이며 표준 규준이 아닙니다.")
-        priorities = st.multiselect("조직 우선역량 · 최대 3개", selected, format_func=labels.get, max_selections=3)
+        st.html('<div class="tap-pick-head tap-pick-head--form"><div><b>조직 우선역량</b>'
+                '<span>리포트에서 먼저 살펴볼 역량을 최대 3개 고르세요.</span></div></div>')
+        with st.container(key=PREFIX + "priority_grid"):
+            columns = st.columns(3, gap="small")
+            priorities = [code for index, code in enumerate(selected)
+                          if columns[index % 3].checkbox(labels[code], key=PREFIX + f"priority_{target_level}_{code}")]
         delivery = st.radio("선호 교육방식", ["all", "offline", "online"], format_func={"all": "무관", "offline": "집합", "online": "온라인"}.get, horizontal=True)
         submitted = st.form_submit_button("프로젝트 등록", type="primary")
     if submitted:
+        if len(priorities) > 3:
+            st.error("조직 우선역량은 최대 3개까지 고를 수 있습니다.")
+            return
         try:
             config = build_project_config(name, course_name, target_level, specialty + job, training, pre_start, pre_end, post_start, post_end, target_mean, priorities, delivery)
         except ValueError as exc:
@@ -689,8 +748,8 @@ def _render_workspace_users(store: Any, token: str, principal: Mapping[str, Any]
             )
         with right, st.container(border=True, key="tap_workspace_account_detail"):
             if user is None:
-                st.subheader("계정 상세")
-                st.info("목록에서 관리할 계정을 선택해 주세요.")
+                _empty_state("manage_accounts", "계정 상세",
+                             "왼쪽 목록에서 계정을 선택하면 로그인 정보와 부서·직급을 확인하고 비밀번호 재발급, 사용 중지를 할 수 있습니다.")
             else:
                 st.caption("계정 상세")
                 st.subheader(str(user.get("display_name") or "계정"))
@@ -718,8 +777,8 @@ def _render_workspace_projects(store: Any, token: str, principal: Mapping[str, A
             )
         with right, st.container(border=True, key="tap_workspace_project_detail"):
             if project is None:
-                st.subheader("프로젝트 상세")
-                st.info("목록에서 프로젝트를 선택해 주세요.")
+                _empty_state("folder_open", "프로젝트 상세",
+                             "왼쪽 목록에서 프로젝트를 선택하면 일정과 참여 현황, 리포트, 참여자 배정이 이 아래에 열립니다.")
             else:
                 st.caption("프로젝트 상세")
                 st.subheader(str(project.get("name") or project.get("project_name") or "교육평가 프로젝트"))
@@ -753,7 +812,7 @@ def _render_workspace(
     elif section == "projects":
         _render_workspace_projects(store, token, principal, projects, users)
     elif section == "create_project":
-        _render_project_create(store, token)
+        _render_project_create(store, token, show_heading=False)
     elif section == "accounts":
         issuance_label = "교육담당자 계정 발급" if role == "kma" else "참여자 계정 발급"
         with st.expander(issuance_label, key=PREFIX + f"workspace_issue_{role}", on_change="rerun"):
