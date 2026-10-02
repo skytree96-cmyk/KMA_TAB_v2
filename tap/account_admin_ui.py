@@ -800,26 +800,25 @@ def _render_workspace_projects(store: Any, token: str, principal: Mapping[str, A
                 title=lambda row: str(row.get("name") or row.get("project_name") or "교육평가 프로젝트"),
                 caption=lambda row: " · ".join(str(part) for part in (row.get("company_name"), (row.get("config") or {}).get("course_name")) if part),
             )
-        with right:
-            with st.container(border=True, key="tap_workspace_project_detail"):
-                if project is None:
-                    _empty_state("folder_open", "프로젝트 상세",
-                                 "왼쪽 목록에서 프로젝트를 선택하면 일정과 참여자 배정, 참여 현황과 리포트가 열립니다.")
-                else:
-                    st.caption("프로젝트 상세")
-                    st.subheader(str(project.get("name") or project.get("project_name") or "교육평가 프로젝트"))
-                    config = project.get("config") or {}
-                    _workspace_fields([
-                        ("회사", project.get("company_name")), ("교육명", config.get("course_name")),
-                        ("교육일", config.get("training_date") or "미설정"),
-                        ("사전검사", f"{config.get('pre_start_date', '미설정')} ~ {config.get('pre_end_date', '미설정')}"),
-                        ("사후검사", f"{config.get('post_start_date', '미설정')} ~ {config.get('post_end_date', '미설정')}"),
-                    ])
-            if project is not None and principal.get("role") == "company":
-                # Assigning participants is the next step after picking a project,
-                # so it sits right under the project details, above the reports.
-                with st.container(border=True, key="tap_workspace_assignments"):
-                    _render_assignments(store, token, project, users)
+        with right, st.container(border=True, key="tap_workspace_project_detail"):
+            if project is None:
+                _empty_state("folder_open", "프로젝트 상세",
+                             "왼쪽 목록에서 프로젝트를 선택하면 일정과 참여자 배정, 참여 현황과 리포트가 열립니다.")
+            else:
+                st.caption("프로젝트 상세")
+                st.subheader(str(project.get("name") or project.get("project_name") or "교육평가 프로젝트"))
+                config = project.get("config") or {}
+                _workspace_fields([
+                    ("회사", project.get("company_name")), ("교육명", config.get("course_name")),
+                    ("교육일", config.get("training_date") or "미설정"),
+                    ("사전검사", f"{config.get('pre_start_date', '미설정')} ~ {config.get('pre_end_date', '미설정')}"),
+                    ("사후검사", f"{config.get('post_start_date', '미설정')} ~ {config.get('post_end_date', '미설정')}"),
+                ])
+    if project is not None and principal.get("role") == "company":
+        # Assigning participants is the next step after picking a project, so it
+        # spans the full width right under the list/detail row, above the reports.
+        with st.container(border=True, key="tap_workspace_assignments"):
+            _render_assignments(store, token, project, users)
     if project is not None:
         with st.container(border=True, key="tap_workspace_project_reports"):
             from tap.account_reports import render_project_report
