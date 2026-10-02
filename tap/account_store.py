@@ -292,12 +292,17 @@ class AccountStore:
         with self._transaction() as conn:
             self._execute(conn, "DELETE FROM tap_sessions WHERE token_hash=?", (hashlib.sha256(token.encode()).hexdigest(),))
 
-    def change_password(self, token: str, current_password: str, new_password: str) -> str:
+    def change_password(self, token: str, current_password: str | None, new_password: str) -> str:
+        """``current_password`` may be None only for the forced first change: that
+        session was just opened with the issued temporary password."""
         _password_input(new_password)
         with self._transaction() as conn:
             user = self._require(conn, token, allow_password_change=True)
             current = self._one(conn, "SELECT * FROM tap_users WHERE id=?", (user["id"],), lock=True)
-            if not verify_password(current_password, current["password_hash"]):
+            if current_password is None:
+                if not current["must_change_password"]:
+                    raise AuthenticationError("현재 비밀번호를 입력해 주세요.")
+            elif not verify_password(current_password, current["password_hash"]):
                 raise AuthenticationError("현재 비밀번호가 맞지 않습니다.")
             if verify_password(new_password, current["password_hash"]):
                 raise ValidationError("기존 비밀번호와 다른 비밀번호를 입력하세요.")

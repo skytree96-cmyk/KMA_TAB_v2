@@ -25,7 +25,7 @@ MAX_BATCH_ROWS = 200
 WORKSPACE_PAGE_SIZE = 12
 WORKSPACE_SECTIONS = {
     "kma": {"companies": "회원사", "accounts": "계정 관리", "projects": "프로젝트"},
-    "company": {"projects": "프로젝트", "create_project": "프로젝트 만들기", "accounts": "참여자 계정"},
+    "company": {"accounts": "참여자 계정", "create_project": "프로젝트 만들기", "projects": "프로젝트"},
 }
 MAX_CSV_BYTES = 256 * 1024
 PROFILE_FIELDS = {"department": ("부서", 100), "job_title": ("직급", 80), "email": ("이메일", 254), "phone": ("연락처", 40)}
@@ -794,32 +794,36 @@ def _render_workspace_projects(store: Any, token: str, principal: Mapping[str, A
         with left, st.container(border=True, key="tap_workspace_project_list"):
             project = _workspace_pick(
                 projects, selection_key=PREFIX + "project_select", search_key=PREFIX + "project_search",
-                search_label="프로젝트 검색", placeholder="회사명, 프로젝트명, 교육명으로 검색", label="프로젝트", unit="개",
-                search_values=lambda row: [row.get("company_name"), row.get("name") or row.get("project_name"), (row.get("config") or {}).get("course_name")],
+                search_label="프로젝트 검색", placeholder="회사명, 사업자등록번호, 프로젝트명, 교육명으로 검색", label="프로젝트", unit="개",
+                search_values=lambda row: [row.get("company_name"), row.get("company_registration_number"),
+                                           row.get("name") or row.get("project_name"), (row.get("config") or {}).get("course_name")],
                 title=lambda row: str(row.get("name") or row.get("project_name") or "교육평가 프로젝트"),
                 caption=lambda row: " · ".join(str(part) for part in (row.get("company_name"), (row.get("config") or {}).get("course_name")) if part),
             )
-        with right, st.container(border=True, key="tap_workspace_project_detail"):
-            if project is None:
-                _empty_state("folder_open", "프로젝트 상세",
-                             "왼쪽 목록에서 프로젝트를 선택하면 일정과 참여 현황, 리포트, 참여자 배정이 이 아래에 열립니다.")
-            else:
-                st.caption("프로젝트 상세")
-                st.subheader(str(project.get("name") or project.get("project_name") or "교육평가 프로젝트"))
-                config = project.get("config") or {}
-                _workspace_fields([
-                    ("회사", project.get("company_name")), ("교육명", config.get("course_name")),
-                    ("교육일", config.get("training_date") or "미설정"),
-                    ("사전검사", f"{config.get('pre_start_date', '미설정')} ~ {config.get('pre_end_date', '미설정')}"),
-                    ("사후검사", f"{config.get('post_start_date', '미설정')} ~ {config.get('post_end_date', '미설정')}"),
-                ])
+        with right:
+            with st.container(border=True, key="tap_workspace_project_detail"):
+                if project is None:
+                    _empty_state("folder_open", "프로젝트 상세",
+                                 "왼쪽 목록에서 프로젝트를 선택하면 일정과 참여자 배정, 참여 현황과 리포트가 열립니다.")
+                else:
+                    st.caption("프로젝트 상세")
+                    st.subheader(str(project.get("name") or project.get("project_name") or "교육평가 프로젝트"))
+                    config = project.get("config") or {}
+                    _workspace_fields([
+                        ("회사", project.get("company_name")), ("교육명", config.get("course_name")),
+                        ("교육일", config.get("training_date") or "미설정"),
+                        ("사전검사", f"{config.get('pre_start_date', '미설정')} ~ {config.get('pre_end_date', '미설정')}"),
+                        ("사후검사", f"{config.get('post_start_date', '미설정')} ~ {config.get('post_end_date', '미설정')}"),
+                    ])
+            if project is not None and principal.get("role") == "company":
+                # Assigning participants is the next step after picking a project,
+                # so it sits right under the project details, above the reports.
+                with st.container(border=True, key="tap_workspace_assignments"):
+                    _render_assignments(store, token, project, users)
     if project is not None:
         with st.container(border=True, key="tap_workspace_project_reports"):
             from tap.account_reports import render_project_report
             render_project_report(store, token, project)
-    if project is not None and principal.get("role") == "company":
-        with st.container(border=True, key="tap_workspace_assignments"):
-            _render_assignments(store, token, project, users)
 
 
 def _render_workspace(
@@ -885,7 +889,9 @@ def render_admin(store: Any, token: str, principal: Mapping[str, Any], *, sectio
         if not ok:
             return
     company_names = {_identifier(row): str(row["name"]) for row in companies}
-    projects = [{**row, "company_name": company_names.get(str(row.get("company_id")), "")} for row in projects]
+    company_numbers = {_identifier(row): _company_registration_label(row) for row in companies}
+    projects = [{**row, "company_name": company_names.get(str(row.get("company_id")), ""),
+                 "company_registration_number": company_numbers.get(str(row.get("company_id")), "")} for row in projects]
     users = [{**row, "company_name": company_names.get(str(row.get("company_id")), str(row.get("company_name") or ""))} for row in users]
     if section is not None:
         _render_workspace(store, token, principal, section, companies, users, projects)

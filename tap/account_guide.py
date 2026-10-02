@@ -70,6 +70,26 @@ GUIDE_CSS = """
   .tg-radio{display:flex;flex-wrap:wrap;gap:6px}
   .tg-radio span{border:1px solid #d5e2e0;background:#fff;border-radius:99px;padding:4px 9px;font-size:11.5px}
   .tg-radio span.on{border-color:#087b76;background:#eaf6f3;color:#087b76;font-weight:700}
+  .tg-scale{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));width:100%}
+  .tg-scale span{display:flex;align-items:center;justify-content:center;text-align:center;min-height:34px;padding:4px 3px;
+                 margin-left:-1px;border:1px solid #b9cccb;background:#f4f7f7;font-size:11px;font-weight:600;color:#33484f;word-break:keep-all}
+  .tg-scale span:first-child{margin-left:0;border-radius:9px 0 0 9px}
+  .tg-scale span:last-child{border-radius:0 9px 9px 0}
+  .tg-scale span.hover{background:#dff2ee;border-color:#7cc4ba;color:#065c58;position:relative;z-index:1}
+  .tg-scale span.on{background:#087b76;border-color:#087b76;color:#fff;font-weight:800;position:relative;z-index:2}
+  .tg-zero{align-self:flex-start;border:1px dashed #b9cccb;border-radius:999px;background:#fff;padding:5px 12px;font-size:11px;font-weight:600;color:#33484f}
+  .tg-checks{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:11.5px}
+  .tg-checks span::before{content:"";display:inline-block;width:11px;height:11px;margin-right:5px;vertical-align:-1px;
+                          border:1.5px solid #9db1b3;border-radius:3px;background:#fff}
+  .tg-checks span.on::before{background:#087b76;border-color:#087b76;box-shadow:inset 0 0 0 2px #fff}
+  .tg-tiles{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}
+  .tg-tiles span{border:1px solid #dce9e6;border-radius:8px;background:#fff;padding:6px 8px;font-size:11px}
+  .tg-tiles span::before{content:"";display:inline-block;width:10px;height:10px;margin-right:5px;vertical-align:-1px;
+                         border:1.5px solid #9db1b3;border-radius:3px}
+  .tg-tiles span.on{border-color:#087b76;background:#eaf6f3;font-weight:700}
+  .tg-tiles span.on::before{background:#087b76;border-color:#087b76}
+  .tg-tiles span.fixed{color:#6b8589}
+  .tg-tiles span.fixed::before{background:#c5d4d2;border-color:#c5d4d2}
   .tg-nav{display:flex;align-items:center;gap:4px;background:#fff;border:1px solid #dce9e6;border-radius:10px;padding:8px 10px;flex-wrap:wrap}
   .tg-logo{font-weight:900;color:#087b76;margin-right:4px;font-size:14px}
   .tg-spacer{flex:1}
@@ -165,7 +185,7 @@ def _topbar(menus: Iterable[str], active: str, role: str, pins: bool = True) -> 
             f'<span class="tg-spacer"></span>{guide}{profile}</div>')
 
 
-MANAGER_MENUS = ("대시보드", "프로젝트", "프로젝트 만들기", "참여자 계정")
+MANAGER_MENUS = ("대시보드", "참여자 계정", "프로젝트 만들기", "프로젝트")
 SAMPLE_PROJECT = "고객 서비스 역량 향상 과정"
 
 
@@ -177,7 +197,7 @@ def _intro() -> str:
   <div><b>STEP 1</b><strong>로그인</strong>
     <p>담당자에게 전달받은 <b style="display:inline;color:#102f36">로그인 ID 전체</b>와 임시 비밀번호를 입력합니다. 이메일은 사용하지 않습니다.</p></div>
   <div><b>STEP 2</b><strong>비밀번호 설정</strong>
-    <p>처음 로그인하면 임시 비밀번호를 본인만 아는 새 비밀번호(3~128자)로 바꿔야 다음 화면으로 이동할 수 있습니다.</p></div>
+    <p>처음 로그인하면 본인만 아는 새 비밀번호(3~128자)를 정해야 다음 화면으로 이동할 수 있습니다. 임시 비밀번호는 다시 입력하지 않습니다.</p></div>
   <div><b>STEP 3</b><strong>메뉴로 이동</strong>
     <p>화면 상단 메뉴로 업무 화면을 이동합니다. 우측 상단 <b style="display:inline;color:#102f36">이용 안내</b>로 이 화면을 열고, 프로필에서 비밀번호 변경·로그아웃을 합니다.</p></div>
 </div>
@@ -191,16 +211,16 @@ def _manager_steps() -> list[str]:
 
     steps.append(_step(
         "화면 구성", "상단 메뉴 한눈에 보기",
-        "교육담당자 계정으로 로그인하면 아래 4개 메뉴가 보입니다. 처음에는 "
-        "<b>참여자 계정 → 프로젝트 만들기 → 프로젝트(배정) → 대시보드</b> 순서로 진행하면 됩니다.",
-        _frame("교육담당자 화면", _topbar(MANAGER_MENUS, "프로젝트", "교육담당자") +
-               '<div class="tg-card"><div class="tg-title">프로젝트</div>'
+        "교육담당자 계정으로 로그인하면 아래 4개 메뉴가 보입니다. 메뉴는 일하는 순서대로 놓여 있어서, 처음에는 "
+        "<b>참여자 계정 → 프로젝트 만들기 → 프로젝트(배정)</b> 순서로 진행한 뒤 대시보드에서 현황을 보면 됩니다.",
+        _frame("교육담당자 화면", _topbar(MANAGER_MENUS, "참여자 계정", "교육담당자") +
+               '<div class="tg-card"><div class="tg-title">참여자 계정</div>'
                '<div class="tg-sub">선택한 메뉴의 업무 화면이 이 영역에 표시됩니다.</div></div>'),
         [
             ("대시보드", "우리 회사 전체 참여 인원, 사전·사후 완료 현황, 일정·미완료 점검, 월별 추세를 봅니다."),
-            ("프로젝트", "프로젝트를 골라 상세 일정, 참여 현황, 리포트를 확인하고 참여자를 배정합니다."),
-            ("프로젝트 만들기", "교육 일정과 측정역량을 정해 새 교육평가 프로젝트를 등록합니다."),
             ("참여자 계정", "참여자 계정을 한 명씩 또는 CSV로 한꺼번에 발급하고, 비밀번호 재발급·사용 중지를 합니다."),
+            ("프로젝트 만들기", "교육 일정과 측정역량을 정해 새 교육평가 프로젝트를 등록합니다."),
+            ("프로젝트", "프로젝트를 골라 상세 일정을 보고, 바로 아래에서 참여자를 배정하고, 참여 현황과 리포트를 확인합니다."),
             ("이용 안내", "언제든 이 안내 화면을 엽니다. ‘업무 화면으로 돌아가기’를 누르면 보던 화면으로 돌아갑니다."),
             ("프로필 (교육담당자 ▾)", "내 이름·아이디·회사를 확인하고 비밀번호 변경, 로그아웃을 합니다."),
         ],
@@ -261,9 +281,11 @@ def _manager_steps() -> list[str]:
         _frame("프로젝트 만들기", (
             '<div class="tg-field"><b>' + _pin(1) + '응답 대상</b><div class="tg-radio">'
             '<span class="on">실무자</span><span>관리자·리더</span><span>임원</span></div></div>'
-            '<div class="tg-field"><b>' + _pin(2) + '측정역량</b><div class="tg-row">'
-            '<span class="tg-tag">고객지향</span><span class="tg-tag">협업과 팀워크</span><span class="tg-tag">성장 마인드셋</span>'
-            '<span class="tg-tag">문제해결력</span><span class="tg-tag muted">+ AI 도구 활용</span><span class="tg-tag muted">+ 영업 핵심역량</span></div>'
+            '<div class="tg-field"><b>' + _pin(2) + '측정역량</b>'
+            '<div class="tg-sub">기본역량 · 자동 포함</div><div class="tg-tiles">'
+            '<span class="fixed">고객지향</span><span class="fixed">협업과 팀워크</span><span class="fixed">문제해결력</span></div>'
+            '<div class="tg-sub">전문·미래역량 · 1/3 선택</div><div class="tg-tiles">'
+            '<span class="on">AI 도구 활용</span><span>변화 대응</span><span>데이터 기반 판단</span></div>'
             '<div class="tg-sub">측정역량 8개 · 32문항</div></div>'
             '<div class="tg-row">' + _field("프로젝트명", "2026 하반기 CS 역량 과정", pin=3) + _field("교육과정명", SAMPLE_PROJECT) + '</div>'
             '<div class="tg-row">' + _field("교육일", "2026-11-12") + _field("교육 전 검사", "11-01 ~ 11-10", pin=4) +
@@ -273,7 +295,7 @@ def _manager_steps() -> list[str]:
         )),
         [
             ("응답 대상", "실무자 / 관리자·리더 / 임원 중 선택합니다. 대상에 따라 고를 수 있는 역량이 달라집니다."),
-            ("측정역량", "기본역량은 자동 포함되고, <b>전문·미래역량 최대 3개</b>와 <b>직무역량 최대 1개</b>를 추가로 고릅니다. 아래에 총 문항 수가 표시됩니다."),
+            ("측정역량", "기본역량은 자동 포함되고, 체크박스로 <b>전문·미래역량 최대 3개</b>와 <b>직무역량 최대 1개</b>를 고릅니다. 한도까지 고르면 나머지는 잠기고, 아래에 총 문항 수가 표시됩니다. 역량에 마우스를 올리면 정의가 보입니다."),
             ("프로젝트명 · 교육과정명", "참여자 화면과 리포트에 그대로 표시되므로 참여자가 알아보기 쉬운 이름으로 적어 주세요."),
             ("교육일 · 검사 기간", "교육 전 검사는 교육 전에 끝나도록, 교육 후 검사는 <b>교육 8~10주 후</b>에 시작하도록 권장합니다. 기간 밖에는 참여자가 응답할 수 없습니다."),
             ("조직 기대치 · 우선역량 · 교육방식", "조직 기대 행동빈도는 리포트에서 목표 대비 차이를 보는 기준입니다. 조직 우선역량(최대 3개)과 선호 교육방식은 프로젝트 정보로 함께 저장됩니다."),
@@ -285,22 +307,23 @@ def _manager_steps() -> list[str]:
 
     steps.append(_step(
         "STEP 4 · 프로젝트 메뉴", "참여자 배정하기",
-        "프로젝트를 선택하고 화면 아래 <b>참여자 배정</b>에서 검사할 사람을 추가합니다. 배정된 참여자만 검사 화면에서 이 교육을 볼 수 있습니다.",
+        "왼쪽에서 프로젝트를 고르면 오른쪽 <b>프로젝트 상세</b> 바로 아래에 <b>참여자 배정</b>이 열립니다. 배정된 참여자만 검사 화면에서 이 교육을 볼 수 있습니다.",
         _frame("프로젝트", (
-            '<div class="tg-split"><div class="tg-card">' + _field("프로젝트 검색", "회사명, 프로젝트명, 교육명으로 검색", pin=1, placeholder=True) +
+            '<div class="tg-split"><div class="tg-card">' + _field("프로젝트 검색", "회사명, 사업자등록번호, 프로젝트명, 교육명으로 검색", pin=1, placeholder=True) +
             f'<div class="tg-list-item on">2026 하반기 CS 역량 과정<div class="tg-sub">{SAMPLE_PROJECT}</div></div>'
             '<div class="tg-list-item">리더십 기본 과정<div class="tg-sub">신임 팀장 교육</div></div></div>'
+            '<div style="display:flex;flex-direction:column;gap:10px">'
             '<div class="tg-card"><div class="tg-sub">프로젝트 상세</div><div class="tg-title">2026 하반기 CS 역량 과정</div>'
-            '<div class="tg-sub">교육일 2026-11-12<br>사전검사 11-01 ~ 11-10<br>사후검사 2027-01-11 ~ 01-18</div></div></div>'
+            '<div class="tg-sub">교육일 2026-11-12 · 사전검사 11-01 ~ 11-10 · 사후검사 2027-01-11 ~ 01-18</div></div>'
             '<div class="tg-card"><div class="tg-row">' + _pin(2) + '<div class="tg-title">참여자 배정</div></div>' +
-            _table(("이름", "부서", "배정 상태", "교육 전", "교육 후"),
-                   (("홍길동", "고객서비스팀", "배정 중", "완료", "미완료"), ("김하나", "매장운영팀", "배정 중", "미완료", "미완료"))) +
-            '<div class="tg-row">' + _field("추가할 참여자", "이민수 · user003 ✕   박서연 · user004 ✕", pin=3) + '</div>' +
+            _table(("이름", "배정", "교육 전", "교육 후"),
+                   (("홍길동", "배정 중", "완료", "미완료"), ("김하나", "배정 중", "미완료", "미완료"))) +
+            _field("추가할 참여자", "이민수 · user003 ✕  박서연 · user004 ✕", pin=3) +
             '<div class="tg-row">' + _btn("선택한 2명 배정", "secondary", pin=4) + '<span class="tg-spacer"></span>' +
-            _pin(5) + '<span class="tg-btn ghost">▸ 참여자 배정 변경</span></div></div>'
+            _pin(5) + '<span class="tg-btn ghost">▸ 참여자 배정 변경</span></div></div></div></div>'
         )),
         [
-            ("프로젝트 검색·선택", "왼쪽 목록에서 프로젝트를 고르면 오른쪽에 일정이, 아래에 참여 현황·리포트·배정 화면이 열립니다."),
+            ("프로젝트 검색·선택", "회사명·사업자등록번호·프로젝트명·교육명으로 찾습니다. 프로젝트를 고르면 오른쪽에 일정과 참여자 배정이, 그 아래에 참여 현황·리포트가 열립니다."),
             ("배정 현황 표", "배정된 참여자별로 교육 전·후 검사 완료 여부를 확인합니다. 이름·아이디·부서·직급으로 검색할 수 있습니다."),
             ("추가할 참여자", "아직 배정되지 않은 우리 회사 참여자를 여러 명 고릅니다. 계정이 없으면 먼저 참여자 계정 메뉴에서 발급하세요."),
             ("선택한 N명 배정", "누르면 즉시 배정되고, 참여자가 로그인하면 내 교육 목록에 표시됩니다."),
@@ -386,15 +409,15 @@ def _participant_steps() -> list[str]:
             _field("로그인 ID", "1234567890-user001", pin=1) + _field("비밀번호", "••••", pin=2) +
             _btn("로그인", pin=3, full=True) + '</div>'
             '<div class="tg-card"><div class="tg-title">처음 사용할 비밀번호 설정</div>' +
-            _field("현재 비밀번호", "••••", pin=4) + _field("새 비밀번호", "••••••••") + _field("새 비밀번호 확인", "••••••••") +
+            _field("새 비밀번호", "••••••••", pin=4) + _field("새 비밀번호 확인", "••••••••") +
             _btn("비밀번호 저장", pin=5, full=True) + '</div></div>'
         )),
         [
             ("로그인 ID", "전달받은 아이디를 <b>앞부분까지 전부</b> 입력하세요 (예: 1234567890-user001). 이메일 주소가 아닙니다."),
             ("비밀번호", "처음에는 교육담당자가 알려준 임시 비밀번호를 입력합니다."),
             ("로그인", "로그인하면 바로 비밀번호 설정 화면이 열립니다."),
-            ("현재 비밀번호", "방금 입력한 임시 비밀번호를 한 번 더 입력합니다."),
-            ("새 비밀번호 저장", "3~128자로 본인만 아는 비밀번호를 정합니다. 저장하면 내 교육 화면으로 이동합니다."),
+            ("새 비밀번호", "3~128자로 본인만 아는 비밀번호를 두 번 입력합니다. 방금 로그인했으므로 임시 비밀번호는 다시 입력하지 않습니다."),
+            ("비밀번호 저장", "저장하면 내 교육 화면으로 이동합니다. 나중에 비밀번호를 바꿀 때는 프로필 메뉴에서 현재 비밀번호와 함께 변경합니다."),
         ],
     ))
 
@@ -426,17 +449,18 @@ def _participant_steps() -> list[str]:
             '<span class="tg-sub">5/24문항 저장됨</span></div>'
             '<div class="tg-card"><div class="tg-sub">고객지향 · 문항 6/24 · 최근 8주</div>'
             '<div class="tg-title">고객의 요구를 확인하기 위해 먼저 질문했다.</div>'
-            '<div class="tg-row">' + _pin(3) + '<div class="tg-radio"><span>0. 수행 기회 없음</span><span>1. 전혀 없었다</span>'
-            '<span>2. 드물게 있었다</span><span>3. 가끔 있었다</span><span class="on">4. 자주 있었다</span><span>5. 거의 항상 있었다</span></div></div>'
-            + _btn("저장하고 다음 문항 →", pin=4, full=True) + '</div>'
-            + _btn("← 이전 문항", "ghost", pin=5)
+            '<div class="tg-row">' + _pin(3) + '<div class="tg-scale" style="flex:1"><span>1. 전혀 없었다</span><span>2. 드물게 있었다</span>'
+            '<span class="hover">3. 가끔 있었다</span><span class="on">4. 자주 있었다</span><span>5. 거의 항상 있었다</span></div></div>'
+            '<div class="tg-row">' + _pin(4) + '<span class="tg-zero">0. 수행 기회 없음</span></div>'
+            '<div class="tg-row">' + _btn("← 이전 문항", "ghost", pin=5) + '<span class="tg-spacer"></span>' + _btn("다음 문항 →", "ghost") + '</div></div>'
         )),
         [
             ("내 교육으로 돌아가기", "중간에 나가도 됩니다. 저장된 문항까지는 남아 있어서 다음에 이어서 응답할 수 있습니다."),
             ("진행률", "지금까지 저장된 문항 수입니다."),
-            ("응답 고르기", "1~5는 행동 빈도입니다. 최근 8주 동안 그런 상황 자체가 없었다면 <b>0. 수행 기회 없음</b>을 고르세요. 0은 점수에 포함되지 않습니다."),
-            ("저장하고 다음 문항", "누를 때마다 응답이 서버에 저장됩니다. 마지막 문항에서는 <b>저장하고 제출 준비</b>로 바뀝니다."),
-            ("이전 문항", "앞 문항으로 돌아가 응답을 고칠 수 있습니다 (최종 제출 전까지)."),
+            ("1~5 중 고르기", "왼쪽에서 오른쪽으로 갈수록 자주 한 것입니다. 마우스를 올리면 연한 초록, 고르면 진한 초록으로 채워집니다. "
+             "<b>클릭하는 즉시 저장되고 다음 문항으로 넘어가므로 따로 저장 버튼이 없습니다.</b>"),
+            ("0. 수행 기회 없음", "최근 8주 동안 그런 상황 자체가 없었다면 막대 아래의 이 버튼을 고르세요. 0은 점수에 포함되지 않습니다."),
+            ("이전 문항 · 다음 문항", "앞 문항으로 돌아가 응답을 고칠 수 있습니다 (최종 제출 전까지). 이미 답한 문항은 ‘다음 문항’으로 그대로 넘어갈 수 있습니다."),
         ],
         note="정답이 있는 시험이 아닙니다. 잘하고 싶은 모습이 아니라 <b>실제로 한 행동</b>을 기준으로 솔직하게 응답해 주세요.",
     ))
@@ -450,14 +474,18 @@ def _participant_steps() -> list[str]:
             + _btn("교육 전 검사 최종 제출", pin=2, full=True) +
             '<div class="tg-card"><div class="tg-sub">교육 후 검사에만 표시</div><div class="tg-title">현업전이 환경 확인</div>'
             '<div class="tg-sub">교육에서 배운 내용을 업무에 적용할 기회가 있었다.</div>'
-            '<div class="tg-radio"><span>1</span><span>2</span><span>3</span><span class="on">4. 그런 편이다</span><span>5</span></div>'
+            '<div class="tg-scale"><span>1. 전혀 그렇지 않다</span><span>2. 그렇지 않은 편이다</span><span>3. 보통이다</span>'
+            '<span class="on">4. 그런 편이다</span><span>5. 매우 그렇다</span></div>'
+            '<div class="tg-sub">적용을 방해한 요인(복수 선택)</div><div class="tg-checks">'
+            '<span class="on">적용 기회 부족</span><span>상사·동료 지원 부족</span><span>도구·정보·권한 부족</span>'
+            '<span class="on">시간·프로세스 제약</span><span>특별한 방해요인 없음</span></div>'
             '<div class="tg-row">' + _btn("현업전이 응답 임시저장", "secondary", pin=3) + '</div>'
             + _btn("교육 후 검사 최종 제출", pin=4, full=True) + '</div>'
         )),
         [
             ("역량문항 응답 수정", "제출 전에 첫 문항부터 다시 보며 응답을 고칠 수 있습니다."),
             ("교육 전 검사 최종 제출", "누르면 교육 전 검사가 끝나고, 나의 교육 전 검사 결과를 바로 볼 수 있습니다."),
-            ("현업전이 응답 임시저장", "교육 후 검사에서만 나옵니다. 배운 내용을 적용할 기회·상사 지원·자원·업무 여건 4문항과 방해요인, 적용 사례(선택)를 적습니다. 이 응답은 역량 점수에 합산되지 않습니다."),
+            ("현업전이 응답 임시저장", "교육 후 검사에서만 나옵니다. 배운 내용을 적용할 기회·상사 지원·자원·업무 여건 4문항(1~5 막대)과 방해요인(체크박스로 여러 개 선택), 적용 사례(선택)를 적습니다. 이 응답은 역량 점수에 합산되지 않습니다."),
             ("교육 후 검사 최종 제출", "현업전이 4문항에 모두 답해야 제출됩니다."),
         ],
         note="<b>최종 제출한 응답은 수정할 수 없습니다.</b> 제출 전에 한 번 더 확인해 주세요.",

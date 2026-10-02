@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import os
+from typing import Any
 
 import streamlit as st
 
@@ -38,10 +39,25 @@ def clear_identity() -> None:
     forget_restored_cookie()
 
 
-def _notice() -> None:
-    message = st.session_state.pop("_tap_account_notice", "")
-    if message:
-        st.success(message)
+EXPIRED_KEY = "_tap_login_expired"
+
+
+EXPIRED_MESSAGE = "로그인이 만료되었거나 계정 상태가 변경되었습니다. 다시 로그인해 주세요."
+
+
+def _notice() -> Any:
+    """Render the fixed message slot above the page and return it for later writes."""
+    # A fixed slot keeps the login card at the same position on every rerun.
+    slot = st.container(key="tap_portal_notice")
+    with slot:
+        message = st.session_state.pop("_tap_account_notice", "")
+        if message:
+            st.success(message)
+        # Stays until the next successful login (clear_identity) so that the
+        # login submit rerun does not remove it and shift the card.
+        if st.session_state.get(EXPIRED_KEY):
+            st.info(EXPIRED_MESSAGE)
+    return slot
 
 
 def _login(store: AccountStore | None) -> None:
@@ -79,7 +95,9 @@ def _password_change(store: AccountStore, token: str, required: bool) -> None:
     st.subheader("처음 사용할 비밀번호 설정" if required else "비밀번호 변경")
     st.caption("3~128자로 설정해 주세요. 담당자는 기존 비밀번호를 조회할 수 없습니다.")
     with st.form("_tap_change_password", clear_on_submit=True):
-        old = st.text_input("현재 비밀번호", type="password", max_chars=128)
+        # The first change follows a login with the issued temporary password,
+        # so asking for it again adds nothing; the store allows this only then.
+        old = None if required else st.text_input("현재 비밀번호", type="password", max_chars=128)
         new = st.text_input("새 비밀번호", type="password", max_chars=128)
         confirm = st.text_input("새 비밀번호 확인", type="password", max_chars=128)
         submitted = st.form_submit_button("비밀번호 저장", type="primary")
@@ -115,7 +133,7 @@ def render_portal(route: str | None = None, *, routed: bool = False) -> None:
         st.title("KMA TAP")
         st.error("계정 서비스에 연결하지 못했습니다. 잠시 후 다시 이용해 주세요.")
         st.stop()
-    _notice()
+    notice = _notice()
     token = st.session_state.get(TOKEN_KEY)
     if not isinstance(token, str) or not token:
         _login(store)
@@ -123,12 +141,16 @@ def render_portal(route: str | None = None, *, routed: bool = False) -> None:
     try:
         principal = store.principal(token)
     except AccountError:
-        from tap.session_cookie import sync_cookie
+        from tap.session_cookie import cookie_update_script
 
         clear_identity()
-        sync_cookie(TOKEN_KEY)
-        st.info("로그인이 만료되었거나 계정 상태가 변경되었습니다. 다시 로그인해 주세요.")
+        st.session_state[EXPIRED_KEY] = True
+        with notice:
+            st.info(EXPIRED_MESSAGE)
         _login(store)
+        # Delete the stale cookie after the card: an element that exists only in
+        # this run must not sit above the card, or the next run would shift it.
+        st.html(cookie_update_script(TOKEN_KEY), unsafe_allow_javascript=True)
         return
     except Exception:
         st.error("계정 상태를 확인하지 못했습니다. 잠시 후 새로고침해 주세요.")
