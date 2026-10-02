@@ -118,6 +118,9 @@ class AccountCatalogTests(unittest.TestCase):
         self.assertEqual((own[full["id"]]["assigned"], own[full["id"]]["pre_completed"], own[full["id"]]["post_completed"]), (1, 1, 1))
         self.assertEqual(own[empty["id"]]["assigned"], 0)
         self.assertEqual(own[full["id"]]["company_name"], self.a["name"])
+        # Dashboards search by business registration number, so both lists carry it.
+        self.assertEqual(own[full["id"]]["company_registration_number"], self.a["slug"])
+        self.assertEqual({row["company_registration_number"] for row in admin["company_participation"]}, {self.a["slug"], self.b["slug"]})
         self.assertEqual(own[full["id"]]["config"], full["config"])
         with self.assertRaises(AuthorizationError):
             self.store.dashboard_summary(token)
