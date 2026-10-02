@@ -307,23 +307,22 @@ def _manager_steps() -> list[str]:
 
     steps.append(_step(
         "STEP 4 · 프로젝트 메뉴", "참여자 배정하기",
-        "왼쪽에서 프로젝트를 고르면 오른쪽 <b>프로젝트 상세</b> 바로 아래에 <b>참여자 배정</b>이 열립니다. 배정된 참여자만 검사 화면에서 이 교육을 볼 수 있습니다.",
+        "왼쪽에서 프로젝트를 고르면 오른쪽에 일정이 보이고, 그 바로 아래에 <b>참여자 배정</b>이 화면 전체 폭으로 열립니다. 배정된 참여자만 검사 화면에서 이 교육을 볼 수 있습니다.",
         _frame("프로젝트", (
             '<div class="tg-split"><div class="tg-card">' + _field("프로젝트 검색", "회사명, 사업자등록번호, 프로젝트명, 교육명으로 검색", pin=1, placeholder=True) +
             f'<div class="tg-list-item on">2026 하반기 CS 역량 과정<div class="tg-sub">{SAMPLE_PROJECT}</div></div>'
             '<div class="tg-list-item">리더십 기본 과정<div class="tg-sub">신임 팀장 교육</div></div></div>'
-            '<div style="display:flex;flex-direction:column;gap:10px">'
             '<div class="tg-card"><div class="tg-sub">프로젝트 상세</div><div class="tg-title">2026 하반기 CS 역량 과정</div>'
-            '<div class="tg-sub">교육일 2026-11-12 · 사전검사 11-01 ~ 11-10 · 사후검사 2027-01-11 ~ 01-18</div></div>'
+            '<div class="tg-sub">교육일 2026-11-12<br>사전검사 11-01 ~ 11-10<br>사후검사 2027-01-11 ~ 01-18</div></div></div>'
             '<div class="tg-card"><div class="tg-row">' + _pin(2) + '<div class="tg-title">참여자 배정</div></div>' +
-            _table(("이름", "배정", "교육 전", "교육 후"),
-                   (("홍길동", "배정 중", "완료", "미완료"), ("김하나", "배정 중", "미완료", "미완료"))) +
-            _field("추가할 참여자", "이민수 · user003 ✕  박서연 · user004 ✕", pin=3) +
+            _table(("이름", "부서", "배정 상태", "교육 전", "교육 후"),
+                   (("홍길동", "고객서비스팀", "배정 중", "완료", "미완료"), ("김하나", "매장운영팀", "배정 중", "미완료", "미완료"))) +
+            '<div class="tg-row">' + _field("추가할 참여자", "이민수 · user003 ✕   박서연 · user004 ✕", pin=3) + '</div>' +
             '<div class="tg-row">' + _btn("선택한 2명 배정", "secondary", pin=4) + '<span class="tg-spacer"></span>' +
-            _pin(5) + '<span class="tg-btn ghost">▸ 참여자 배정 변경</span></div></div></div></div>'
+            _pin(5) + '<span class="tg-btn ghost">▸ 참여자 배정 변경</span></div></div>'
         )),
         [
-            ("프로젝트 검색·선택", "회사명·사업자등록번호·프로젝트명·교육명으로 찾습니다. 프로젝트를 고르면 오른쪽에 일정과 참여자 배정이, 그 아래에 참여 현황·리포트가 열립니다."),
+            ("프로젝트 검색·선택", "회사명·사업자등록번호·프로젝트명·교육명으로 찾습니다. 프로젝트를 고르면 오른쪽에 일정이, 바로 아래에 참여자 배정과 참여 현황·리포트가 차례로 열립니다."),
             ("배정 현황 표", "배정된 참여자별로 교육 전·후 검사 완료 여부를 확인합니다. 이름·아이디·부서·직급으로 검색할 수 있습니다."),
             ("추가할 참여자", "아직 배정되지 않은 우리 회사 참여자를 여러 명 고릅니다. 계정이 없으면 먼저 참여자 계정 메뉴에서 발급하세요."),
             ("선택한 N명 배정", "누르면 즉시 배정되고, 참여자가 로그인하면 내 교육 목록에 표시됩니다."),
