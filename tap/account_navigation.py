@@ -21,10 +21,11 @@ MENUS = {
         ("question_bank", "문항은행·검수", ":material/library_books:"),
     ),
     "company": (
+        # Work order: issue participant accounts, create a project, then assign in it.
         ("dashboard", "대시보드", ":material/dashboard:"),
-        ("projects", "프로젝트", ":material/folder_open:"),
-        ("create_project", "프로젝트 만들기", ":material/add_circle:"),
         ("accounts", "참여자 계정", ":material/group:"),
+        ("create_project", "프로젝트 만들기", ":material/add_circle:"),
+        ("projects", "프로젝트", ":material/folder_open:"),
     ),
     "participant": (("assessments", "내 교육", ":material/assignment:"),),
 }

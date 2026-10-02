@@ -49,19 +49,25 @@ def forget_restored_cookie() -> None:
     st.session_state[CHECKED_KEY] = True
 
 
-def sync_cookie(token_key: str) -> None:
-    """Write or delete the browser cookie when the session token changed."""
+def cookie_update_script(token_key: str) -> str:
+    """Return the script that brings the browser cookie in line with the session, or ""."""
     desired = _valid(st.session_state.get(token_key))
     if st.session_state.get(SYNCED_KEY) == desired:
-        return
+        return ""
     st.session_state[SYNCED_KEY] = desired
     if desired:
         cookie = f"{COOKIE_NAME}={desired}; Path=/; Max-Age={SESSION_SECONDS}; SameSite=Strict"
     else:
         cookie = f"{COOKIE_NAME}=; Path=/; Max-Age=0; SameSite=Strict"
+    return f"<script>document.cookie = {cookie!r} + (location.protocol === 'https:' ? '; Secure' : '');</script>"
+
+
+def sync_cookie(token_key: str) -> None:
+    """Write or delete the browser cookie when the session token changed."""
+    script = cookie_update_script(token_key)
+    # Always emit this slot. Adding it only on some reruns shifts every later
+    # element, and the shifted login card briefly showed twice while Streamlit
+    # kept the stale copy until the slow password check finished.
     with st.container(key="tap_session_cookie_sync"):
-        st.html(
-            "<style>.st-key-tap_session_cookie_sync{display:none}</style>"
-            f"<script>document.cookie = {cookie!r} + (location.protocol === 'https:' ? '; Secure' : '');</script>",
-            unsafe_allow_javascript=True,
-        )
+        st.html("<style>.st-key-tap_session_cookie_sync{display:none}</style>" + script,
+                unsafe_allow_javascript=True)

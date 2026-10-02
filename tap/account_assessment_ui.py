@@ -322,7 +322,7 @@ def _render_question(store: Any, token: str, assignment_id: str, phase: str, que
     with st.container(border=True, key=PREFIX + "question_stage"):
         st.caption(f"{question['factor_name_ko']} · 문항 {cursor + 1}/{len(questions)} · 최근 8주")
         st.subheader(question["revised_text"])
-        st.write("얼마나 자주 했습니까? 해당 행동을 할 상황이 없었다면 0을 선택하세요. 선택하면 자동으로 저장되고 다음 문항으로 넘어갑니다.")
+        st.write("얼마나 자주 했습니까? 1~5 중에서 고르세요. 해당 행동을 할 상황이 없었다면 아래 '0. 수행 기회 없음'을 선택하세요. 선택하면 자동으로 저장되고 다음 문항으로 넘어갑니다.")
         # One click saves and advances; no separate save button.
         submit_args = (store, token, assignment_id, st.session_state[PREFIX + "owner"], phase, cursor, code, codes)
         response_key = PREFIX + f"{phase}_response_{code}"

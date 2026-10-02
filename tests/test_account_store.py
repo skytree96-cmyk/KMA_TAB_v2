@@ -386,6 +386,17 @@ class AccountStoreTests(unittest.TestCase):
         self.assertEqual(len(self.store.list_assignments(token)), 2)
 
 
+    def test_first_password_change_skips_current_password_only_while_forced(self):
+        record = self.store.create_user(self.admin, self.a["slug"] + "-first", "첫 로그인", "participant", self.a["id"], INITIAL)
+        forced = self.store.login(record["login_id"], INITIAL)
+        token = self.store.change_password(forced, None, CHANGED)
+        self.assertFalse(self.store.principal(token)["must_change_password"])
+        # Once the forced change is done, a later change must prove the current password.
+        with self.assertRaises(AuthenticationError):
+            self.store.change_password(token, None, "다른-비밀번호")
+        self.store.change_password(token, CHANGED, "다른-비밀번호")
+
+
 class AccountProfileMigrationTests(unittest.TestCase):
     def test_old_schema_gains_empty_profile_columns_without_changing_existing_user(self):
         schema = (Path(__file__).resolve().parents[1] / "database" / "account_schema.sql").read_text(encoding="utf-8")

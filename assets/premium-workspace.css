@@ -142,7 +142,7 @@
 .tap-phase-status .is-done {color: var(--green); background: var(--green-pale);}
 .tap-phase-status .is-todo {color: var(--muted); background: var(--surface-soft); box-shadow: inset 0 0 0 1px var(--line);}
 
-/* Participant assessment: white question card, answer chips in a 3-column grid. */
+/* Participant assessment: white question card. */
 .stApp:has(.tap-assessment-focus) {background: var(--canvas);}
 .stApp:has(.tap-assessment-focus) .st-key-_tap_participant_question_stage {
   padding: 30px 32px;
@@ -155,26 +155,53 @@
 .stApp:has(.tap-assessment-focus) [data-testid="stProgressBarTrack"] {height: 6px; border-radius: 99px; background: #e4ebea; overflow: hidden;}
 .stApp:has(.tap-assessment-focus) [data-testid="stProgressBarTrack"] > div {border-radius: 99px; background: var(--brand);}
 .stApp:has(.tap-assessment-focus) [data-testid="stProgress"] p {font-size: var(--fs-xs); font-weight: 700; color: var(--brand);}
-.stApp:has(.tap-assessment-focus) .st-key-_tap_participant_question_stage [data-testid="stElementContainer"]:has([data-testid="stRadio"]),
-.stApp:has(.tap-assessment-focus) .st-key-_tap_participant_question_stage [data-testid="stRadio"],
-.stApp:has(.tap-assessment-focus) .st-key-_tap_participant_question_stage [data-testid="stRadio"] > div {width: 100% !important; max-width: none;}
-.stApp:has(.tap-assessment-focus) .st-key-_tap_participant_question_stage [data-testid="stRadioGroup"] {
-  display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; width: 100%;
-}
-.stApp:has(.tap-assessment-focus) .st-key-_tap_participant_question_stage [data-testid="stRadioOption"] {
-  box-sizing: border-box; width: 100%; min-height: 56px; margin: 0; padding: 12px 16px;
-  border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface); cursor: pointer;
-  transition: border-color .14s ease, background .14s ease;
-}
-.stApp:has(.tap-assessment-focus) .st-key-_tap_participant_question_stage [data-testid="stRadioOption"]:hover {border-color: var(--line-strong); background: var(--surface-soft);}
-.stApp:has(.tap-assessment-focus) .st-key-_tap_participant_question_stage [data-testid="stRadioOption"]:is([data-selected="true"],:has(input:checked)) {
-  border-color: var(--brand); background: var(--brand-pale); box-shadow: inset 0 0 0 1px var(--brand);
-}
-.stApp:has(.tap-assessment-focus) .st-key-_tap_participant_question_stage [data-testid="stRadioOption"] p {font-size: var(--fs-base); font-weight: 600;}
-.stApp:has(.tap-assessment-focus) .st-key-_tap_participant_question_stage [data-testid="stRadioOption"]:focus-within {outline: 2px solid var(--brand); outline-offset: 2px;}
 @media (max-width: 640px) {
   .stApp:has(.tap-assessment-focus) .st-key-_tap_participant_question_stage {padding: 20px 16px;}
-  .stApp:has(.tap-assessment-focus) .st-key-_tap_participant_question_stage [data-testid="stRadioGroup"] {grid-template-columns: repeat(2, minmax(0, 1fr));}
+}
+
+/* Answer scales: 1-5 as one joined segmented bar read left to right; 0 ("no
+   opportunity") sits apart below it. Hover tints green, the choice fills green. */
+.stApp :is(.st-key-_tap_participant_likert_scale,.st-key-_tap_participant_transfer_scale) [data-testid="stElementContainer"]:has([data-testid="stRadio"]),
+.stApp :is(.st-key-_tap_participant_likert_scale,.st-key-_tap_participant_transfer_scale) [data-testid="stRadio"],
+.stApp :is(.st-key-_tap_participant_likert_scale,.st-key-_tap_participant_transfer_scale) [data-testid="stRadio"] > div {width: 100% !important; max-width: none;}
+.stApp :is(.st-key-_tap_participant_likert_scale,.st-key-_tap_participant_transfer_scale) [data-testid="stRadioGroup"] {
+  display: grid !important; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 0; width: 100%;
+}
+.stApp :is(.st-key-_tap_participant_likert_scale,.st-key-_tap_participant_transfer_scale) [data-testid="stRadioOption"] {
+  position: relative; box-sizing: border-box; display: flex; align-items: center; justify-content: center;
+  width: 100%; min-width: 0; min-height: 64px; margin: 0 0 0 -1px; padding: 10px 8px;
+  border: 1px solid var(--line-strong); border-radius: 0; background: #f4f7f7; box-shadow: none;
+  text-align: center; cursor: pointer; transition: background .12s ease, color .12s ease, border-color .12s ease;
+}
+/* Hide the circle: the whole cell is the target and the fill shows the choice. */
+.stApp :is(.st-key-_tap_participant_likert_scale,.st-key-_tap_participant_transfer_scale) [data-testid="stRadioOption"] div:has(> [data-testid="stMarkdownContainer"]) > div:first-child {display: none;}
+.stApp :is(.st-key-_tap_participant_likert_scale,.st-key-_tap_participant_transfer_scale) [data-testid="stRadioOption"] [data-testid="stMarkdownContainer"] {width: 100%;}
+.stApp :is(.st-key-_tap_participant_likert_scale,.st-key-_tap_participant_transfer_scale) [data-testid="stRadioOption"] p {
+  font-size: var(--fs-base); font-weight: 600; line-height: 1.35; color: var(--ink-soft); word-break: keep-all; text-align: center;
+}
+.stApp .st-key-_tap_participant_likert_scale [data-testid="stRadioOption"]:nth-child(2),
+.stApp .st-key-_tap_participant_transfer_scale [data-testid="stRadioOption"]:nth-child(1) {margin-left: 0; border-radius: 14px 0 0 14px;}
+.stApp .st-key-_tap_participant_likert_scale [data-testid="stRadioOption"]:nth-child(6),
+.stApp .st-key-_tap_participant_transfer_scale [data-testid="stRadioOption"]:nth-child(5) {border-radius: 0 14px 14px 0;}
+.stApp :is(.st-key-_tap_participant_likert_scale,.st-key-_tap_participant_transfer_scale) [data-testid="stRadioOption"]:hover {
+  z-index: 1; border-color: #7cc4ba; background: #dff2ee;
+}
+.stApp :is(.st-key-_tap_participant_likert_scale,.st-key-_tap_participant_transfer_scale) [data-testid="stRadioOption"]:hover p {color: var(--brand-deep);}
+.stApp :is(.st-key-_tap_participant_likert_scale,.st-key-_tap_participant_transfer_scale) [data-testid="stRadioOption"]:is([data-selected="true"],:has(input:checked)) {
+  z-index: 2; border-color: var(--brand); background: var(--brand);
+}
+.stApp :is(.st-key-_tap_participant_likert_scale,.st-key-_tap_participant_transfer_scale) [data-testid="stRadioOption"]:is([data-selected="true"],:has(input:checked)) p {color: #fff; font-weight: 700;}
+.stApp :is(.st-key-_tap_participant_likert_scale,.st-key-_tap_participant_transfer_scale) [data-testid="stRadioOption"]:focus-within {z-index: 3; outline: 2px solid var(--brand); outline-offset: 2px;}
+/* 0 = no opportunity to show the behaviour: a separate pill under the bar. */
+.stApp .st-key-_tap_participant_likert_scale [data-testid="stRadioOption"]:nth-child(1) {
+  order: 2; grid-column: 1 / -1; justify-self: start; width: auto; min-height: 44px; margin: 14px 0 0;
+  padding: 8px 18px; border-style: dashed; border-radius: 999px; background: var(--surface);
+}
+.stApp .st-key-_tap_participant_likert_scale [data-testid="stRadioOption"]:nth-child(1) p {font-size: var(--fs-sm);}
+@media (max-width: 640px) {
+  .stApp :is(.st-key-_tap_participant_likert_scale,.st-key-_tap_participant_transfer_scale) [data-testid="stRadioOption"] {min-height: 72px; padding: 8px 4px;}
+  .stApp :is(.st-key-_tap_participant_likert_scale,.st-key-_tap_participant_transfer_scale) [data-testid="stRadioOption"] p {font-size: 12px;}
+  .stApp .st-key-_tap_participant_likert_scale [data-testid="stRadioOption"]:nth-child(1) {min-height: 40px;}
 }
 
 @media (prefers-reduced-motion: reduce) {
