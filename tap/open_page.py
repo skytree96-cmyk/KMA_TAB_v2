@@ -52,9 +52,12 @@ PUBLIC_PAGE_CSS = """
 
 @lru_cache(maxsize=1)
 def _rendered_open_page_html() -> str:
-    """Return the landing page with one in-memory PDF download payload."""
+    """Render local app links and a PDF payload without changing the static source."""
 
     source = OPEN_PAGE_PATH.read_text(encoding="utf-8")
+    # The standalone landing page links to Community Cloud. When rendered inside
+    # Streamlit, use the current host so Render and local deployments stay local.
+    source = source.replace('href="https://kmatap.streamlit.app/', 'href="/')
     if source.count(GUIDE_PDF_BASE64_TOKEN) != 1:
         raise ValueError("사용설명서 다운로드 토큰은 오픈페이지에 정확히 1개여야 합니다.")
     encoded_guide = base64.b64encode(GUIDE_PDF_PATH.read_bytes()).decode("ascii")

@@ -1,0 +1,34 @@
+# KMA TAP account deployment. Free database is for the initial 30-day validation.
+services:
+  - type: web
+    name: kmatap
+    repo: https://github.com/skytree96-cmyk/KMA_TAB_v2
+    branch: codex/production-accounts
+    runtime: python
+    plan: free
+    region: singapore
+    buildCommand: python -m pip install -r requirements.txt && python scripts/brand_streamlit_shell.py
+    startCommand: python scripts/start_accounts.py
+    healthCheckPath: /_stcore/health
+    autoDeployTrigger: "off"
+    envVars:
+      - key: TAP_POSTGRES_PREFLIGHT
+        value: "0"
+      - key: TAP_APP_MODE
+        value: production
+      - key: GITHUB_DEMO_STORE_ENABLED
+        value: "false"
+      - key: DATABASE_URL
+        fromDatabase:
+          name: kmatap-db
+          property: connectionString
+      - key: BOOTSTRAP_ADMIN_LOGIN
+        value: kma.admin
+      - key: BOOTSTRAP_ADMIN_PASSWORD_HASH
+        sync: false
+
+databases:
+  - name: kmatap-db
+    plan: free
+    region: singapore
+    ipAllowList: []

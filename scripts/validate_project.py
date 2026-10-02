@@ -30,6 +30,10 @@ BINARY_RELEASE_SUFFIXES = {
     ".png",
     ".pptx",
     ".webp",
+    ".woff2",
+    ".woff",
+    ".ttf",
+    ".otf",
     ".xlsx",
     ".zip",
 }

@@ -1,0 +1,240 @@
+/* Signed-in workspace on the PAI pattern. Loaded after workspace-ui.css. */
+.stApp:has(.st-key-tap_workspace_topbar) {
+  --tap-workspace-surface: var(--surface);
+  --tap-workspace-border: var(--line);
+  --tap-workspace-selected: var(--brand-pale);
+  --tap-workspace-soft: var(--surface-soft);
+  background: var(--canvas);
+}
+
+/* App header: dark brand bar with light navigation, as PAI's .app-header. */
+.stApp:has(.st-key-tap_workspace_topbar) .st-key-tap_workspace_topbar {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  border-bottom: 1px solid rgb(255 255 255 / .2);
+  background:
+    radial-gradient(ellipse at 12% 0%, rgb(150 222 212 / .22), transparent 48%),
+    linear-gradient(110deg, #0f8c85, var(--brand) 55%, var(--brand-deep));
+  box-shadow: 0 6px 24px rgb(10 63 60 / .14);
+}
+.stApp:has(.st-key-tap_workspace_topbar) .st-key-tap_workspace_brand .tap-ci {--ci-kma: #fff; --ci-tap: #c8f1ea; --ci-caption: #d3ebe7;}
+.stApp:has(.st-key-tap_workspace_topbar) .st-key-tap_workspace_nav [data-testid="stButton"] button {
+  color: #d3ebe7;
+  font-weight: 600;
+}
+.stApp:has(.st-key-tap_workspace_topbar) .st-key-tap_workspace_nav [data-testid="stButton"] button p {font-size: var(--fs-base);}
+.stApp:has(.st-key-tap_workspace_topbar) .st-key-tap_workspace_nav [data-testid="stButton"] button:hover,
+.stApp:has(.st-key-tap_workspace_topbar) .st-key-tap_workspace_nav [data-testid="stButton"] button[kind^="primary"] {
+  color: #fff;
+  background: rgb(255 255 255 / .08);
+}
+.stApp:has(.st-key-tap_workspace_topbar) .st-key-tap_workspace_nav [data-testid="stButton"] button[kind^="primary"]::after {
+  height: 3px;
+  background: var(--canvas);
+  box-shadow: none;
+}
+.stApp:has(.st-key-tap_workspace_topbar) .st-key-tap_workspace_profile button {color: #eef8f6; border-color: transparent;}
+.stApp:has(.st-key-tap_workspace_topbar) .st-key-tap_workspace_profile button:hover,
+.stApp:has(.st-key-tap_workspace_topbar) .st-key-tap_workspace_profile button[aria-expanded="true"] {background: rgb(255 255 255 / .1);}
+.stApp:has(.st-key-tap_workspace_topbar) .st-key-tap_workspace_profile [data-testid="stIconMaterial"] {color: inherit;}
+
+/* Page header: small context line and a compact title (PAI .topbar__context). */
+.stApp:has(.st-key-tap_workspace_topbar) .st-key-tap_workspace_main {padding-top: 26px; gap: 18px;}
+.stApp:has(.st-key-tap_workspace_topbar) .st-key-tap_workspace_breadcrumb p {
+  margin: 0;
+  font-size: var(--fs-xs) !important;
+  font-weight: 500;
+  color: var(--muted) !important;
+}
+.stApp:has(.st-key-tap_workspace_topbar) .st-key-tap_workspace_main h1 {
+  font-size: var(--fs-xl);
+  font-weight: 700;
+  line-height: 1.35;
+  color: var(--ink);
+}
+.stApp:has(.st-key-tap_workspace_topbar) .st-key-tap_workspace_main h3 {font-size: var(--fs-lg); font-weight: 700;}
+.stApp:has(.st-key-tap_workspace_topbar) .st-key-tap_workspace_main p {font-size: var(--fs-base); line-height: 1.6;}
+.stApp:has(.st-key-tap_workspace_topbar) .st-key-tap_workspace_main [data-testid="stCaptionContainer"] p {font-size: var(--fs-sm); line-height: 1.55;}
+.stApp:has(.st-key-tap_workspace_topbar) .st-key-tap_workspace_main [data-testid="stWidgetLabel"] p {font-size: var(--fs-sm); font-weight: 600; color: var(--ink-soft);}
+
+/* Surfaces: solid white, 1px line, small shadow, 18px radius. */
+.stApp:has(.st-key-tap_workspace_topbar) :is(
+  .st-key-tap_workspace_project_list,.st-key-tap_workspace_project_detail,
+  .st-key-tap_workspace_account_list,.st-key-tap_workspace_account_detail,
+  .st-key-tap_workspace_project_reports,.st-key-tap_workspace_assignments,
+  .st-key-account_dashboard_participation,.st-key-account_dashboard_ranking,.st-key-account_dashboard_trend,
+  .st-key-account_dashboard_schedule,.st-key-account_dashboard_projects,
+  .st-key-_tap_participant_project_card),
+.stApp:has(.st-key-tap_workspace_topbar) [class*="st-key-account_dashboard_"][data-testid="stVerticalBlockBorderWrapper"],
+.stApp:has(.st-key-tap_workspace_topbar) .st-key-tap_workspace_main [data-testid="stForm"] {
+  padding: 24px 26px !important;
+  border: 1px solid var(--line) !important;
+  border-radius: var(--radius-lg) !important;
+  background: var(--surface) !important;
+  box-shadow: var(--shadow-sm) !important;
+}
+.stApp:has(.st-key-tap_workspace_topbar) .st-key-_tap_participant_question_stage [data-testid="stForm"] {
+  padding: 0 !important; border: 0 !important; background: transparent !important; box-shadow: none !important;
+}
+.stApp:has(.st-key-tap_workspace_topbar) [class*="st-key-account_dashboard_"] h3 {font-size: var(--fs-lg); font-weight: 700; color: var(--ink);}
+
+/* KPI cards rendered by account_dashboard._kpis (PAI .kpi-card). */
+.tap-kpi-grid {display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px;}
+.tap-kpi {
+  min-width: 0;
+  padding: 20px 22px 18px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+}
+.tap-kpi--accent {border-color: var(--line-strong);}
+.tap-kpi__head {display: flex; align-items: center; justify-content: space-between; gap: 10px; color: var(--ink-soft); font-size: var(--fs-sm); font-weight: 600;}
+.tap-kpi__icon {
+  width: 30px; height: 30px; flex: none;
+  display: grid; place-items: center;
+  border-radius: 9px;
+  font-family: "Material Symbols Rounded"; font-size: 18px; font-feature-settings: "liga"; letter-spacing: normal;
+  color: var(--kpi-tone, var(--brand)); background: var(--kpi-pale, var(--brand-pale));
+}
+.tap-kpi__value {display: flex; align-items: baseline; gap: 6px; margin: 14px 0 6px; color: var(--ink);}
+.tap-kpi__value strong {font-size: var(--fs-2xl); font-weight: 700; line-height: 1.1; letter-spacing: -.01em; font-variant-numeric: tabular-nums;}
+.tap-kpi__value span {color: var(--muted); font-size: var(--fs-sm); font-weight: 600;}
+.tap-kpi p {margin: 0; color: var(--muted); font-size: var(--fs-xs); line-height: 1.55;}
+.tap-trend {display: inline-block; margin-right: 6px; padding: 2px 7px; border-radius: 999px; font-size: var(--fs-xs); font-weight: 700; color: var(--kpi-tone, var(--brand)); background: var(--kpi-pale, var(--brand-pale));}
+.tap-kpi--brand {--kpi-tone: var(--brand); --kpi-pale: var(--brand-pale);}
+.tap-kpi--indigo {--kpi-tone: var(--indigo); --kpi-pale: var(--indigo-pale);}
+.tap-kpi--violet {--kpi-tone: var(--violet); --kpi-pale: var(--violet-pale);}
+.tap-kpi--amber {--kpi-tone: var(--amber); --kpi-pale: var(--amber-pale);}
+@media (max-width: 980px) {.tap-kpi-grid {grid-template-columns: repeat(2, minmax(0, 1fr));}}
+@media (max-width: 520px) {.tap-kpi-grid {gap: 10px;} .tap-kpi {padding: 16px;} .tap-kpi__value strong {font-size: var(--fs-xl);}}
+
+/* Dashboard overview: both panels share the taller panel's height. */
+.stApp:has(.st-key-tap_workspace_topbar) .st-key-account_dashboard_overview [data-testid="stHorizontalBlock"] {align-items: stretch;}
+.stApp:has(.st-key-tap_workspace_topbar) .st-key-account_dashboard_overview [data-testid="stLayoutWrapper"]:has(> :is(.st-key-account_dashboard_participation,.st-key-account_dashboard_ranking)) {flex: 1 1 auto;}
+.tap-dash-insight {background: var(--surface-soft); border-color: var(--line); color: var(--ink-soft);}
+.tap-dash-track i {background: var(--brand);}
+.tap-dash-ring::before {background: var(--surface);}
+
+/* Selectable list rows (account/project pickers). */
+.stApp:has(.st-key-tap_workspace_topbar) :is(.st-key-tap_workspace_project_list,.st-key-tap_workspace_account_list) [data-testid="stRadioGroup"] {border-top: 1px solid var(--line); gap: 0;}
+.stApp:has(.st-key-tap_workspace_topbar) :is(.st-key-tap_workspace_project_list,.st-key-tap_workspace_account_list) [data-testid="stRadioOption"] {
+  min-height: 64px;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--line);
+  background: transparent;
+}
+.stApp:has(.st-key-tap_workspace_topbar) :is(.st-key-tap_workspace_project_list,.st-key-tap_workspace_account_list) [data-testid="stRadioOption"]:hover {background: var(--surface-soft);}
+.stApp:has(.st-key-tap_workspace_topbar) :is(.st-key-tap_workspace_project_list,.st-key-tap_workspace_account_list) [data-testid="stRadioOption"][data-selected="true"] {background: var(--brand-pale);}
+.stApp:has(.st-key-tap_workspace_topbar) :is(.st-key-tap_workspace_project_list,.st-key-tap_workspace_account_list) [data-testid="stRadioOption"][data-selected="true"]::before {background: var(--brand);}
+.stApp:has(.st-key-tap_workspace_topbar) :is(.st-key-tap_workspace_project_list,.st-key-tap_workspace_account_list) [data-testid="stRadioOption"] [data-testid="stMarkdownContainer"] p {font-size: var(--fs-base); font-weight: 600;}
+.stApp:has(.st-key-tap_workspace_topbar) :is(.st-key-tap_workspace_project_list,.st-key-tap_workspace_account_list) [data-testid="stRadioOption"] [data-testid="stCaptionContainer"] p {font-size: var(--fs-xs);}
+.stApp:has(.st-key-tap_workspace_topbar) .tap-workspace-fields {font-size: var(--fs-sm);}
+.stApp:has(.st-key-tap_workspace_topbar) .tap-workspace-fields dt {font-weight: 600; color: var(--muted);}
+.stApp:has(.st-key-tap_workspace_topbar) [data-testid="stDataFrame"] {border: 1px solid var(--line); border-radius: var(--radius-md);}
+
+/* Participant home card and phase badges. */
+.stApp:has(.st-key-tap_workspace_topbar) .st-key-_tap_participant_project_card {gap: 12px;}
+.tap-phase-status {display: flex; gap: 8px; flex-wrap: wrap; margin: 2px 0 6px;}
+.tap-phase-status span {display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px; border-radius: 999px; font-size: var(--fs-xs); font-weight: 700;}
+.tap-phase-status span::before {content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor;}
+.tap-phase-status .is-done {color: var(--green); background: var(--green-pale);}
+.tap-phase-status .is-todo {color: var(--muted); background: var(--surface-soft); box-shadow: inset 0 0 0 1px var(--line);}
+
+/* Participant assessment: white question card, answer chips in a 3-column grid. */
+.stApp:has(.tap-assessment-focus) {background: var(--canvas);}
+.stApp:has(.tap-assessment-focus) .st-key-_tap_participant_question_stage {
+  padding: 30px 32px;
+  border: 1px solid var(--line);
+  border-radius: 22px;
+  background: var(--surface);
+  box-shadow: var(--shadow-md);
+}
+.stApp:has(.tap-assessment-focus) .st-key-_tap_participant_question_stage h3 {font-size: clamp(20px, 2.2vw, 26px); line-height: 1.45; font-weight: 700;}
+.stApp:has(.tap-assessment-focus) [data-testid="stProgressBarTrack"] {height: 6px; border-radius: 99px; background: #e4ebea; overflow: hidden;}
+.stApp:has(.tap-assessment-focus) [data-testid="stProgressBarTrack"] > div {border-radius: 99px; background: var(--brand);}
+.stApp:has(.tap-assessment-focus) [data-testid="stProgress"] p {font-size: var(--fs-xs); font-weight: 700; color: var(--brand);}
+.stApp:has(.tap-assessment-focus) .st-key-_tap_participant_question_stage [data-testid="stElementContainer"]:has([data-testid="stRadio"]),
+.stApp:has(.tap-assessment-focus) .st-key-_tap_participant_question_stage [data-testid="stRadio"],
+.stApp:has(.tap-assessment-focus) .st-key-_tap_participant_question_stage [data-testid="stRadio"] > div {width: 100% !important; max-width: none;}
+.stApp:has(.tap-assessment-focus) .st-key-_tap_participant_question_stage [data-testid="stRadioGroup"] {
+  display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; width: 100%;
+}
+.stApp:has(.tap-assessment-focus) .st-key-_tap_participant_question_stage [data-testid="stRadioOption"] {
+  box-sizing: border-box; width: 100%; min-height: 56px; margin: 0; padding: 12px 16px;
+  border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface); cursor: pointer;
+  transition: border-color .14s ease, background .14s ease;
+}
+.stApp:has(.tap-assessment-focus) .st-key-_tap_participant_question_stage [data-testid="stRadioOption"]:hover {border-color: var(--line-strong); background: var(--surface-soft);}
+.stApp:has(.tap-assessment-focus) .st-key-_tap_participant_question_stage [data-testid="stRadioOption"]:is([data-selected="true"],:has(input:checked)) {
+  border-color: var(--brand); background: var(--brand-pale); box-shadow: inset 0 0 0 1px var(--brand);
+}
+.stApp:has(.tap-assessment-focus) .st-key-_tap_participant_question_stage [data-testid="stRadioOption"] p {font-size: var(--fs-base); font-weight: 600;}
+.stApp:has(.tap-assessment-focus) .st-key-_tap_participant_question_stage [data-testid="stRadioOption"]:focus-within {outline: 2px solid var(--brand); outline-offset: 2px;}
+@media (max-width: 640px) {
+  .stApp:has(.tap-assessment-focus) .st-key-_tap_participant_question_stage {padding: 20px 16px;}
+  .stApp:has(.tap-assessment-focus) .st-key-_tap_participant_question_stage [data-testid="stRadioGroup"] {grid-template-columns: repeat(2, minmax(0, 1fr));}
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .stApp * {transition: none !important;}
+}
+
+/* Competency picker: checkbox tiles with a section header and live count. */
+.stApp:has(.st-key-tap_workspace_topbar) .st-key-account_admin_factor_picker {
+  gap: 12px;
+  padding: 24px 26px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+}
+.tap-pick-head {display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; margin-top: 8px;}
+.tap-pick-head b {display: block; font-size: var(--fs-base); color: var(--ink);}
+.tap-pick-head span {font-size: var(--fs-sm); color: var(--muted);}
+.tap-pick-head--form {margin-top: 4px;}
+.tap-pick-count {flex: none; padding: 3px 10px; border-radius: 999px; font-size: var(--fs-xs) !important; font-weight: 700; color: var(--brand) !important; background: var(--brand-pale);}
+.tap-pick-count.is-full {color: var(--amber) !important; background: var(--amber-pale);}
+.tap-pick-total {display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 14px; margin-top: 6px; padding: 14px 16px; border-radius: var(--radius-md); background: var(--surface-soft); color: var(--ink-soft); font-size: var(--fs-sm);}
+.tap-pick-total b {color: var(--brand);}
+.tap-pick-total span {color: var(--muted); font-size: var(--fs-xs);}
+.stApp:has(.st-key-tap_workspace_topbar) :is([class*="st-key-account_admin_factor_base_grid"],[class*="st-key-account_admin_specialty_"],[class*="st-key-account_admin_job_"],.st-key-account_admin_priority_grid) [data-testid="stHorizontalBlock"] {gap: 10px;}
+.stApp:has(.st-key-tap_workspace_topbar) :is([class*="st-key-account_admin_factor_base_grid"],[class*="st-key-account_admin_specialty_"],[class*="st-key-account_admin_job_"],.st-key-account_admin_priority_grid) [data-testid="stColumn"] > div {gap: 10px;}
+.stApp:has(.st-key-tap_workspace_topbar) :is([class*="st-key-account_admin_factor_base_grid"],[class*="st-key-account_admin_specialty_"],[class*="st-key-account_admin_job_"],.st-key-account_admin_priority_grid) [data-testid="stCheckbox"] label {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 52px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  cursor: pointer;
+  transition: border-color .14s ease, background .14s ease;
+}
+.stApp:has(.st-key-tap_workspace_topbar) :is([class*="st-key-account_admin_factor_base_grid"],[class*="st-key-account_admin_specialty_"],[class*="st-key-account_admin_job_"],.st-key-account_admin_priority_grid) [data-testid="stCheckbox"] label:hover {border-color: var(--line-strong); background: var(--surface-soft);}
+.stApp:has(.st-key-tap_workspace_topbar) :is([class*="st-key-account_admin_specialty_"],[class*="st-key-account_admin_job_"],.st-key-account_admin_priority_grid) [data-testid="stCheckbox"] label:has(input:checked) {
+  border-color: var(--brand);
+  background: var(--brand-pale);
+  box-shadow: inset 0 0 0 1px var(--brand);
+}
+.stApp:has(.st-key-tap_workspace_topbar) [class*="st-key-account_admin_factor_base_grid"] [data-testid="stCheckbox"] label {background: var(--surface-soft); cursor: default;}
+.stApp:has(.st-key-tap_workspace_topbar) :is([class*="st-key-account_admin_specialty_"],[class*="st-key-account_admin_job_"]) [data-testid="stCheckbox"] label:has(input:disabled:not(:checked)) {opacity: .5; cursor: not-allowed;}
+.stApp:has(.st-key-tap_workspace_topbar) :is([class*="st-key-account_admin_factor_base_grid"],[class*="st-key-account_admin_specialty_"],[class*="st-key-account_admin_job_"],.st-key-account_admin_priority_grid) [data-testid="stCheckbox"] p {font-size: var(--fs-sm); font-weight: 600; color: var(--ink);}
+@media (max-width: 760px) {
+  .stApp:has(.st-key-tap_workspace_topbar) .st-key-account_admin_factor_picker {padding: 18px 16px;}
+}
+.stApp:has(.st-key-tap_workspace_topbar) :is([class*="st-key-account_admin_factor_base_grid"],[class*="st-key-account_admin_specialty_"],[class*="st-key-account_admin_job_"],.st-key-account_admin_priority_grid) :is([data-testid="stElementContainer"]:has([data-testid="stCheckbox"]),[data-testid="stCheckbox"]) {width: 100% !important; max-width: none;}
+
+/* Empty detail state (PAI-style): icon, title, guidance. */
+.tap-empty {display: flex; flex-direction: column; align-items: flex-start; gap: 8px; padding: 6px 2px;}
+.tap-empty__icon {width: 44px; height: 44px; display: grid; place-items: center; border-radius: 12px; font-family: "Material Symbols Rounded"; font-size: 23px; font-feature-settings: "liga"; letter-spacing: normal; color: var(--brand); background: var(--brand-pale);}
+.tap-empty b {margin-top: 6px; font-size: var(--fs-lg); color: var(--ink);}
+.tap-empty p {margin: 0; font-size: var(--fs-sm) !important; line-height: 1.65 !important; color: var(--muted);}
+
+/* Numbered form sections (project creation). */
+.tap-form-section {display: flex; gap: 12px; align-items: flex-start; margin: 10px 0 2px; padding-top: 14px; border-top: 1px solid var(--line);}
+.stApp [data-testid="stForm"] [data-testid="stVerticalBlock"] > :first-child .tap-form-section {border-top: 0; padding-top: 0; margin-top: 0;}
+.tap-form-section > span {flex: none; padding: 2px 8px; border-radius: 6px; font-size: var(--fs-xs); font-weight: 700; color: var(--brand); background: var(--brand-pale);}
+.tap-form-section b {font-size: var(--fs-base); color: var(--ink);}
+.tap-form-section p {margin: 2px 0 0; font-size: var(--fs-sm) !important; line-height: 1.55 !important; color: var(--muted);}

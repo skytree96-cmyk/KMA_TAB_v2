@@ -1,0 +1,17 @@
+# Upload set for `gcloud builds submit` (the image itself is filtered by .dockerignore).
+.git
+.gitignore
+.gcloudignore
+.github
+.devcontainer
+.tmp/
+tmp/
+output/
+cloudflare/
+tests/
+deploy/gcp/config.env
+**/__pycache__/
+*.pptx
+.env
+.env.*
+.streamlit/secrets.toml

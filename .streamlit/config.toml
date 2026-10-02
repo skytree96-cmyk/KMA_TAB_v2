@@ -1,4 +1,5 @@
 [theme]
+baseFontSize = 18
 primaryColor = "#087B76"
 backgroundColor = "#F4F8F7"
 secondaryBackgroundColor = "#EFF9F7"
