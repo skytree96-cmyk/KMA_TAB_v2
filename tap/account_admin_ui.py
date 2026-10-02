@@ -733,13 +733,15 @@ def _workspace_pick(
 
 def _company_pick(companies: list[dict[str, Any]], selection_key: str, search_label: str) -> Mapping[str, Any] | None:
     """Find a member company by typing instead of scrolling a dropdown."""
-    return _workspace_pick(
-        companies, selection_key=selection_key, search_key=selection_key + "_search",
-        search_label=search_label, placeholder="회사명 또는 사업자등록번호로 검색", label="회원사", unit="개",
-        search_values=lambda row: [row.get("name"), _company_registration_label(row)],
-        title=lambda row: str(row.get("name") or "회원사"),
-        caption=lambda row: f"사업자등록번호 {_company_registration_label(row)}",
-    )
+    # The panel key styles results as a card grid; see premium-workspace.css.
+    with st.container(border=True, key="tap_company_pick_" + selection_key.removeprefix(PREFIX)):
+        return _workspace_pick(
+            companies, selection_key=selection_key, search_key=selection_key + "_search",
+            search_label=search_label, placeholder="회사명 또는 사업자등록번호로 검색", label="회원사", unit="개",
+            search_values=lambda row: [row.get("name"), _company_registration_label(row)],
+            title=lambda row: str(row.get("name") or "회원사"),
+            caption=lambda row: f"사업자등록번호 {_company_registration_label(row)}",
+        )
 
 
 def _render_workspace_users(store: Any, token: str, principal: Mapping[str, Any], users: list[dict[str, Any]]) -> None:

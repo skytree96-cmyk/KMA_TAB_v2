@@ -92,7 +92,8 @@ def filter_projects(projects: list[dict[str, Any]], query: str, company_id: str 
     return [project for project in projects if (
         (not company_id or project.get("company_id") == company_id)
         and all(word in " ".join(str(value or "") for value in (
-            project.get("company_name"), project.get("name"), (project.get("config") or {}).get("course_name")
+            project.get("company_name"), project.get("company_registration_number"),
+            project.get("name"), (project.get("config") or {}).get("course_name")
         )).casefold() for word in words)
     )]
 
@@ -112,13 +113,16 @@ def _render_projects(store: Any, token: str, projects: list[dict[str, Any]], rol
         st.subheader("프로젝트 현황")
         company_id = None
         if role == "kma":
-            companies = {str(project["company_id"]): str(project.get("company_name") or "회사명 미등록") for project in projects}
+            # The number in the label lets the dropdown's type-ahead match a registration number too.
+            companies = {str(project["company_id"]): " · ".join(part for part in (
+                str(project.get("company_name") or "회사명 미등록"), str(project.get("company_registration_number") or "")) if part)
+                for project in projects}
             company_key = PREFIX + "company"
             if st.session_state.get(company_key) not in {None, *companies}:
                 st.session_state[company_key] = None
             company_id = st.selectbox("회사", [None, *sorted(companies, key=companies.get)],
                                       format_func=lambda value: "전체 회사" if value is None else companies[value], key=company_key)
-        query = st.text_input("회사·프로젝트·교육 검색", key=PREFIX + "search", placeholder="회사명, 프로젝트명 또는 교육과정명")
+        query = st.text_input("회사·프로젝트·교육 검색", key=PREFIX + "search", placeholder="회사명, 사업자등록번호, 프로젝트명 또는 교육과정명")
         matches = filter_projects(projects, query, company_id)
         st.caption(f"검색 결과 {len(matches):,}개 / 전체 {len(projects):,}개 프로젝트")
         pages = max(1, ceil(len(matches) / PAGE_SIZE))
@@ -292,8 +296,9 @@ def render_dashboard(store: Any, token: str, principal: Mapping[str, Any]) -> No
                 st.subheader("기업별 검사 참여율")
                 st.caption("모수: 각 기업 전체 등록 참여자 · 미배정 포함")
                 companies = list(summary.get("company_participation") or [])
-                query = st.text_input("기업 검색", key=PREFIX + "ranking_search", placeholder="회사명으로 검색") if len(companies) > 6 else ""
-                matches = [row for row in companies if query.casefold().strip() in str(row.get("company_name") or "").casefold()]
+                query = st.text_input("기업 검색", key=PREFIX + "ranking_search", placeholder="회사명 또는 사업자등록번호로 검색") if len(companies) > 6 else ""
+                matches = [row for row in companies if query.casefold().strip() in " ".join(
+                    str(row.get(field) or "") for field in ("company_name", "company_registration_number")).casefold()]
                 matches.sort(key=lambda row: (-(_count(row,"participating") / _count(row,"total") if _count(row,"total") else -1), str(row.get("company_name") or "")))
                 _ranking([(row.get("company_name") or "회사명 미등록", _count(row,"participating"), _count(row,"total")) for row in matches])
             else:

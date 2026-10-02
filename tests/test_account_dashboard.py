@@ -9,7 +9,7 @@ from tap.account_dashboard import filter_projects, project_status, schedule_chec
 
 
 PROJECT = {
-    "id": "p1", "company_id": "co1", "company_name": "알파 교육", "name": "리더 성장",
+    "id": "p1", "company_id": "co1", "company_name": "알파 교육", "company_registration_number": "1058201810", "name": "리더 성장",
     "assigned": 10, "pre_completed": 8, "post_completed": 3,
     "config": {"course_name": "AI Leadership", "selected_factors": [],
                "pre_start_date": "2026-10-01", "pre_end_date": "2026-10-07",
@@ -170,7 +170,7 @@ class AccountDashboardTests(unittest.TestCase):
         self.assertEqual(project_status(same_day, date(2026, 10, 8)), "사전·사후검사 진행")
 
     def test_search_matches_company_project_course_and_all_words(self):
-        for query in ("알파", "성장", "lEaDeR", "알파 Leadership"):
+        for query in ("알파", "성장", "lEaDeR", "알파 Leadership", "1058201810", "105820", "알파 1058201810"):
             self.assertEqual(filter_projects([PROJECT], query), [PROJECT])
         self.assertEqual(filter_projects([PROJECT], "알파 unknown"), [])
         self.assertEqual(filter_projects([PROJECT], "", "co2"), [])

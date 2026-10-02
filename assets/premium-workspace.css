@@ -238,3 +238,38 @@
 .tap-form-section > span {flex: none; padding: 2px 8px; border-radius: 6px; font-size: var(--fs-xs); font-weight: 700; color: var(--brand); background: var(--brand-pale);}
 .tap-form-section b {font-size: var(--fs-base); color: var(--ink);}
 .tap-form-section p {margin: 2px 0 0; font-size: var(--fs-sm) !important; line-height: 1.55 !important; color: var(--muted);}
+
+/* Company picker: results as a compact card grid that uses the full panel width. */
+.stApp [class*="st-key-tap_company_pick_"] {
+  padding: 18px 20px; border: 1px solid var(--line); border-radius: var(--radius-lg); background: var(--surface);
+}
+.stApp [class*="st-key-tap_company_pick_"] [data-testid="stElementContainer"]:has([data-testid="stRadio"]),
+.stApp [class*="st-key-tap_company_pick_"] [data-testid="stRadio"] {width: 100%;}
+.stApp [class*="st-key-tap_company_pick_"] [data-testid="stRadioGroup"] {
+  display: grid !important; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 10px; width: 100%;
+}
+.stApp [class*="st-key-tap_company_pick_"] [data-testid="stRadioOption"] {
+  position: relative; box-sizing: border-box; width: 100%; min-height: 0; margin: 0;
+  padding: 14px 40px 14px 16px; border: 1px solid var(--line); border-radius: var(--radius-md);
+  background: var(--surface); box-shadow: none; cursor: pointer;
+  transition: border-color .15s ease, background .15s ease;
+}
+/* The whole card is the target; hide the circle but keep the native input for keyboard focus. */
+.stApp [class*="st-key-tap_company_pick_"] [data-testid="stRadioOption"] div:has(> [data-testid="stMarkdownContainer"]) > div:first-child {display: none;}
+.stApp [class*="st-key-tap_company_pick_"] [data-testid="stRadioOption"] [data-testid="stMarkdownContainer"] p {
+  font-size: var(--fs-base); font-weight: 600; color: var(--ink); line-height: 1.35;
+}
+.stApp [class*="st-key-tap_company_pick_"] [data-testid="stRadioOption"] [data-testid="stCaptionContainer"] p {
+  margin-top: 2px; font-size: var(--fs-xs); color: var(--muted); font-variant-numeric: tabular-nums;
+}
+.stApp [class*="st-key-tap_company_pick_"] [data-testid="stRadioOption"]:hover {border-color: #9fd3cc; background: var(--surface-soft);}
+.stApp [class*="st-key-tap_company_pick_"] [data-testid="stRadioOption"][data-selected="true"] {
+  border-color: var(--brand); background: var(--brand-pale); box-shadow: inset 0 0 0 1px var(--brand);
+}
+.stApp [class*="st-key-tap_company_pick_"] [data-testid="stRadioOption"][data-selected="true"]::after {
+  content: "check_circle"; position: absolute; top: 50%; right: 12px; transform: translateY(-50%);
+  font-family: "Material Symbols Rounded"; font-size: 22px; line-height: 1; color: var(--brand);
+}
+.stApp [class*="st-key-tap_company_pick_"] [data-testid="stRadioOption"]:focus-within {outline: 2px solid var(--brand); outline-offset: 2px;}
+/* Streamlit indents the caption to clear the (now hidden) radio circle. */
+.stApp [class*="st-key-tap_company_pick_"] [data-testid="stRadioOption"] div:has(> [data-testid="stCaptionContainer"]) {padding-left: 0;}
