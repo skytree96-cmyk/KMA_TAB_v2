@@ -277,11 +277,16 @@ def _render_review(store: Any, token: str, assignment_id: str, phase: str, quest
     stored = payload.get("post_transfer_responses", {})
     with st.form(PREFIX + "transfer_form"):
         values = {}
-        for key, label in TRANSFER_ITEMS:
-            value = stored.get(key)
-            values[key] = st.radio(label, options=list(TRANSFER_LABELS), index=value - 1 if type(value) is int and 1 <= value <= 5 else None,
-                                   format_func=lambda x: f"{x}. {TRANSFER_LABELS[x]}", horizontal=True, key=PREFIX + "transfer_" + key)
-        barriers = st.multiselect("적용을 방해한 요인(복수 선택)", options=list(BARRIERS), default=stored.get("barriers", []), key=PREFIX + "barriers")
+        with st.container(key=PREFIX + "transfer_scale"):
+            for key, label in TRANSFER_ITEMS:
+                value = stored.get(key)
+                values[key] = st.radio(label, options=list(TRANSFER_LABELS), index=value - 1 if type(value) is int and 1 <= value <= 5 else None,
+                                       format_func=lambda x: f"{x}. {TRANSFER_LABELS[x]}", horizontal=True, key=PREFIX + "transfer_" + key)
+        st.markdown("**적용을 방해한 요인(복수 선택)**")
+        saved_barriers = set(stored.get("barriers", []))
+        with st.container(key=PREFIX + "barrier_checks"):
+            barriers = [barrier for index, barrier in enumerate(BARRIERS)
+                        if st.checkbox(barrier, value=barrier in saved_barriers, key=PREFIX + f"barrier_{index}")]
         applied = st.text_area("실제 업무에 적용한 교육 내용(선택)", value=str(stored.get("applied_content", "")), key=PREFIX + "applied", max_chars=2000)
         draft = st.form_submit_button("현업전이 응답 임시저장")
         finish = st.form_submit_button("교육 후 검사 최종 제출", type="primary", width="stretch")
@@ -317,16 +322,19 @@ def _render_question(store: Any, token: str, assignment_id: str, phase: str, que
     with st.container(border=True, key=PREFIX + "question_stage"):
         st.caption(f"{question['factor_name_ko']} · 문항 {cursor + 1}/{len(questions)} · 최근 8주")
         st.subheader(question["revised_text"])
-        st.write("얼마나 자주 했습니까? 해당 행동을 할 상황이 없었다면 0을 선택하세요.")
-        with st.form(PREFIX + f"{phase}_question_{code}"):
+        st.write("얼마나 자주 했습니까? 해당 행동을 할 상황이 없었다면 0을 선택하세요. 선택하면 자동으로 저장되고 다음 문항으로 넘어갑니다.")
+        # One click saves and advances; no separate save button.
+        submit_args = (store, token, assignment_id, st.session_state[PREFIX + "owner"], phase, cursor, code, codes)
+        response_key = PREFIX + f"{phase}_response_{code}"
+        with st.container(key=PREFIX + "likert_scale"):
             st.radio("응답", options=list(LIKERT_OPTIONS), index=list(LIKERT_OPTIONS).index(current) if current in LIKERT_OPTIONS else None,
-                     format_func=lambda x: f"{x}. {LIKERT_OPTIONS[x]}", horizontal=True, key=PREFIX + f"{phase}_response_{code}")
-            st.form_submit_button(
-                "저장하고 제출 준비" if cursor == len(questions) - 1 else "저장하고 다음 문항 →",
-                type="primary", width="stretch", on_click=_submit_question,
-                args=(store, token, assignment_id, st.session_state[PREFIX + "owner"], phase, cursor, code, codes),
-            )
-        st.button("← 이전 문항", disabled=cursor == 0, key=PREFIX + phase + "_previous", on_click=_go_to_question, args=(phase, cursor - 1))
+                     format_func=lambda x: f"{x}. {LIKERT_OPTIONS[x]}", horizontal=True, label_visibility="collapsed",
+                     key=response_key, on_change=_submit_question, args=submit_args)
+        with st.container(horizontal=True, horizontal_alignment="distribute", key=PREFIX + "question_nav"):
+            st.button("← 이전 문항", disabled=cursor == 0, key=PREFIX + phase + "_previous", on_click=_go_to_question, args=(phase, cursor - 1))
+            # Re-clicking the chosen option fires no change event; this retries a failed save or keeps an existing answer.
+            st.button("제출 준비 →" if cursor == len(questions) - 1 else "다음 문항 →", key=PREFIX + phase + "_next",
+                      disabled=st.session_state.get(response_key) is None, on_click=_submit_question, args=submit_args)
 
 
 def render_participant(store: Any, token: str, principal: Mapping[str, Any]) -> None:

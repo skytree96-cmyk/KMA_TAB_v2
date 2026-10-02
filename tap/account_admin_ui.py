@@ -275,9 +275,11 @@ def _render_companies(store: Any, token: str, companies: list[dict[str, Any]], *
         return
     st.subheader("사업자등록번호 등록·수정")
     st.caption("미등록 회사의 번호를 보완하거나 등록된 번호를 수정할 수 있습니다.")
-    by_id = {_identifier(row): row for row in companies}
-    selected = st.selectbox("사업자등록번호를 변경할 회사", list(by_id), format_func=lambda value: f"{by_id[value]['name']} · {_company_registration_label(by_id[value])}", key=PREFIX + "registration_company")
-    current_number = _company_registration_label(by_id[selected])
+    company = _company_pick(companies, PREFIX + "registration_company_pick", "사업자등록번호를 변경할 회사 검색")
+    if company is None:
+        return
+    selected = _identifier(company)
+    current_number = _company_registration_label(company)
     with st.form(PREFIX + "registration_update_" + selected):
         registration_input = st.text_input("등록할 사업자등록번호", value="" if current_number == "미등록" else current_number, help="하이픈 없이 0~9 숫자 10자리로 입력해 주세요.", max_chars=20, key=PREFIX + "registration_value_" + selected)
         if st.form_submit_button("사업자등록번호 저장"):
@@ -729,6 +731,17 @@ def _workspace_pick(
     return by_id.get(selected)
 
 
+def _company_pick(companies: list[dict[str, Any]], selection_key: str, search_label: str) -> Mapping[str, Any] | None:
+    """Find a member company by typing instead of scrolling a dropdown."""
+    return _workspace_pick(
+        companies, selection_key=selection_key, search_key=selection_key + "_search",
+        search_label=search_label, placeholder="회사명 또는 사업자등록번호로 검색", label="회원사", unit="개",
+        search_values=lambda row: [row.get("name"), _company_registration_label(row)],
+        title=lambda row: str(row.get("name") or "회원사"),
+        caption=lambda row: f"사업자등록번호 {_company_registration_label(row)}",
+    )
+
+
 def _render_workspace_users(store: Any, token: str, principal: Mapping[str, Any], users: list[dict[str, Any]]) -> None:
     allowed = [row for row in users if row.get("role") in {"company", "participant"} and _identifier(row) != _identifier(principal)]
     if principal.get("role") == "company":
@@ -736,6 +749,15 @@ def _render_workspace_users(store: Any, token: str, principal: Mapping[str, Any]
     with st.container(key="tap_workspace_split"):
         left, right = st.columns([1.4, 1], gap="large")
         with left, st.container(border=True, key="tap_workspace_account_list"):
+            if principal.get("role") == "kma":
+                counts = {role: sum(row.get("role") == role for row in allowed) for role in ("company", "participant")}
+                role_filter = st.segmented_control(
+                    "계정 구분", ["all", "company", "participant"], key=PREFIX + "manage_user_role",
+                    format_func=lambda value: f"전체 {len(allowed)}" if value == "all" else f"{ROLE_LABELS[value]} {counts[value]}",
+                    default="all", label_visibility="collapsed", width="stretch",
+                )
+                if role_filter in counts:
+                    allowed = [row for row in allowed if row.get("role") == role_filter]
             user = _workspace_pick(
                 allowed, selection_key=PREFIX + "manage_user", search_key=PREFIX + "manage_user_search",
                 search_label="계정 검색", placeholder="이름, 아이디, 회사명으로 검색", label="관리할 계정", unit="명",
@@ -817,17 +839,11 @@ def _render_workspace(
         issuance_label = "교육담당자 계정 발급" if role == "kma" else "참여자 계정 발급"
         with st.expander(issuance_label, key=PREFIX + f"workspace_issue_{role}", on_change="rerun"):
             if role == "kma":
-                active_companies = {_identifier(row): row for row in companies if row.get("active", True)}
+                active_companies = [row for row in companies if row.get("active", True)]
                 if active_companies:
-                    issue_key = PREFIX + "issue_company"
-                    if st.session_state.get(issue_key) not in active_companies:
-                        st.session_state.pop(issue_key, None)
-                    company_id = st.selectbox(
-                        "계정을 발급할 회사", list(active_companies),
-                        format_func=lambda value: f"{active_companies[value]['name']} · {_company_registration_label(active_companies[value])}",
-                        key=issue_key, persist_state="session",
-                    )
-                    _render_create_user(store, token, principal, active_companies[company_id], "company", show_heading=False)
+                    issue_company = _company_pick(active_companies, PREFIX + "issue_company_pick", "계정을 발급할 회사 검색")
+                    if issue_company is not None:
+                        _render_create_user(store, token, principal, issue_company, "company", show_heading=False)
                 else:
                     st.info("먼저 회원사를 등록해 주세요.")
             else:
@@ -877,10 +893,10 @@ def render_admin(store: Any, token: str, principal: Mapping[str, Any], *, sectio
         with company_tab:
             _render_companies(store, token, companies)
         with user_tab:
-            active_companies = {_identifier(row): row for row in companies if row.get("active", True)}
+            active_companies = [row for row in companies if row.get("active", True)]
             if active_companies:
-                company_id = st.selectbox("계정을 발급할 회사", list(active_companies), format_func=lambda value: f"{active_companies[value]['name']} · {_company_registration_label(active_companies[value])}", key=PREFIX + "issue_company")
-                _render_create_user(store, token, principal, active_companies[company_id], "company")
+                if (issue_company := _company_pick(active_companies, PREFIX + "issue_company_pick", "계정을 발급할 회사 검색")) is not None:
+                    _render_create_user(store, token, principal, issue_company, "company")
             else:
                 st.info("먼저 회원사를 등록해 주세요.")
             _render_manage_users(store, token, principal, users)

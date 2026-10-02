@@ -338,6 +338,11 @@ _render_assignments(Store(), "token", {"id":"p1", "company_id":"co1"}, users)
         self.assertEqual(table.iloc[0]["사업자등록번호"], "미등록")
         app.session_state["users"] = [{"id":"u2", "login_id":"acme-old", "display_name":"기존 담당자", "role":"company", "company_id":"co1", "active":True}]
         run_app(app)
+        # The company is found by search, then picked from the result list.
+        app.text_input(key="account_admin_registration_company_pick_search").input("테스트")
+        run_app(app)
+        app.radio(key="account_admin_registration_company_pick").set_value("co1")
+        run_app(app)
         next(item for item in app.text_input if item.label == "등록할 사업자등록번호").input("0123456789")
         next(item for item in app.button if item.label == "사업자등록번호 저장").click()
         run_app(app)
@@ -349,6 +354,9 @@ _render_assignments(Store(), "token", {"id":"p1", "company_id":"co1"}, users)
     def test_kma_issues_manager_plain_id_with_kma_and_no_participant_profile(self):
         app = AppTest.from_string(APP.replace("ROLE", repr("kma"))).run(timeout=30)
         app.session_state["account_admin_kma_tabs"] = "교육담당자·계정"
+        run_app(app)
+        self.assertFalse(any(item.label == "아이디" for item in app.text_input))
+        app.radio(key="account_admin_issue_company_pick").set_value("co1")
         run_app(app)
         self.assertFalse(any(item.label in {"부서", "직급", "이메일", "연락처"} for item in app.text_input))
         next(item for item in app.text_input if item.label == "아이디").input("Manager001")

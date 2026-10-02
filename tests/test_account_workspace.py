@@ -136,6 +136,33 @@ class AccountWorkspaceTests(unittest.TestCase):
         rerun(app)
         self.assertFalse(app.radio)
 
+    def test_kma_account_list_splits_managers_and_participants(self):
+        app = self.app("accounts")
+        users = app.radio(key="account_admin_manage_user")
+        self.assertEqual(len(users.options), 3)
+        app.button_group(key="account_admin_manage_user_role").set_value("company")
+        rerun(app)
+        self.assertEqual(app.radio(key="account_admin_manage_user").options, ["알파 담당자 · alpha-manager"])
+        app.button_group(key="account_admin_manage_user_role").set_value("participant")
+        rerun(app)
+        self.assertEqual(app.radio(key="account_admin_manage_user").options, ["홍길동 · alpha-hong", "김하나 · Beta-Kim"])
+        # Company managers only see their participants, so no role split is offered.
+        self.assertEqual(self.app("accounts", "company").get("button_group"), [])
+
+    def test_kma_issue_company_is_found_by_search(self):
+        app = self.app("accounts", account_admin_workspace_issue_kma=True)
+        self.assertFalse(any(item.label == "아이디" for item in app.text_input))
+        app.text_input(key="account_admin_issue_company_pick_search").input("beta")
+        rerun(app)
+        self.assertEqual(app.radio(key="account_admin_issue_company_pick").options, ["Beta Academy"])
+        app.radio(key="account_admin_issue_company_pick").set_value("co2")
+        rerun(app)
+        next(item for item in app.text_input if item.label == "아이디").input("beta.manager")
+        next(item for item in app.text_input if item.label == "이름").input("베타 담당자")
+        next(item for item in app.button if item.label == "교육담당자 계정 발급").click()
+        rerun(app)
+        self.assertEqual(app.session_state["issued"]["company_id"], "co2")
+
     def test_account_search_and_reset_never_target_a_filtered_out_account(self):
         app = self.app("accounts")
         for query in ("길동", "PHA-HO", "알파 교육"):

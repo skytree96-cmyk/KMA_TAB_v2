@@ -92,8 +92,8 @@ def click(app, label):
 
 
 def answer(app, value):
-    next(radio for radio in app.radio if radio.label == "응답").set_value(value)
-    next(button for button in app.button if button.label.startswith("저장하고")).click().run()
+    # Selecting an option saves and advances without a separate save button.
+    next(radio for radio in app.radio if radio.label == "응답").set_value(value).run()
     if app.exception:
         raise AssertionError(str(app.exception))
 
@@ -184,11 +184,15 @@ class AccountAssessmentTests(unittest.TestCase):
         self.assertTrue(app.error)
         for key, label in TRANSFER_ITEMS:
             next(r for r in app.radio if r.label == label).set_value(5)
+        next(c for c in app.checkbox if c.label == "적용 기회 부족").check()
+        next(c for c in app.checkbox if c.label == "시간·프로세스 제약").check()
         click(app, "현업전이 응답 임시저장")
         self.assertFalse(store.records["a", "post"]["completed"])
+        self.assertEqual(store.records["a", "post"]["payload"]["post_transfer_responses"]["barriers"], ["적용 기회 부족", "시간·프로세스 제약"])
         app = participant_app(store)
         for key, label in TRANSFER_ITEMS:
             self.assertEqual(next(r for r in app.radio if r.label == label).value, 5)
+        self.assertEqual([c.label for c in app.checkbox if c.value], ["적용 기회 부족", "시간·프로세스 제약"])
         click(app, "교육 후 검사 최종 제출")
         self.assertTrue(store.records["a", "post"]["completed"])
         comparison = app.dataframe[0].value
@@ -249,7 +253,7 @@ class AccountAssessmentTests(unittest.TestCase):
         self.assertEqual(next(r for r in app.radio if r.label == "응답").value, 5)
         self.assertNotIn(PREFIX + "saved_record", app.session_state)
         self.assertTrue(any("문항 1/" in caption.value for caption in app.caption))
-        click(app, "저장하고 다음 문항 →")
+        click(app, "다음 문항 →")
         self.assertEqual(app.session_state[PREFIX + "pre_cursor"], 1)
         self.assertEqual(store.records["a", "pre"]["payload"]["responses"][store.config["question_snapshot_codes"][0]], 5)
 
