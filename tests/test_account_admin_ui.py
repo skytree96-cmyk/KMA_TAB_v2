@@ -9,7 +9,7 @@ from datetime import date
 from streamlit.testing.v1 import AppTest
 
 from tap.account_admin_ui import (
-    _company_registration_label, _login_id, _registration_number, _safe_error,
+    CSV_TEMPLATE, _company_registration_label, _login_id, _registration_number, _safe_error,
     _temporary_password, build_project_config, credentials_csv, parse_participant_csv,
 )
 from tap.data import questions_for_factors
@@ -30,6 +30,15 @@ class AccountAdminInputTests(unittest.TestCase):
         self.assertEqual([row["login_id"] for row in rows], ["acme-user001", "acme-user002"])
         with self.assertRaisesRegex(ValueError, "같은 아이디"):
             parse_participant_csv(b"login_id,display_name\nuser001,A\nacme-USER001,B\n", "acme")
+
+    def test_csv_template_uses_korean_headers_and_parses(self):
+        self.assertNotIn("login_id", CSV_TEMPLATE)
+        self.assertEqual(len(parse_participant_csv(CSV_TEMPLATE.encode("utf-8"), "acme")), 2)
+        row = parse_participant_csv("아이디,이름,연락처,부서\nuser001,홍길동,010-1234-5678,교육팀\n".encode(), "acme")[0]
+        self.assertEqual((row["login_id"], row["display_name"], row["department"], row["phone"]),
+                         ("acme-user001", "홍길동", "교육팀", "010-1234-5678"))
+        with self.assertRaisesRegex(ValueError, "첫 두 열은 아이디, 이름"):
+            parse_participant_csv("이름,아이디\n홍길동,user001\n".encode(), "acme")
 
     def test_csv_rejects_bad_rows_before_returning_any_participants(self):
         for content in (
