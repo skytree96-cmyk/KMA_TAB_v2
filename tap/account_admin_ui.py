@@ -29,6 +29,9 @@ WORKSPACE_SECTIONS = {
 }
 MAX_CSV_BYTES = 256 * 1024
 PROFILE_FIELDS = {"department": ("부서", 100), "job_title": ("직급", 80), "email": ("이메일", 254), "phone": ("연락처", 40)}
+# Customers see Korean headers; the original English headers stay accepted for files made earlier.
+CSV_HEADER_ALIASES = {"아이디": "login_id", "이름": "display_name", **{label: key for key, (label, _) in PROFILE_FIELDS.items()}}
+CSV_TEMPLATE = "\ufeff아이디,이름,부서,직급,이메일,연락처\nuser001,참여자1,,,,\nuser002,참여자2,,,,\n"
 
 
 def _identifier(row: Mapping[str, Any]) -> str:
@@ -115,12 +118,13 @@ def parse_participant_csv(content: bytes, company_prefix: str) -> list[dict[str,
     try:
         text = content.decode("utf-8-sig")
     except UnicodeDecodeError as exc:
-        raise ValueError("UTF-8 형식의 CSV 파일을 올려 주세요.") from exc
+        raise ValueError("엑셀에서 ‘CSV UTF-8(쉼표로 분리)’ 형식으로 저장한 파일을 올려 주세요.") from exc
     reader = csv.DictReader(io.StringIO(text, newline=""), strict=True)
     try:
-        fields = reader.fieldnames or []
+        fields = [CSV_HEADER_ALIASES.get(name.strip(), name.strip()) for name in reader.fieldnames or []]
+        reader.fieldnames = fields
         if fields[:2] != ["login_id", "display_name"] or len(fields) != len(set(fields)) or not set(fields[2:]).issubset(PROFILE_FIELDS):
-            raise ValueError("첫 두 열은 login_id,display_name이어야 합니다. 선택 열은 department,job_title,email,phone만 사용할 수 있습니다. 아래 양식을 사용해 주세요.")
+            raise ValueError("첫 두 열은 아이디, 이름이어야 합니다. 그 뒤에는 부서, 직급, 이메일, 연락처 열만 쓸 수 있습니다. 아래 양식을 내려받아 사용해 주세요.")
         rows: list[dict[str, str]] = []
         seen: set[str] = set()
         for number, row in enumerate(reader, start=2):
@@ -340,8 +344,8 @@ def _render_create_user(store: Any, token: str, principal: Mapping[str, Any], co
 
 def _render_batch(store: Any, token: str, principal: Mapping[str, Any], company: Mapping[str, Any], users: list[dict[str, Any]]) -> None:
     with st.expander("CSV로 참여자 일괄 등록", key=PREFIX + f"batch_expander_{_identifier(company)}", on_change="rerun"):
-        st.caption(f"UTF-8 CSV · 한 번에 최대 {MAX_BATCH_ROWS}명 · 아이디·이름은 필수이며 부서·직급·이메일·연락처는 선택입니다. 기존 아이디·이름 2열 양식도 사용할 수 있습니다. user 또는 user001처럼 user 뒤에 숫자만 붙인 기본 예시 아이디에만 회사 식별정보가 자동으로 붙습니다. 직접 정한 아이디와 회사 식별정보가 이미 붙은 아이디는 그대로 사용합니다. 임시 비밀번호는 모두 kma이며, 첫 로그인 때 변경해야 합니다.")
-        st.download_button("CSV 양식 내려받기", "\ufefflogin_id,display_name,department,job_title,email,phone\nuser001,참여자1,,,,\nuser002,참여자2,,,,\n".encode("utf-8"), "tap_participants_template.csv", "text/csv", key=PREFIX + "batch_template")
+        st.caption(f"CSV 파일 · 한 번에 최대 {MAX_BATCH_ROWS}명 · 아이디·이름은 필수이며 부서·직급·이메일·연락처는 선택입니다. 기존 아이디·이름 2열 양식도 사용할 수 있습니다. user 또는 user001처럼 user 뒤에 숫자만 붙인 기본 예시 아이디에만 회사 식별정보가 자동으로 붙습니다. 직접 정한 아이디와 회사 식별정보가 이미 붙은 아이디는 그대로 사용합니다. 임시 비밀번호는 모두 kma이며, 첫 로그인 때 변경해야 합니다.")
+        st.download_button("CSV 양식 내려받기", CSV_TEMPLATE.encode("utf-8"), "tap_participants_template.csv", "text/csv", key=PREFIX + "batch_template")
         upload = st.file_uploader("참여자 CSV", type=["csv"], key=PREFIX + "batch_upload")
         if upload is None:
             return
