@@ -72,7 +72,8 @@ def export_report_pdf(store: Any, token: str, project: Mapping[str, Any], assign
 def _organization_courses(config: Mapping[str, Any], summaries: Any) -> list[dict[str, Any]]:
     disclosed = [{**row, "pre_score": row["pre_mean"], "post_score": row["post_mean"]}
                  for row in summaries if row["paired_n"] >= MIN_GROUP_N]
-    return recommend_courses(config, disclosed)
+    # Three competencies × (public course, e-learning, in-house inquiry course).
+    return recommend_courses(config, disclosed, limit=9, audience="organization")
 
 
 def _render_transfer(results: list[dict[str, Any]]) -> dict[str, Any]:
@@ -98,17 +99,11 @@ def _render_courses(courses: list[dict[str, Any]], transfer: Mapping[str, Any]) 
         st.success("공개된 역량이 모두 목표 수준에 도달했거나 차이가 0.2점 미만이어서 우선 검토할 후속 과정이 없습니다.")
     elif note := course_context_note(transfer):
         st.warning(note)
-    for index, course in enumerate(courses, 1):
-        with st.container(border=True):
-            st.markdown(f"**{index}. {course['title']}** · {course['delivery_label']}")
-            st.caption(f"관련 역량 {course['factor_name_ko']} · {course['reason']}")
-            if course["advice"]:
-                st.markdown(course["advice"])
-            if course.get("url"):
-                st.link_button("KMA에서 과정 찾기", course["url"])
     if courses:
-        st.caption("교육 후 점수가 목표보다 0.2점 이상 낮은 역량을 부족한 정도가 큰 순서로 골랐고, 역량마다 가장 잘 맞는 과정을 먼저 보여 줍니다. "
-                   "개설 여부와 일정은 KMA 교육 페이지에서 확인해 주세요.")
+        from tap.account_course_ui import render_course_cards
+        render_course_cards(courses)
+        st.caption("교육 후 점수가 목표보다 0.2점 이상 낮은 역량을 부족한 정도가 큰 순서로 골라, 역량마다 공개교육·이러닝·단체교육 문의 과정을 하나씩 보여 줍니다. "
+                   "공개교육은 다음 기수가 열린 과정만 제안하며 버튼은 최신 일정 페이지로 연결됩니다.")
     st.markdown("회사 상황에 맞춘 과정이 필요하면 KMA에 맞춤형 교육을 문의할 수 있습니다.")
     st.link_button("맞춤형 교육 문의", COURSE_INQUIRY_URL)
 

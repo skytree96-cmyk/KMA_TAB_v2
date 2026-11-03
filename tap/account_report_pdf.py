@@ -277,6 +277,8 @@ def _followup_story(transfer: Mapping[str, Any] | None, courses: list[Mapping[st
         for index, course in enumerate(courses, 1):
             items.extend([Spacer(1, 10), _p(f"{index}. {course['title']}  ({course['delivery_label']})", size=10.5, bold=True),
                           _p(f"관련 역량 {course['factor_name_ko']}  ·  {course['reason']}", size=8.4, color=MUTED),
+                          *([_p(f"{course['schedule']}  ·  {course['url']}", size=7.6, color=MUTED)]
+                            if course.get("schedule") or course.get("url") else []),
                           *([_p(course["advice"], size=8.4)] if course.get("advice") else [])])
         items.extend([Spacer(1, 9), _p("개설 여부와 일정은 KMA 교육 페이지(www.kma.or.kr)에서 확인해 주세요.", size=7.8, color=MUTED), *inquiry])
         panels.append(_panel(items, width))

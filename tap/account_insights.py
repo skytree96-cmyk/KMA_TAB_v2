@@ -9,7 +9,7 @@ from typing import Any, Iterable, Mapping
 
 from tap.config import MIN_GROUP_N
 from tap.data import load_course_map, load_courses
-from tap.recommendation import TRAINING_GATE
+from tap.recommendation import TRAINING_GATE, normalize_course_title
 
 
 TRANSFER_FACTORS = (
@@ -19,7 +19,12 @@ TRANSFER_FACTORS = (
     ("time_process_support", "시간·프로세스"),
 )
 BARRIERS = ("적용 기회 부족", "상사·동료 지원 부족", "도구·정보·권한 부족", "시간·프로세스 제약", "특별한 방해요인 없음")
-DELIVERY_LABELS = {"online": "온라인", "offline": "집합"}
+DELIVERY_LABELS = {"online": "온라인", "offline": "집합", "online_live": "온라인 라이브", "inhouse": "사내교육",
+                   "online_short": "온라인"}
+# Per competency, one public course then one e-learning course; organizations also see the in-house
+# inquiry course. The source order flips when the project prefers online delivery.
+SOURCE_SLOTS = {"individual": (("public_edu_center", 1), ("studio_elearning", 1)),
+                "organization": (("public_edu_center", 1), ("studio_elearning", 1), ("b2b_inquiry", 1))}
 # KMA's inquiry page, where HR teams request training tailored to their company.
 COURSE_INQUIRY_URL = "https://www.kma.or.kr/kr/usrs/eduRegMgnt/eduRegMgntForm.do?cateNm=customerInquiry"
 # Below this mean the transfer factor is called out as a follow-up item.
@@ -71,13 +76,18 @@ def transfer_notes(summary: Mapping[str, Any]) -> list[str]:
     return notes
 
 
-def recommend_courses(config: Mapping[str, Any], factor_rows: Iterable[Mapping[str, Any]], limit: int = 4) -> list[dict[str, Any]]:
-    """Pick follow-up courses for competencies still at least 0.2 below the project target after training.
+def recommend_courses(config: Mapping[str, Any], factor_rows: Iterable[Mapping[str, Any]], limit: int = 4, *,
+                      audience: str = "individual", score_key: str = "post_score",
+                      max_competencies: int = 3) -> list[dict[str, Any]]:
+    """Pick courses for competencies at least 0.2 below the project target.
 
-    factor_rows need factor_code, factor_name_ko and post_score, and may carry pre_score; rows without a
-    post score are skipped. Larger gaps come first (gaps in the same 0.1 band tie, and the organization's
-    priority competencies break the tie). Every competency gets its best course before any gets a second,
-    and each course appears once.
+    factor_rows need factor_code, factor_name_ko and the score under ``score_key`` (post_score after
+    training, score_1_to_5 for the pre-training report) and may carry pre_score; rows without a score
+    are skipped. Larger gaps come first (gaps in the same 0.1 band tie, and the organization's priority
+    competencies break the tie). Courses are filled source by source: every competency gets its best
+    public course (only courses with an upcoming session), then its best e-learning course, and
+    organizations also get an in-house inquiry course. The same course — a second location or next
+    year's run of the same title — is never shown twice.
     """
     if TRAINING_GATE.get(str(config.get("training_cause") or "mixed_or_unknown"), 0.0) == 0.0:
         return []
@@ -85,49 +95,106 @@ def recommend_courses(config: Mapping[str, Any], factor_rows: Iterable[Mapping[s
     priorities = {str(code) for code in config.get("organization_priorities") or []}
     needs = []
     for row in factor_rows:
-        if row.get("post_score") is None:
+        if row.get(score_key) is None:
             continue
-        code, post = str(row["factor_code"]), float(row["post_score"])
+        code, score = str(row["factor_code"]), float(row[score_key])
         target = float(targets.get(code, 3.5))
-        gap = round(target - post, 2)
+        gap = round(target - score, 2)
         if gap < MEANINGFUL_DIFFERENCE:
             continue
-        pre = row.get("pre_score")
-        needs.append({"factor_code": code, "factor_name_ko": row["factor_name_ko"], "post": post, "target": target,
-                      "gap": gap, "change": None if pre is None else round(post - float(pre), 2)})
+        pre = row.get("pre_score") if score_key == "post_score" else None
+        needs.append({"factor_code": code, "factor_name_ko": row["factor_name_ko"], "score": score, "target": target,
+                      "gap": gap, "change": None if pre is None else round(score - float(pre), 2),
+                      "phase": "post" if score_key == "post_score" else "pre"})
     needs.sort(key=lambda need: (-round(need["gap"], 1), need["factor_code"] not in priorities, need["factor_code"]))
+    # Only the few competencies furthest from target: a report that lists courses for every competency
+    # stops being a recommendation.
+    needs = needs[:max_competencies]
 
     level = str(config.get("target_level") or "all")
     preference = str(config.get("delivery_preference") or "all")
-    # A course written for one level (e.g. team leaders) is never offered to another level.
+    # A course written for one level (e.g. team leaders) is never offered to another level, and a public
+    # course without an upcoming session is not offered at all (active == has_upcoming in the catalog).
     catalog = {str(row["course_id"]): row for row in load_courses()
                if row.get("active", True) and row.get("target_level", "all") in {"all", level}}
-    queues = {need["factor_code"]: [str(mapping["course_id"]) for mapping in sorted(
-        (mapping for mapping in load_course_map()
-         if mapping["factor_code"] == need["factor_code"] and str(mapping["course_id"]) in catalog),
-        key=lambda mapping: (preference != "all" and catalog[str(mapping["course_id"])].get("delivery") != preference,
-                             -float(mapping["content_fit"]), str(mapping["course_id"])))] for need in needs}
+    queues: dict[str, list[dict[str, Any]]] = {}
+    for need in needs:
+        mappings = [mapping for mapping in load_course_map()
+                    if mapping["factor_code"] == need["factor_code"] and str(mapping["course_id"]) in catalog]
+        mappings.sort(key=lambda mapping: (-float(mapping["content_fit"]),
+                                           str(catalog[str(mapping["course_id"])].get("next_start") or "99999999"),
+                                           str(mapping["course_id"])))
+        queues[need["factor_code"]] = [catalog[str(mapping["course_id"])] for mapping in mappings]
+
+    slots = list(SOURCE_SLOTS.get(audience, SOURCE_SLOTS["individual"]))
+    if preference == "online":
+        slots.sort(key=lambda slot: slot[0] != "studio_elearning")
+    elif preference == "offline":
+        slots.sort(key=lambda slot: slot[0] != "public_edu_center")
+    allowed = {source for source, _ in slots}
+
     picked: list[dict[str, Any]] = []
-    seen: set[str] = set()
-    while len(picked) < limit and any(queues.values()):
+    seen_ids: set[str] = set()
+    seen_titles: set[str] = set()
+
+    def take(need: Mapping[str, Any], source: str | None) -> bool:
+        for course in queues[need["factor_code"]]:
+            course_id = str(course["course_id"])
+            course_source = str(course.get("source", ""))
+            if course_id in seen_ids or course_source not in allowed:
+                continue
+            if source is not None and course_source != source:
+                continue
+            title_key = normalize_course_title(course.get("title", ""))
+            if title_key in seen_titles:
+                continue
+            seen_ids.add(course_id)
+            seen_titles.add(title_key)
+            reason = _course_reason(need)
+            if any(row["factor_code"] == need["factor_code"] for row in picked):
+                reason["advice"] = ""  # say what the change suggests once per competency, not under every course
+            picked.append({**course, "factor_code": need["factor_code"], "factor_name_ko": need["factor_name_ko"],
+                           "delivery_label": DELIVERY_LABELS.get(str(course.get("delivery")), "온라인·집합"),
+                           "schedule": course_schedule_text(course), **reason})
+            return True
+        return False
+
+    # Source by source so every competency gets its public course before any gets an e-learning one.
+    for source, count in slots:
         for need in needs:
-            queue = queues[need["factor_code"]]
-            while queue and queue[0] in seen:
-                queue.pop(0)
-            if queue and len(picked) < limit:
-                course = catalog[queue.pop(0)]
-                seen.add(str(course["course_id"]))
-                reason = _course_reason(need)
-                if any(row["factor_code"] == need["factor_code"] for row in picked):
-                    reason["advice"] = ""  # say what the change suggests once per competency, not under every course
-                picked.append({**course, "factor_code": need["factor_code"], "factor_name_ko": need["factor_name_ko"],
-                               "delivery_label": DELIVERY_LABELS.get(str(course.get("delivery")), "온라인·집합"), **reason})
+            for _ in range(count):
+                if len(picked) >= limit or not take(need, source):
+                    break
+    # Fill any remaining room round-robin from whatever is left, as the earlier version did.
+    progressed = True
+    while len(picked) < limit and progressed:
+        progressed = False
+        for need in needs:
+            if len(picked) < limit and take(need, None):
+                progressed = True
     return picked
+
+
+def course_schedule_text(course: Mapping[str, Any]) -> str:
+    """One line a reader can act on: next session date and place, or 'available any time'."""
+    source = str(course.get("source", ""))
+    if source == "public_edu_center":
+        start = str(course.get("next_start") or "")
+        bits = [f"다음 개강 {start[:4]}-{start[4:6]}-{start[6:]}" if len(start) == 8 else "일정은 과정 페이지에서 확인"]
+        bits.extend(str(course[key]) + suffix for key, suffix in (("place", ""), ("edu_day", "일"), ("edu_time", "시간"))
+                    if course.get(key))
+        return " · ".join(bits)
+    if source == "studio_elearning":
+        return "온라인 · 상시 수강"
+    if source == "b2b_inquiry":
+        return "사내교육 · 인원을 모아 KMA에 문의"
+    return DELIVERY_LABELS.get(str(course.get("delivery")), "")
 
 
 def _course_reason(need: Mapping[str, Any]) -> dict[str, Any]:
     """The numbers behind a pick, and what the pre/post change suggests doing with it."""
-    reason = f"교육 후 {need['post']:.2f}점, 목표 {need['target']:.2f}점보다 {need['gap']:.2f}점 낮음"
+    phase_label = "교육 후" if need.get("phase") == "post" else "교육 전"
+    reason = f"{phase_label} {need['score']:.2f}점, 목표 {need['target']:.2f}점보다 {need['gap']:.2f}점 낮음"
     change = need["change"]
     if change is None:
         return {"reason": reason, "advice": ""}
