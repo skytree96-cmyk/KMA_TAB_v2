@@ -116,6 +116,58 @@ class AccountStoreTests(unittest.TestCase):
         self.now += 901
         self.assertEqual(self.store.principal(self.store.login("kma-admin", CHANGED))["role"], "kma")
 
+    def test_parallel_wrong_passwords_cannot_exceed_the_failure_limit(self):
+        # Attempts are counted before the password check, so a burst of guesses
+        # running in parallel still gets at most LOGIN_MAX_FAILURES checks.
+        from concurrent.futures import ThreadPoolExecutor
+
+        def guess(_):
+            try:
+                self.store.login("kma-admin", "Wrong-Password-2026!")
+            except RateLimitError:
+                return "locked"
+            except AuthenticationError:
+                return "wrong"
+            return "ok"
+
+        with ThreadPoolExecutor(8) as pool:
+            outcomes = list(pool.map(guess, range(8)))
+        self.assertEqual(outcomes.count("wrong"), 5)
+        self.assertEqual(outcomes.count("locked"), 3)
+        with self.assertRaises(RateLimitError):
+            self.store.login("kma-admin", CHANGED)
+
+    def test_busy_password_check_is_not_counted_as_a_failure(self):
+        import threading
+        from unittest import mock
+
+        import tap.account_store as module
+        with mock.patch.object(module, "_SCRYPT_SLOTS", threading.BoundedSemaphore(1)) as slots, \
+                mock.patch.object(module, "_SCRYPT_WAIT_SECONDS", 0.01):
+            slots.acquire()
+            try:
+                for _ in range(6):
+                    with self.assertRaisesRegex(RateLimitError, "접속이 많아"):
+                        self.store.login("kma-admin", CHANGED)
+            finally:
+                slots.release()
+        self.assertEqual(self.store.principal(self.store.login("kma-admin", CHANGED))["role"], "kma")
+
+    def test_login_rejects_a_password_reset_during_the_check(self):
+        import tap.account_store as module
+        record, _ = self.user()
+        real_verify = module.verify_password
+
+        def verify_then_reset(password, encoded):
+            result = real_verify(password, encoded)
+            self.store.reset_password(self.admin, record["id"], "Another-Temp-2026!")
+            return result
+
+        from unittest import mock
+        with mock.patch.object(module, "verify_password", verify_then_reset):
+            with self.assertRaisesRegex(AuthenticationError, "ID 또는 비밀번호"):
+                self.store.login(record["login_id"], CHANGED)
+
     def test_idle_and_absolute_session_expiry(self):
         self.now += SESSION_IDLE_SECONDS + 1
         with self.assertRaises(AuthenticationError):

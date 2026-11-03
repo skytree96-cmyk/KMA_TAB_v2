@@ -13,10 +13,12 @@ import hashlib
 import hmac
 import json
 import math
+import os
 from pathlib import Path
 import re
 import secrets
 import sqlite3
+import threading
 import time
 from typing import Any
 import uuid
@@ -74,12 +76,28 @@ def _password_input(password: str) -> bytes:
     return password.encode("utf-8")
 
 
+# Each scrypt call takes ~0.9 CPU-seconds and 32 MiB. Unbounded, a burst of
+# logins at the start of a session exhausted the 1 GiB instance (load test,
+# 2026-11-03), so a few run at once and the rest queue for a free slot.
+_SCRYPT_SLOTS = threading.BoundedSemaphore(max(1, int(os.environ.get("TAP_PASSWORD_HASH_CONCURRENCY", "2"))))
+_SCRYPT_WAIT_SECONDS = float(os.environ.get("TAP_PASSWORD_HASH_WAIT_SECONDS", "90"))
+
+
+def _scrypt(raw: bytes, salt: bytes) -> bytes:
+    if not _SCRYPT_SLOTS.acquire(timeout=_SCRYPT_WAIT_SECONDS):
+        raise RateLimitError("접속이 많아 처리가 늦어지고 있습니다. 잠시 후 다시 시도해 주세요.")
+    try:
+        return hashlib.scrypt(raw, salt=salt, n=_SCRYPT_N, r=_SCRYPT_R, p=_SCRYPT_P,
+                              maxmem=64 * 1024 * 1024, dklen=32)
+    finally:
+        _SCRYPT_SLOTS.release()
+
+
 def hash_password(password: str) -> str:
     """Salted scrypt: OWASP's 32 MiB, r=8, p=3 configuration."""
     raw = _password_input(password)
     salt = secrets.token_bytes(16)
-    value = hashlib.scrypt(raw, salt=salt, n=_SCRYPT_N, r=_SCRYPT_R, p=_SCRYPT_P,
-                           maxmem=64 * 1024 * 1024, dklen=32)
+    value = _scrypt(raw, salt)
     return "$".join(("scrypt", str(_SCRYPT_N), str(_SCRYPT_R), str(_SCRYPT_P),
                      base64.b64encode(salt).decode(), base64.b64encode(value).decode()))
 
@@ -103,9 +121,11 @@ def verify_password(password: str, encoded: str) -> bool:
         if not isinstance(password, str) or len(password) > 128:
             return False
         salt, expected = _parse_hash(encoded)
-        actual = hashlib.scrypt(password.encode("utf-8"), salt=salt, n=_SCRYPT_N,
-                                r=_SCRYPT_R, p=_SCRYPT_P, maxmem=64 * 1024 * 1024, dklen=32)
+        actual = _scrypt(password.encode("utf-8"), salt)
         return hmac.compare_digest(actual, expected)
+    except RateLimitError:
+        # Busy, not wrong: must not be counted as a failed password.
+        raise
     except (ValueError, TypeError):
         return False
 
@@ -145,6 +165,29 @@ class AccountStore:
             self._dsn = dsn
         else:
             raise ValidationError("운영에는 PostgreSQL DATABASE_URL이 필요합니다.")
+        self._pool = None
+        self._pool_lock = threading.Lock()
+
+    def _connections(self):
+        """Process-wide PostgreSQL pool, opened on first use.
+
+        Every click runs 3-4 transactions; opening a connection for each one
+        stalled at 30 concurrent participants in the load test. Instances x
+        TAP_DB_POOL_MAX must stay under Cloud SQL's max_connections (25 on
+        db-f1-micro), so the default of 4 allows five instances.
+        """
+        with self._pool_lock:
+            if self._pool is None:
+                from psycopg.rows import dict_row
+                from psycopg_pool import ConnectionPool
+
+                self._pool = ConnectionPool(
+                    self._dsn, min_size=1, max_size=max(1, int(os.environ.get("TAP_DB_POOL_MAX", "4"))),
+                    kwargs={"row_factory": dict_row, "connect_timeout": 10},
+                    timeout=float(os.environ.get("TAP_DB_POOL_WAIT_SECONDS", "30")),
+                    check=ConnectionPool.check_connection, max_idle=300, open=True,
+                )
+            return self._pool
 
     @contextmanager
     def _transaction(self):
@@ -153,10 +196,11 @@ class AccountStore:
             conn.row_factory = sqlite3.Row
             conn.execute("PRAGMA foreign_keys=ON")
             conn.execute("BEGIN IMMEDIATE")
+            release = conn.close
         else:
-            import psycopg
-            from psycopg.rows import dict_row
-            conn = psycopg.connect(self._dsn, row_factory=dict_row, connect_timeout=10)
+            pool = self._connections()
+            conn = pool.getconn()
+            release = lambda: pool.putconn(conn)  # noqa: E731
         try:
             yield conn
             conn.commit()
@@ -166,7 +210,7 @@ class AccountStore:
                 raise ConflictError("이미 등록된 ID이거나 연결할 수 없는 데이터입니다.") from exc
             raise
         finally:
-            conn.close()
+            release()
 
     def _execute(self, conn, sql: str, params=()):
         return conn.execute(sql.replace("?", "%s") if not self._sqlite else sql, params)
@@ -229,32 +273,45 @@ class AccountStore:
         # Unknown IDs follow the same persisted failure path and expensive hash check.
         normalized = str(login_id or "").strip().lower()[:128]
         login_key = hashlib.sha256(normalized.encode()).hexdigest()
-        failure = None
-        token = None
+        # The ~0.9 s password check runs between two short transactions so that
+        # it holds neither a pooled connection nor row locks. The attempt is
+        # counted as a failure before the check, so parallel guesses cannot
+        # exceed LOGIN_MAX_FAILURES; a correct password clears the counter.
         with self._transaction() as conn:
             now = self._clock()
-            user = self._one(conn, "SELECT * FROM tap_users WHERE login_id=?", (normalized,), lock=True)
-            company = self._one(conn, "SELECT active FROM tap_companies WHERE id=?", (user["company_id"],)) if user and user["company_id"] else None
+            user = self._one(conn, "SELECT * FROM tap_users WHERE login_id=?", (normalized,))
             self._execute(conn, "INSERT INTO tap_login_attempts(login_hash,window_start) VALUES (?,?) ON CONFLICT (login_hash) DO NOTHING", (login_key, now))
             attempt = self._one(conn, "SELECT * FROM tap_login_attempts WHERE login_hash=?", (login_key,), lock=True)
-            if attempt["locked_until"] > now:
-                failure = RateLimitError("로그인 시도가 많습니다. 15분 후 다시 시도하세요.")
-            else:
-                # Random dummy salt/digest does equal work without storing a default credential.
-                dummy = "$".join(("scrypt", str(_SCRYPT_N), str(_SCRYPT_R), str(_SCRYPT_P), base64.b64encode(b"\0" * 16).decode(), base64.b64encode(b"\0" * 32).decode()))
-                correct = verify_password(password, user["password_hash"] if user else dummy)
-                if not correct or not user or not user["active"] or (user["company_id"] and (not company or not company["active"])):
-                    failures = (attempt["failures"] if now - attempt["window_start"] < LOGIN_WINDOW_SECONDS else 0) + 1
-                    start = attempt["window_start"] if now - attempt["window_start"] < LOGIN_WINDOW_SECONDS else now
-                    self._execute(conn, "UPDATE tap_login_attempts SET failures=?,window_start=?,locked_until=? WHERE login_hash=?",
-                                  (failures, start, now + LOGIN_WINDOW_SECONDS if failures >= LOGIN_MAX_FAILURES else 0, login_key))
-                    failure = AuthenticationError("ID 또는 비밀번호를 확인하세요.")
-                else:
-                    self._execute(conn, "DELETE FROM tap_login_attempts WHERE login_hash=?", (login_key,))
-                    token = self._new_session(conn, user["id"])
-        if failure:
-            raise failure
-        return token
+            locked = attempt["locked_until"] > now
+            if not locked:
+                failures = (attempt["failures"] if now - attempt["window_start"] < LOGIN_WINDOW_SECONDS else 0) + 1
+                start = attempt["window_start"] if now - attempt["window_start"] < LOGIN_WINDOW_SECONDS else now
+                self._execute(conn, "UPDATE tap_login_attempts SET failures=?,window_start=?,locked_until=? WHERE login_hash=?",
+                              (failures, start, now + LOGIN_WINDOW_SECONDS if failures >= LOGIN_MAX_FAILURES else 0, login_key))
+        if locked:
+            raise RateLimitError("로그인 시도가 많습니다. 15분 후 다시 시도하세요.")
+        # Random dummy salt/digest does equal work without storing a default credential.
+        dummy = "$".join(("scrypt", str(_SCRYPT_N), str(_SCRYPT_R), str(_SCRYPT_P), base64.b64encode(b"\0" * 16).decode(), base64.b64encode(b"\0" * 32).decode()))
+        try:
+            correct = verify_password(password, user["password_hash"] if user else dummy)
+        except RateLimitError:
+            # Server busy: give the reserved attempt back so it is not a failure.
+            with self._transaction() as conn:
+                self._execute(conn, "UPDATE tap_login_attempts SET failures=CASE WHEN failures>0 THEN failures-1 ELSE 0 END,"
+                              "locked_until=CASE WHEN failures-1<? THEN 0 ELSE locked_until END WHERE login_hash=?",
+                              (LOGIN_MAX_FAILURES, login_key))
+            raise
+        if not correct or not user:
+            raise AuthenticationError("ID 또는 비밀번호를 확인하세요.")
+        with self._transaction() as conn:
+            # Re-read under lock: a reset or deactivation during the check wins.
+            current = self._one(conn, "SELECT * FROM tap_users WHERE id=?", (user["id"],), lock=True)
+            company = self._one(conn, "SELECT active FROM tap_companies WHERE id=?", (current["company_id"],)) if current and current["company_id"] else None
+            if (not current or current["password_hash"] != user["password_hash"] or not current["active"]
+                    or (current["company_id"] and (not company or not company["active"]))):
+                raise AuthenticationError("ID 또는 비밀번호를 확인하세요.")
+            self._execute(conn, "DELETE FROM tap_login_attempts WHERE login_hash=?", (login_key,))
+            return self._new_session(conn, current["id"])
 
     def _require(self, conn, token, roles=None, *, allow_password_change=False):
         if not isinstance(token, str) or not 32 <= len(token) <= 128:
@@ -296,17 +353,25 @@ class AccountStore:
         """``current_password`` may be None only for the forced first change: that
         session was just opened with the issued temporary password."""
         _password_input(new_password)
+        # Password checks run outside the transaction (see login); the write
+        # below only proceeds if the stored hash is still the one checked.
+        with self._transaction() as conn:
+            user = self._require(conn, token, allow_password_change=True)
+            checked = self._one(conn, "SELECT * FROM tap_users WHERE id=?", (user["id"],))
+        if current_password is None:
+            if not checked["must_change_password"]:
+                raise AuthenticationError("현재 비밀번호를 입력해 주세요.")
+        elif not verify_password(current_password, checked["password_hash"]):
+            raise AuthenticationError("현재 비밀번호가 맞지 않습니다.")
+        if verify_password(new_password, checked["password_hash"]):
+            raise ValidationError("기존 비밀번호와 다른 비밀번호를 입력하세요.")
+        new_hash = hash_password(new_password)
         with self._transaction() as conn:
             user = self._require(conn, token, allow_password_change=True)
             current = self._one(conn, "SELECT * FROM tap_users WHERE id=?", (user["id"],), lock=True)
-            if current_password is None:
-                if not current["must_change_password"]:
-                    raise AuthenticationError("현재 비밀번호를 입력해 주세요.")
-            elif not verify_password(current_password, current["password_hash"]):
-                raise AuthenticationError("현재 비밀번호가 맞지 않습니다.")
-            if verify_password(new_password, current["password_hash"]):
-                raise ValidationError("기존 비밀번호와 다른 비밀번호를 입력하세요.")
-            self._execute(conn, "UPDATE tap_users SET password_hash=?,must_change_password=0 WHERE id=?", (hash_password(new_password), user["id"]))
+            if current["password_hash"] != checked["password_hash"] or bool(current["must_change_password"]) != bool(checked["must_change_password"]):
+                raise ConflictError("비밀번호가 방금 변경되었습니다. 다시 시도해 주세요.")
+            self._execute(conn, "UPDATE tap_users SET password_hash=?,must_change_password=0 WHERE id=?", (new_hash, user["id"]))
             self._execute(conn, "DELETE FROM tap_sessions WHERE user_id=?", (user["id"],))
             self._audit(conn, user["id"], "change_password", user["id"])
             return self._new_session(conn, user["id"])
@@ -450,7 +515,7 @@ class AccountStore:
 
     def create_user(self, token: str, login_id: str, display_name: str, role: str, company_id: str | None, temp_password: str, *, profile: dict | None = None) -> dict:
         login_id, display_name = _login_id(login_id), _text(display_name, "이름")
-        _password_input(temp_password)
+        password_hash = hash_password(temp_password)  # before the transaction; see login
         profile = self._profile(profile)
         with self._transaction() as conn:
             actor = self._require(conn, token, {"kma", "company"})
@@ -462,7 +527,7 @@ class AccountStore:
             if not company:
                 raise ValidationError("회사를 확인하세요.")
             user_id = str(uuid.uuid4())
-            self._execute(conn, "INSERT INTO tap_users(id,login_id,display_name,role,company_id,password_hash,created_at,department,job_title,email,phone) VALUES (?,?,?,?,?,?,?,?,?,?,?)", (user_id, login_id, display_name, role, company_id, hash_password(temp_password), self._clock(), profile["department"], profile["job_title"], profile["email"], profile["phone"]))
+            self._execute(conn, "INSERT INTO tap_users(id,login_id,display_name,role,company_id,password_hash,created_at,department,job_title,email,phone) VALUES (?,?,?,?,?,?,?,?,?,?,?)", (user_id, login_id, display_name, role, company_id, password_hash, self._clock(), profile["department"], profile["job_title"], profile["email"], profile["phone"]))
             self._audit(conn, actor["id"], "create_user", user_id)
             return {"id": user_id, "login_id": login_id, "display_name": display_name, "role": role, "company_id": company_id, "active": True, "must_change_password": True, "company_name": company["name"], "company_slug": company["slug"], **profile}
 
@@ -473,11 +538,11 @@ class AccountStore:
         return target
 
     def reset_password(self, token: str, user_id: str, temp_password: str) -> None:
-        _password_input(temp_password)
+        password_hash = hash_password(temp_password)  # before the transaction; see login
         with self._transaction() as conn:
             actor = self._require(conn, token, {"kma", "company"})
             target = self._managed_user(conn, actor, user_id)
-            self._execute(conn, "UPDATE tap_users SET password_hash=?,must_change_password=1 WHERE id=?", (hash_password(temp_password), target["id"]))
+            self._execute(conn, "UPDATE tap_users SET password_hash=?,must_change_password=1 WHERE id=?", (password_hash, target["id"]))
             self._execute(conn, "DELETE FROM tap_sessions WHERE user_id=?", (target["id"],))
             self._execute(conn, "DELETE FROM tap_login_attempts WHERE login_hash=?", (hashlib.sha256(target["login_id"].encode()).hexdigest(),))
             self._audit(conn, actor["id"], "reset_password", target["id"])
