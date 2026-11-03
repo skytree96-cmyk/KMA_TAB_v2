@@ -246,17 +246,19 @@ def _render_results(questions: list[dict[str, Any]], config: Mapping[str, Any], 
 def _render_followup_courses(config: Mapping[str, Any], results: list[dict[str, Any]]) -> None:
     from tap.account_insights import recommend_courses
     courses = recommend_courses(config, results, limit=3)
-    st.subheader("추천 후속 과정")
+    st.subheader("보완 학습 제안")
     if not courses:
-        st.success("모든 역량이 목표 수준 이상입니다. 지금의 실천을 유지하며 적용 사례를 기록해 보세요.")
+        st.success("모든 역량이 목표 수준에 도달했거나 차이가 0.2점 미만입니다. 지금의 실천을 유지하며 적용 사례를 기록해 보세요.")
         return
     for course in courses:
         with st.container(border=True):
             st.markdown(f"**{course['title']}** · {course['delivery_label']}")
-            st.caption(f"관련 역량 {course['factor_name_ko']} · {course['mapping_rationale']}")
+            st.caption(f"관련 역량 {course['factor_name_ko']} · {course['reason']}")
+            if course["advice"]:
+                st.markdown(course["advice"])
             if course.get("url"):
-                st.link_button("과정 안내 보기", course["url"])
-    st.caption("교육 후 점수가 목표 수준에 못 미친 역량을 기준으로 골랐습니다. 수강 여부는 교육담당자와 상의해 주세요.")
+                st.link_button("KMA에서 과정 찾기", course["url"])
+    st.caption("교육 후 점수가 목표보다 0.2점 이상 낮은 역량을 기준으로 골랐습니다. 본인 응답(자기보고)에 근거한 제안이므로 수강 여부는 교육담당자와 상의해 주세요.")
 
 
 def _render_report_download(assignment: Mapping[str, Any], config: Mapping[str, Any], questions: list[dict[str, Any]],
