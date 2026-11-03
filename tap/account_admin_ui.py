@@ -342,7 +342,8 @@ def _render_create_user(store: Any, token: str, principal: Mapping[str, Any], co
                 st.rerun()
 
 
-def _render_batch(store: Any, token: str, principal: Mapping[str, Any], company: Mapping[str, Any], users: list[dict[str, Any]]) -> None:
+def _render_batch(store: Any, token: str, principal: Mapping[str, Any], company: Mapping[str, Any], users: list[dict[str, Any]],
+                  projects: list[dict[str, Any]] | None = None) -> None:
     with st.expander("CSV로 참여자 일괄 등록", key=PREFIX + f"batch_expander_{_identifier(company)}", on_change="rerun"):
         st.caption(f"CSV 파일 · 한 번에 최대 {MAX_BATCH_ROWS}명 · 아이디·이름은 필수이며 부서·직급·이메일·연락처는 선택입니다. 기존 아이디·이름 2열 양식도 사용할 수 있습니다. user 또는 user001처럼 user 뒤에 숫자만 붙인 기본 예시 아이디에만 회사 식별정보가 자동으로 붙습니다. 직접 정한 아이디와 회사 식별정보가 이미 붙은 아이디는 그대로 사용합니다. 임시 비밀번호는 모두 kma이며, 첫 로그인 때 변경해야 합니다.")
         st.download_button("CSV 양식 내려받기", CSV_TEMPLATE.encode("utf-8"), "tap_participants_template.csv", "text/csv", key=PREFIX + "batch_template")
@@ -354,31 +355,48 @@ def _render_batch(store: Any, token: str, principal: Mapping[str, Any], company:
         except ValueError as exc:
             st.error(str(exc))
             return
-        existing = {str(row["login_id"]).lower() for row in users}
+        existing = {str(row["login_id"]).lower(): row for row in users}
         duplicate_count = sum(row["login_id"] in existing for row in rows)
         st.dataframe([{"로그인 아이디": row["login_id"], "이름": row["display_name"], **{label: row.get(key, "") for key, (label, _) in PROFILE_FIELDS.items()}, "등록": "기존 계정 · 제외" if row["login_id"] in existing else "새 계정"} for row in rows], hide_index=True, width="stretch")
         pending = [row for row in rows if row["login_id"] not in existing]
         if duplicate_count:
             st.info(f"이미 등록된 {duplicate_count}개 계정은 변경하지 않습니다.")
-        if st.button(f"새 참여자 {len(pending)}명 등록", disabled=not pending, key=PREFIX + "batch_create"):
-            issued: list[dict[str, str]] = []
-            failures: list[str] = []
-            with st.spinner("참여자 계정을 발급하고 있습니다."):
-                for row in pending:
-                    password = _temporary_password("participant")
-                    try:
-                        store.create_user(token, row["login_id"], row["display_name"], "participant", _identifier(company), password, profile={key: row.get(key, "") for key in PROFILE_FIELDS})
-                    except Exception as exc:
-                        LOGGER.error("Participant batch account creation failed: %s", type(exc).__name__)
-                        failures.append(f"{row['login_id']}: {_safe_error(exc)}")
-                        if type(exc).__name__ in {"AuthenticationError", "AuthorizationError", "RateLimitError"}:
-                            break
+        projects_by_id = {_identifier(row): row for row in projects or [] if str(row.get("company_id")) == _identifier(company)}
+        project_id = st.selectbox(
+            "등록하면서 배정할 프로젝트", list(projects_by_id), index=None, placeholder="배정하지 않음",
+            format_func=lambda value: str(projects_by_id[value].get("name") or projects_by_id[value].get("project_name") or "교육평가 프로젝트"),
+            key=PREFIX + "batch_project", help="고르면 CSV의 참여자 전원(이미 등록된 계정 포함)을 이 프로젝트에 함께 배정합니다.",
+        ) if projects_by_id else None
+        # Existing accounts listed in the CSV are assigned too; inactive ones cannot be.
+        existing_ids = [_identifier(existing[row["login_id"]]) for row in rows
+                        if row["login_id"] in existing and existing[row["login_id"]].get("active", True)
+                        and existing[row["login_id"]].get("role") == "participant"] if project_id else []
+        if pending and project_id:
+            label = f"새 참여자 {len(pending)}명 등록 후 {len(pending) + len(existing_ids)}명 배정"
+        elif project_id:
+            label = f"기존 참여자 {len(existing_ids)}명 배정"
+        else:
+            label = f"새 참여자 {len(pending)}명 등록"
+        if st.button(label, disabled=not (pending or existing_ids), key=PREFIX + "batch_create", type="primary"):
+            password = _temporary_password("participant")
+            with st.spinner("참여자 계정을 처리하고 있습니다."):
+                try:
+                    # One transaction: either every row is saved or none is.
+                    if pending:
+                        store.create_users(token, "participant", _identifier(company), pending, password,
+                                           project_id=project_id, existing_user_ids=existing_ids)
                     else:
-                        issued.append({"login_id": row["login_id"], "display_name": row["display_name"], "temp_password": password})
-                        _remember_credentials([issued[-1]], principal)
-            _notice(f"참여자 {len(issued)}명 계정을 발급했습니다.")
-            if failures:
-                st.session_state[PREFIX + "batch_failures"] = failures
+                        store.assign_participants(token, project_id, existing_ids)
+                except Exception as exc:
+                    LOGGER.error("Participant batch failed: %s", type(exc).__name__)
+                    detail = str(exc) if type(exc).__name__ == "ConflictError" and str(exc).startswith("이미 사용 중인 아이디") else ""
+                    st.error(_safe_error(exc) + (f" {detail} · 아무 계정도 등록하지 않았습니다. 아이디를 바꿔 다시 올려 주세요." if detail else " 아무 계정도 등록하지 않았습니다."))
+                    return
+            _remember_credentials([{"login_id": row["login_id"], "display_name": row["display_name"], "temp_password": password} for row in pending], principal)
+            parts = [f"참여자 {len(pending)}명 계정을 발급했습니다"] if pending else []
+            if project_id:
+                parts.append(f"{len(pending) + len(existing_ids)}명을 프로젝트에 배정했습니다")
+            _notice(" · ".join(parts) + ".")
             st.rerun()
 
 
@@ -706,12 +724,53 @@ def _render_progress_board(project: Mapping[str, Any], everyone: list[Mapping[st
     if not shown:
         st.info("이 상태에 해당하는 참여자가 없습니다.")
         return
-    def department(row: Mapping[str, Any]) -> str:
-        return str(row.get("department") or "").strip() or NO_DEPARTMENT
-    names = sorted({department(row) for row in shown}, key=lambda name: (name == NO_DEPARTMENT, name))
+    names = sorted({_department(row) for row in shown}, key=lambda name: (name == NO_DEPARTMENT, name))
     for name in names:
-        _render_department(project_id, name, [row for row in shown if department(row) == name],
-                           [row for row in everyone if department(row) == name], expanded=len(names) == 1)
+        _render_department(project_id, name, [row for row in shown if _department(row) == name],
+                           [row for row in everyone if _department(row) == name], expanded=len(names) == 1)
+
+
+def _department(row: Mapping[str, Any]) -> str:
+    return str(row.get("department") or "").strip() or NO_DEPARTMENT
+
+
+def _bulk_pick(
+    rows: list[Mapping[str, Any]], pick_key: str, *, search_key: str, search_label: str, unit_label: str,
+    group: Callable[[Mapping[str, Any]], str] = _department, group_label: str = "부서 전체 선택",
+) -> list[str]:
+    """Pick whole groups in one click, plus individuals found by search.
+
+    Group chips stay visible and the individual picks are cut to the current
+    search, so the selection never contains someone the screen does not show.
+    """
+    groups: dict[str, list[Mapping[str, Any]]] = {}
+    for row in rows:
+        groups.setdefault(group(row), []).append(row)
+    names = sorted(groups, key=lambda name: (name == NO_DEPARTMENT, name))
+    group_key = pick_key + "_groups"
+    st.session_state[group_key] = [name for name in st.session_state.get(group_key) or [] if name in groups]
+    chosen = st.pills(group_label, names, selection_mode="multi", key=group_key,
+                      format_func=lambda name: f"{name} {len(groups[name])}") or []
+    in_groups = {_identifier(row) for name in chosen for row in groups[name]}
+    query = st.text_input(
+        search_label, key=search_key, placeholder="이름, 아이디, 부서, 직급으로 검색",
+        help="부서 전체 선택에 없는 사람을 한 명씩 더할 때 씁니다. 영문 대소문자는 구분하지 않습니다.",
+    ).strip().casefold()
+    matched = {_identifier(row): row for row in rows if _identifier(row) not in in_groups and _participant_matches(row, query)}
+    st.session_state[pick_key] = [value for value in st.session_state.get(pick_key) or [] if value in matched]
+    st.caption(f"검색 결과 {len(matched)}명 · {unit_label} {len(rows)}명")
+    if matched:
+        st.multiselect("개별 추가", list(matched), key=pick_key, placeholder="검색한 사람 중에서 한 명씩 고르세요",
+                       format_func=lambda value: f"{matched[value].get('display_name', '')} · {matched[value].get('login_id', '')}")
+    elif query:
+        st.info("검색 결과가 없습니다. 검색어를 다시 입력해 주세요.")
+    by_id = {_identifier(row): row for row in rows}
+    selected = [value for value in by_id if value in in_groups or value in st.session_state[pick_key]]
+    if selected:
+        st.dataframe([{"이름": by_id[value].get("display_name", ""), "로그인 아이디": by_id[value].get("login_id", ""),
+                       "부서": by_id[value].get("department", ""), "직급": by_id[value].get("job_title", "")} for value in selected],
+                     hide_index=True, width="stretch", height=min(400, 38 + 35 * len(selected)))
+    return selected
 
 
 def _render_assignments(store: Any, token: str, project: Mapping[str, Any], users: list[dict[str, Any]]) -> None:
@@ -760,28 +819,14 @@ def _render_assignments(store: Any, token: str, project: Mapping[str, Any], user
         st.session_state[assign_key] = []
         st.info("배정할 새 참여자가 없습니다. 참여자 계정을 발급하거나 기존 배정 현황을 확인해 주세요.")
         return
-    query = st.text_input(
-        "추가할 참여자 검색", key=PREFIX + f"assign_search_{project_id}",
-        placeholder="이름, 아이디, 부서, 직급으로 검색",
-        help="이름·아이디·부서·직급의 일부로 검색할 수 있습니다. 영문 대소문자는 구분하지 않습니다.",
-    ).strip().casefold()
-    matched_candidates = {user_id: row for user_id, row in candidates.items() if _participant_matches(row, query)}
-    st.session_state[assign_key] = [user_id for user_id in st.session_state.get(assign_key, []) if user_id in matched_candidates]
-    st.caption(f"검색 결과 {len(matched_candidates)}명 · 배정 가능한 참여자 {len(candidates)}명")
-    if not matched_candidates:
-        st.info("추가할 참여자 검색 결과가 없습니다. 검색어를 다시 입력해 주세요.")
-        return
-    selected = st.multiselect("추가할 참여자", list(matched_candidates), format_func=lambda value: f"{matched_candidates[value]['display_name']} · {matched_candidates[value]['login_id']}", key=assign_key)
-    if st.button(f"선택한 {len(selected)}명 배정", disabled=not selected, key=PREFIX + f"assign_save_{project_id}"):
-        count = 0
-        for user_id in selected:
-            ok, _ = _attempt(lambda user_id=user_id: store.assign_participant(token, project_id, user_id))
-            if not ok:
-                break
-            count += 1
-        if count:
+    st.markdown("**참여자 추가**")
+    selected = _bulk_pick(list(candidates.values()), assign_key, search_key=PREFIX + f"assign_search_{project_id}",
+                          search_label="추가할 참여자 검색", unit_label="배정 가능한 참여자")
+    if st.button(f"선택한 {len(selected)}명 배정", disabled=not selected, key=PREFIX + f"assign_save_{project_id}", type="primary"):
+        # One transaction: a failure leaves nobody half-assigned.
+        ok, count = _attempt(lambda: store.assign_participants(token, project_id, selected))
+        if ok:
             _notice(f"참여자 {count}명을 배정했습니다.")
-        if count == len(selected):
             st.rerun()
 
 
@@ -951,6 +996,47 @@ def _render_workspace_users(store: Any, token: str, principal: Mapping[str, Any]
                     *((label, user.get(key)) for key, (label, _) in PROFILE_FIELDS.items()),
                 ])
                 _render_user_actions(store, token, principal, user)
+    _render_bulk_accounts(store, token, principal, allowed)
+
+
+BULK_ACTIONS = {"reset": "임시 비밀번호 재발급", "deactivate": "사용 중지", "activate": "다시 활성화"}
+
+
+def _render_bulk_accounts(store: Any, token: str, principal: Mapping[str, Any], users: list[dict[str, Any]]) -> None:
+    """Reissue or stop many accounts at once, e.g. a whole department after a course."""
+    if not users:
+        return
+    with st.expander("여러 계정 한 번에 처리", key=PREFIX + "bulk_accounts", on_change="rerun"):
+        action = st.segmented_control("처리할 작업", list(BULK_ACTIONS), format_func=BULK_ACTIONS.get, default="reset",
+                                      key=PREFIX + "bulk_action", width="stretch") or "reset"
+        wanted = {"reset": None, "deactivate": True, "activate": False}[action]
+        rows = [row for row in users if wanted is None or bool(row.get("active", True)) == wanted]
+        if not rows:
+            st.info("이 작업을 할 계정이 없습니다.")
+            return
+        by_company = principal.get("role") == "kma"
+        selected = _bulk_pick(
+            rows, PREFIX + f"bulk_{action}", search_key=PREFIX + f"bulk_{action}_search", search_label="계정 검색",
+            unit_label="대상 계정", group=(lambda row: str(row.get("company_name") or "회사 미등록")) if by_company else _department,
+            group_label="회사 전체 선택" if by_company else "부서 전체 선택",
+        )
+        st.caption({"reset": "임시 비밀번호는 모두 kma로 재발급되고 기존 로그인은 종료됩니다. 다음 로그인 때 새 비밀번호로 바꿉니다.",
+                    "deactivate": "사용 중지한 계정은 바로 로그아웃되고 로그인할 수 없습니다. 검사 결과는 보존됩니다.",
+                    "activate": "다시 활성화한 계정은 기존 비밀번호로 로그인합니다."}[action])
+        if st.button(f"선택한 {len(selected)}명 {BULK_ACTIONS[action]}", disabled=not selected, key=PREFIX + "bulk_save", type="primary"):
+            # One transaction: either every selected account changes or none does.
+            if action == "reset":
+                password = _temporary_password("participant")
+                ok, count = _attempt(lambda: store.reset_passwords(token, selected, password))
+                if ok:
+                    picked = {_identifier(row): row for row in rows}
+                    _remember_credentials([{"login_id": str(picked[value]["login_id"]), "display_name": str(picked[value].get("display_name") or ""),
+                                            "temp_password": password} for value in selected], principal)
+            else:
+                ok, count = _attempt(lambda: store.set_users_active(token, selected, action == "activate"))
+            if ok:
+                _notice(f"{count}명 계정을 {BULK_ACTIONS[action]}했습니다." if action != "reset" else f"{count}명에게 임시 비밀번호를 재발급했습니다.")
+                st.rerun()
 
 
 def _render_workspace_projects(store: Any, token: str, principal: Mapping[str, Any], projects: list[dict[str, Any]], users: list[dict[str, Any]]) -> None:
@@ -1020,7 +1106,7 @@ def _render_workspace(
                     st.info("먼저 회원사를 등록해 주세요.")
             else:
                 _render_create_user(store, token, principal, company, "participant", show_heading=False)
-                _render_batch(store, token, principal, company, users)
+                _render_batch(store, token, principal, company, users, projects)
         _render_workspace_users(store, token, principal, users)
 
 
@@ -1036,10 +1122,6 @@ def render_admin(store: Any, token: str, principal: Mapping[str, Any], *, sectio
     st.title(WORKSPACE_SECTIONS[role][section] if section is not None else ("회원사·계정 관리" if role == "kma" else "교육 운영 관리"))
     if notice := st.session_state.pop(PREFIX + "notice", None):
         st.success(notice)
-    if failures := st.session_state.pop(PREFIX + "batch_failures", None):
-        st.warning("일부 계정은 등록하지 못했습니다. 성공한 계정의 로그인 정보를 먼저 확인한 뒤 실패한 행을 다시 등록해 주세요.")
-        for failure in failures:
-            st.write(failure)
     _render_credentials(principal)
     ok, companies = _attempt(lambda: store.list_companies(token))
     if not ok:
@@ -1050,7 +1132,8 @@ def render_admin(store: Any, token: str, principal: Mapping[str, Any], *, sectio
         if not ok:
             return
     projects: list[dict[str, Any]] = []
-    if section is None or section == "projects":
+    # The participant CSV can assign a project right away, so it needs the list too.
+    if section is None or section == "projects" or (section == "accounts" and role == "company"):
         ok, projects = _attempt(lambda: store.list_projects(token))
         if not ok:
             return
@@ -1089,5 +1172,5 @@ def render_admin(store: Any, token: str, principal: Mapping[str, Any], *, sectio
             _render_project_create(store, token)
         with user_tab:
             _render_create_user(store, token, principal, company, "participant")
-            _render_batch(store, token, principal, company, users)
+            _render_batch(store, token, principal, company, users, projects)
             _render_manage_users(store, token, principal, users)

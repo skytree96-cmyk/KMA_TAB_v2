@@ -313,6 +313,46 @@ class AccountStoreTests(unittest.TestCase):
         self.assertEqual(len(boundary["department"]), 100)
         self.assertEqual(len(boundary["job_title"]), 80)
 
+    def test_bulk_creation_is_all_or_nothing_and_assigns_listed_existing_accounts(self):
+        existing, _ = self.user(suffix="old")
+        project = self.project()
+        rows = [{"login_id": "0123456789-new1", "display_name": "새1", "department": "영업"},
+                {"login_id": "0123456789-old", "display_name": "중복"}]
+        with self.assertRaisesRegex(ConflictError, "0123456789-old"):
+            self.store.create_users(self.admin, "participant", self.a["id"], rows, "kma", project_id=project["id"])
+        self.assertEqual(len(self.store.list_users(self.admin)), 2)  # admin + existing; nothing half-created
+        created = self.store.create_users(self.admin, "participant", self.a["id"], rows[:1] + [{"login_id": "0123456789-new2", "display_name": "새2"}],
+                                          "kma", project_id=project["id"], existing_user_ids=[existing["id"]])
+        self.assertEqual([row["department"] for row in created], ["영업", ""])
+        self.assertEqual({row["login_id"] for row in self.store.list_assignments(self.admin, project["id"])},
+                         {"0123456789-new1", "0123456789-new2", "0123456789-old"})
+        self.store.login("0123456789-new2", "kma")
+        foreign, _ = self.user(company=self.b, suffix="x")
+        with self.assertRaises(AuthorizationError):
+            self.store.create_users(self.admin, "participant", self.a["id"], [{"login_id": "0123456789-new3", "display_name": "새3"}],
+                                    "kma", project_id=project["id"], existing_user_ids=[foreign["id"]])
+        self.assertNotIn("0123456789-new3", {row["login_id"] for row in self.store.list_users(self.admin)})
+
+    def test_bulk_assignment_reset_and_deactivation_roll_back_on_one_bad_target(self):
+        users = [self.user(suffix=f"b{i}")[0] for i in range(3)]
+        foreign, _ = self.user(company=self.b, suffix="x")
+        project = self.project()
+        ids = [row["id"] for row in users]
+        with self.assertRaises(AuthorizationError):
+            self.store.assign_participants(self.admin, project["id"], ids + [foreign["id"]])
+        self.assertEqual(self.store.list_assignments(self.admin, project["id"]), [])
+        self.assertEqual(self.store.assign_participants(self.admin, project["id"], ids[:2]), 2)
+        self.assertEqual(self.store.assign_participants(self.admin, project["id"], ids), 1)
+        manager = self.user("company", suffix="manager-a")[1]
+        with self.assertRaises(AuthorizationError):
+            self.store.set_users_active(manager, ids + [foreign["id"]], False)
+        self.assertTrue(all(row["active"] for row in self.store.list_users(self.admin)))
+        self.assertEqual(self.store.set_users_active(manager, ids, False), 3)
+        self.assertEqual(sum(not row["active"] for row in self.store.list_users(self.admin)), 3)
+        self.assertEqual(self.store.reset_passwords(manager, ids, "kma"), 3)
+        with self.assertRaises(ValidationError):
+            self.store.reset_passwords(manager, [], "kma")
+
     def test_reset_and_deactivation_revoke_existing_sessions(self):
         user, token = self.user()
         self.store.reset_password(self.admin, user["id"], INITIAL)

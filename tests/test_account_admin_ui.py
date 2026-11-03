@@ -179,6 +179,10 @@ class Store:
         user = {"id":"u" + str(len(st.session_state["all_issued"]) + 1), "login_id":login_id, "display_name":display_name, "role":role, "company_id":company_id, "company_name":"테스트 회원사", "active":True, **(profile or {})}
         st.session_state["users"] = self.list_users(token) + [user]
         return user
+    def create_users(self, token, role, company_id, rows, temp_password, *, project_id=None, existing_user_ids=None):
+        st.session_state["batch_assignment"] = (project_id, existing_user_ids)
+        return [self.create_user(token, row["login_id"], row["display_name"], role, company_id, temp_password,
+                                 profile={key: value for key, value in row.items() if key not in {"login_id", "display_name"}}) for row in rows]
     def reset_password(self, token, user_id, temp_password):
         st.session_state["reset"] = {"user_id":user_id, "password":temp_password}
     def create_project(self, token, name, config):
@@ -270,6 +274,82 @@ _render_assignments(Store(), "token", {"id": "p1", "company_id": "co1", "config"
         self.assertEqual(statuses, {"미시작"})
         self.assertEqual(sum(len(frame.value) for frame in app.dataframe), 9)
 
+class BulkActionTests(unittest.TestCase):
+    def test_department_chip_assigns_everyone_in_one_call(self):
+        app = AppTest.from_string('''
+import streamlit as st
+from tap.account_admin_ui import _render_assignments
+users = [{"id": f"s{i}", "display_name": f"영업{i}", "login_id": f"sales{i}", "department": "영업본부"} for i in range(12)]
+users += [{"id": "h1", "display_name": "인사", "login_id": "hr1", "department": ""}]
+users = [{"role": "participant", "company_id": "co1", "active": True, **row} for row in users]
+class Store:
+    def list_assignments(self, token, project_id):
+        return []
+    def assign_participants(self, token, project_id, user_ids):
+        st.session_state["calls"] = st.session_state.get("calls", []) + [list(user_ids)]
+        return len(user_ids)
+_render_assignments(Store(), "token", {"id": "p1", "company_id": "co1"}, users)
+''').run(timeout=30)
+        chips = app.button_group(key="account_admin_assign_p1_groups")
+        self.assertEqual(chips.options, ["영업본부 12", "부서 미등록 1"])
+        chips.set_value(["영업본부"])
+        run_app(app)
+        # Department members leave the individual list, so nobody is counted twice.
+        self.assertEqual(app.multiselect(key="account_admin_assign_p1").options, ["인사 · hr1"])
+        app.multiselect(key="account_admin_assign_p1").set_value(["h1"])
+        run_app(app)
+        self.assertEqual(len(app.dataframe[-1].value), 13)
+        app.button(key="account_admin_assign_save_p1").click()
+        run_app(app)
+        self.assertEqual(list(app.exception), [])
+        self.assertEqual(app.session_state["calls"], [[f"s{i}" for i in range(12)] + ["h1"]])
+
+    def test_csv_can_issue_and_assign_existing_and_new_people_together(self):
+        app = AppTest.from_string(APP.replace("ROLE", repr("company")).replace(
+            "    def list_projects(self, token):\n        return []",
+            "    def list_projects(self, token):\n        return [{\"id\":\"p1\", \"name\":\"리더 과정\", \"company_id\":\"co1\", \"config\":{}}]")).run(timeout=30)
+        app.session_state["users"] = [{"id":"old", "login_id":"acme-user001", "display_name":"기존", "role":"participant", "company_id":"co1", "active":True}]
+        app.session_state["account_admin_company_tabs"] = "참여자 계정"
+        app.session_state["account_admin_batch_expander_co1"] = True
+        run_app(app)
+        app.get("file_uploader")[0].upload("p.csv", "아이디,이름\nuser001,기존\nuser002,새사람\n".encode(), "text/csv")
+        run_app(app)
+        app.selectbox(key="account_admin_batch_project").set_value("p1")
+        run_app(app)
+        next(item for item in app.button if item.label == "새 참여자 1명 등록 후 2명 배정").click()
+        run_app(app)
+        self.assertEqual(list(app.exception), [])
+        self.assertEqual([item["login_id"] for item in app.session_state["all_issued"]], ["acme-user002"])
+        self.assertEqual(app.session_state["batch_assignment"], ("p1", ["old"]))
+        self.assertTrue(any("2명을 프로젝트에 배정" in item.value for item in app.success))
+
+    def test_bulk_accounts_reset_a_department_and_remember_credentials(self):
+        app = AppTest.from_string('''
+import streamlit as st
+from tap.account_admin_ui import _render_bulk_accounts
+users = [{"id": f"u{i}", "display_name": f"사람{i}", "login_id": f"acme-u{i}", "role": "participant", "company_id": "co1",
+          "department": "영업" if i < 3 else "기획", "active": i != 4} for i in range(5)]
+class Store:
+    def reset_passwords(self, token, user_ids, password):
+        st.session_state["reset"] = (list(user_ids), password)
+        return len(user_ids)
+    def set_users_active(self, token, user_ids, active):
+        st.session_state["active"] = (list(user_ids), active)
+        return len(user_ids)
+_render_bulk_accounts(Store(), "token", {"id": "m", "role": "company", "company_id": "co1"}, users)
+''').run(timeout=30)
+        app.button_group(key="account_admin_bulk_reset_groups").set_value(["영업"])
+        run_app(app)
+        app.button(key="account_admin_bulk_save").click()
+        run_app(app)
+        self.assertEqual(list(app.exception), [])
+        self.assertEqual(app.session_state["reset"], (["u0", "u1", "u2"], "kma"))
+        self.assertEqual(len(app.session_state["account_admin_credentials"]["rows"]), 3)
+        app.button_group(key="account_admin_bulk_action").set_value("activate")
+        run_app(app)
+        self.assertEqual(app.button_group(key="account_admin_bulk_activate_groups").options, ["기획 1"])
+
+
 class AccountAdminRenderTests(unittest.TestCase):
     def test_assignment_can_be_removed_and_reactivated_without_deleting_account(self):
         app = AppTest.from_string('''
@@ -309,8 +389,9 @@ class Store:
         ]
     def set_assignment_active(self, token, assignment_id, active):
         st.session_state["changed_assignment"] = (assignment_id, active)
-    def assign_participant(self, token, project_id, user_id):
-        st.session_state["new_assignment"] = (project_id, user_id)
+    def assign_participants(self, token, project_id, user_ids):
+        st.session_state["new_assignment"] = (project_id, user_ids)
+        return len(user_ids)
 users = [
     {"id":"u1", "display_name":"홍길동", "login_id":"alpha-hong", "department":"교육Team", "job_title":"대리"},
     {"id":"u2", "display_name":"김다른", "login_id":"beta-other", "department":"기획", "job_title":"차장"},
@@ -355,7 +436,7 @@ _render_assignments(Store(), "token", {"id":"p1", "company_id":"co1"}, users)
         run_app(app)
         app.button(key="account_admin_assign_save_p1").click()
         run_app(app)
-        self.assertEqual(app.session_state["new_assignment"], ("p1", "n2"))
+        self.assertEqual(app.session_state["new_assignment"], ("p1", ["n2"]))
         for key in ("account_admin_assignment_search_p1", "account_admin_assign_search_p1"):
             app.text_input(key=key).input("검색 결과 없음")
         run_app(app)

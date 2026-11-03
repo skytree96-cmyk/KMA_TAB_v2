@@ -63,6 +63,8 @@ _SCRYPT_N, _SCRYPT_R, _SCRYPT_P = 2**15, 8, 3
 _LOGIN_RE = re.compile(r"[a-z0-9][a-z0-9._-]{2,63}\Z")
 _REGISTRATION_RE = re.compile(r"[0-9]{10}\Z")
 _PROFILE_LIMITS = {"department": 100, "job_title": 80, "email": 254, "phone": 40}
+# Bulk actions run in one transaction; the UI's CSV limit is 200 rows.
+_MAX_BULK = 200
 _PROFILE_LABELS = {"department": "부서", "job_title": "직급", "email": "이메일", "phone": "연락처"}
 _EMAIL_RE = re.compile(r"[^@\s]+@[^@\s]+\.[^@\s]+\Z")
 _PHONE_RE = re.compile(r"\+?[0-9][0-9 ().-]*\Z")
@@ -514,9 +516,30 @@ class AccountStore:
         return cleaned
 
     def create_user(self, token: str, login_id: str, display_name: str, role: str, company_id: str | None, temp_password: str, *, profile: dict | None = None) -> dict:
-        login_id, display_name = _login_id(login_id), _text(display_name, "이름")
-        password_hash = hash_password(temp_password)  # before the transaction; see login
         profile = self._profile(profile)
+        return self.create_users(token, role, company_id, [{"login_id": login_id, "display_name": display_name, **profile}], temp_password)[0]
+
+    def create_users(self, token: str, role: str, company_id: str | None, rows: list[dict], temp_password: str, *,
+                     project_id: str | None = None, existing_user_ids: list[str] | None = None) -> list[dict]:
+        """Create every account, and optionally assign it, or none of them.
+
+        existing_user_ids are accounts the same CSV listed that already exist;
+        they are assigned to project_id together with the new ones.
+
+        The shared temporary password is hashed once: a 100-row CSV would
+        otherwise spend ~90 CPU-seconds on identical scrypt work.
+        """
+        if not isinstance(rows, list) or not 1 <= len(rows) <= _MAX_BULK:
+            raise ValidationError(f"한 번에 1~{_MAX_BULK}명까지 처리할 수 있습니다.")
+        cleaned = []
+        for row in rows:
+            if not isinstance(row, dict):
+                raise ValidationError("계정 정보 형식을 확인해 주세요.")
+            profile = {key: value for key, value in row.items() if key not in {"login_id", "display_name"}}
+            cleaned.append((_login_id(row.get("login_id")), _text(row.get("display_name"), "이름"), self._profile(profile)))
+        if len({login_id for login_id, _, _ in cleaned}) != len(cleaned):
+            raise ValidationError("같은 아이디가 두 번 있습니다.")
+        password_hash = hash_password(temp_password)  # before the transaction; see login
         with self._transaction() as conn:
             actor = self._require(conn, token, {"kma", "company"})
             if role not in {"company", "participant"}:
@@ -526,10 +549,19 @@ class AccountStore:
             company = self._one(conn, "SELECT * FROM tap_companies WHERE id=? AND active=1", (company_id,))
             if not company:
                 raise ValidationError("회사를 확인하세요.")
-            user_id = str(uuid.uuid4())
-            self._execute(conn, "INSERT INTO tap_users(id,login_id,display_name,role,company_id,password_hash,created_at,department,job_title,email,phone) VALUES (?,?,?,?,?,?,?,?,?,?,?)", (user_id, login_id, display_name, role, company_id, password_hash, self._clock(), profile["department"], profile["job_title"], profile["email"], profile["phone"]))
-            self._audit(conn, actor["id"], "create_user", user_id)
-            return {"id": user_id, "login_id": login_id, "display_name": display_name, "role": role, "company_id": company_id, "active": True, "must_change_password": True, "company_name": company["name"], "company_slug": company["slug"], **profile}
+            logins = [login_id for login_id, _, _ in cleaned]
+            taken = [row["login_id"] for row in self._all(conn, "SELECT login_id FROM tap_users WHERE login_id IN (" + ",".join("?" * len(logins)) + ") ORDER BY login_id", logins)]
+            if taken:
+                raise ConflictError("이미 사용 중인 아이디: " + ", ".join(taken))
+            created = []
+            for login_id, display_name, profile in cleaned:
+                user_id = str(uuid.uuid4())
+                self._execute(conn, "INSERT INTO tap_users(id,login_id,display_name,role,company_id,password_hash,created_at,department,job_title,email,phone) VALUES (?,?,?,?,?,?,?,?,?,?,?)", (user_id, login_id, display_name, role, company_id, password_hash, self._clock(), profile["department"], profile["job_title"], profile["email"], profile["phone"]))
+                self._audit(conn, actor["id"], "create_user", user_id)
+                created.append({"id": user_id, "login_id": login_id, "display_name": display_name, "role": role, "company_id": company_id, "active": True, "must_change_password": True, "company_name": company["name"], "company_slug": company["slug"], **profile})
+            if project_id is not None:
+                self._assign(conn, actor, project_id, [row["id"] for row in created] + list(existing_user_ids or []))
+            return created
 
     def _managed_user(self, conn, actor, user_id):
         target = self._one(conn, "SELECT * FROM tap_users WHERE id=?", (user_id,), lock=True)
@@ -537,25 +569,44 @@ class AccountStore:
             raise AuthorizationError("관리할 수 없는 계정입니다.")
         return target
 
+    @staticmethod
+    def _ids(values) -> list[str]:
+        if not isinstance(values, list) or not 1 <= len(values) <= _MAX_BULK or any(not isinstance(v, str) for v in values):
+            raise ValidationError(f"한 번에 1~{_MAX_BULK}명까지 처리할 수 있습니다.")
+        return list(dict.fromkeys(values))
+
     def reset_password(self, token: str, user_id: str, temp_password: str) -> None:
+        self.reset_passwords(token, [user_id], temp_password)
+
+    def reset_passwords(self, token: str, user_ids: list[str], temp_password: str) -> int:
+        """Reissue one shared temporary password to every account, or to none."""
+        user_ids = self._ids(user_ids)
         password_hash = hash_password(temp_password)  # before the transaction; see login
         with self._transaction() as conn:
             actor = self._require(conn, token, {"kma", "company"})
-            target = self._managed_user(conn, actor, user_id)
-            self._execute(conn, "UPDATE tap_users SET password_hash=?,must_change_password=1 WHERE id=?", (password_hash, target["id"]))
-            self._execute(conn, "DELETE FROM tap_sessions WHERE user_id=?", (target["id"],))
-            self._execute(conn, "DELETE FROM tap_login_attempts WHERE login_hash=?", (hashlib.sha256(target["login_id"].encode()).hexdigest(),))
-            self._audit(conn, actor["id"], "reset_password", target["id"])
+            for user_id in user_ids:
+                target = self._managed_user(conn, actor, user_id)
+                self._execute(conn, "UPDATE tap_users SET password_hash=?,must_change_password=1 WHERE id=?", (password_hash, target["id"]))
+                self._execute(conn, "DELETE FROM tap_sessions WHERE user_id=?", (target["id"],))
+                self._execute(conn, "DELETE FROM tap_login_attempts WHERE login_hash=?", (hashlib.sha256(target["login_id"].encode()).hexdigest(),))
+                self._audit(conn, actor["id"], "reset_password", target["id"])
+            return len(user_ids)
 
     def set_user_active(self, token: str, user_id: str, active: bool) -> None:
+        self.set_users_active(token, [user_id], active)
+
+    def set_users_active(self, token: str, user_ids: list[str], active: bool) -> int:
         if type(active) is not bool:
             raise ValidationError("활성 상태를 확인하세요.")
+        user_ids = self._ids(user_ids)
         with self._transaction() as conn:
             actor = self._require(conn, token, {"kma", "company"})
-            target = self._managed_user(conn, actor, user_id)
-            self._execute(conn, "UPDATE tap_users SET active=? WHERE id=?", (int(active), target["id"]))
-            self._execute(conn, "DELETE FROM tap_sessions WHERE user_id=?", (target["id"],))
-            self._audit(conn, actor["id"], "activate_user" if active else "deactivate_user", target["id"])
+            for user_id in user_ids:
+                target = self._managed_user(conn, actor, user_id)
+                self._execute(conn, "UPDATE tap_users SET active=? WHERE id=?", (int(active), target["id"]))
+                self._execute(conn, "DELETE FROM tap_sessions WHERE user_id=?", (target["id"],))
+                self._audit(conn, actor["id"], "activate_user" if active else "deactivate_user", target["id"])
+            return len(user_ids)
 
     @staticmethod
     def _project_config(config: dict, question_overrides: dict | None = None) -> dict:
@@ -640,14 +691,30 @@ class AccountStore:
     def assign_participant(self, token: str, project_id: str, user_id: str) -> dict:
         with self._transaction() as conn:
             actor = self._require(conn, token, {"kma", "company"})
-            project = self._project(conn, actor, project_id)
+            self._assign(conn, actor, project_id, [user_id])
+            return self._assignments(conn, "a.project_id=? AND a.user_id=?", (project_id, user_id))[0]
+
+    def assign_participants(self, token: str, project_id: str, user_ids: list[str]) -> int:
+        """Assign everyone or no one; returns how many were newly assigned."""
+        user_ids = self._ids(user_ids)
+        with self._transaction() as conn:
+            actor = self._require(conn, token, {"kma", "company"})
+            return self._assign(conn, actor, project_id, user_ids)
+
+    def _assign(self, conn, actor, project_id, user_ids) -> int:
+        project = self._project(conn, actor, project_id)
+        added = 0
+        for user_id in user_ids:
             user = self._one(conn, "SELECT * FROM tap_users WHERE id=? AND role='participant' AND active=1", (user_id,))
             if not user or user["company_id"] != project["company_id"]:
                 raise AuthorizationError("같은 회사의 활성 참여자만 배정할 수 있습니다.")
-            self._execute(conn, "INSERT INTO tap_assignments(id,project_id,user_id,created_at) VALUES (?,?,?,?) ON CONFLICT (project_id,user_id) DO NOTHING", (str(uuid.uuid4()), project_id, user_id, self._clock()))
-            result = self._assignments(conn, "a.project_id=? AND a.user_id=?", (project_id, user_id))[0]
-            self._audit(conn, actor["id"], "assign_participant", result["id"])
-            return result
+            existing = self._one(conn, "SELECT id FROM tap_assignments WHERE project_id=? AND user_id=?", (project_id, user_id))
+            if existing is None:
+                self._execute(conn, "INSERT INTO tap_assignments(id,project_id,user_id,created_at) VALUES (?,?,?,?) ON CONFLICT (project_id,user_id) DO NOTHING", (str(uuid.uuid4()), project_id, user_id, self._clock()))
+                existing = self._one(conn, "SELECT id FROM tap_assignments WHERE project_id=? AND user_id=?", (project_id, user_id))
+                added += 1
+            self._audit(conn, actor["id"], "assign_participant", existing["id"])
+        return added
 
     def _assignments(self, conn, where, params):
         rows = self._all(conn, "SELECT a.*,u.display_name AS user_name,u.login_id,p.name AS project_name,p.company_id,p.config_json,COALESCE(pre.completed,0) AS pre_completed,COALESCE(post.completed,0) AS post_completed FROM tap_assignments a JOIN tap_users u ON u.id=a.user_id JOIN tap_projects p ON p.id=a.project_id LEFT JOIN tap_assessments pre ON pre.assignment_id=a.id AND pre.phase='pre' LEFT JOIN tap_assessments post ON post.assignment_id=a.id AND post.phase='post' WHERE " + where + " ORDER BY a.created_at,a.id", params)

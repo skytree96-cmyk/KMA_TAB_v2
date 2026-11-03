@@ -89,7 +89,7 @@ class AccountWorkspaceTests(unittest.TestCase):
             ("kma", "companies", ["companies"]),
             ("company", "create_project", ["companies"]),
             ("kma", "accounts", ["companies", "users"]),
-            ("company", "accounts", ["companies", "users"]),
+            ("company", "accounts", ["companies", "users", "projects"]),
             ("kma", "projects", ["companies", "projects"]),
             ("company", "projects", ["companies", "users", "projects"]),
         ):
@@ -147,7 +147,7 @@ class AccountWorkspaceTests(unittest.TestCase):
         rerun(app)
         self.assertEqual(app.radio(key="account_admin_manage_user").options, ["홍길동 · alpha-hong", "김하나 · Beta-Kim"])
         # Company managers only see their participants, so no role split is offered.
-        self.assertEqual(self.app("accounts", "company").get("button_group"), [])
+        self.assertFalse(any(item.key == "account_admin_manage_user_role" for item in self.app("accounts", "company").get("button_group")))
 
     def test_kma_issue_company_is_found_by_search(self):
         app = self.app("accounts", account_admin_workspace_issue_kma=True)
