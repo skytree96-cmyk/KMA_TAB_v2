@@ -672,7 +672,18 @@ class AccountStore:
                     self._project(conn, actor, project_id)
                 conditions.append("a.project_id=?")
                 params.append(project_id)
-            return self._assignments(conn, " AND ".join(conditions), params)
+            where = " AND ".join(conditions)
+            rows = self._assignments(conn, where, params)
+            if project_id and actor["role"] != "participant":
+                # Managers' progress board: saved answers of unfinished drafts.
+                # Only this per-project view pays for reading the drafts.
+                answered = {(row["assignment_id"], row["phase"]): len(json.loads(row["payload_json"]).get("responses") or {})
+                            for row in self._all(conn, "SELECT s.assignment_id,s.phase,s.payload_json FROM tap_assessments s JOIN tap_assignments a ON a.id=s.assignment_id JOIN tap_projects p ON p.id=a.project_id WHERE s.completed=0 AND " + where, params)}
+                for row in rows:
+                    row["question_count"] = len(row["config"].get("question_snapshot_codes") or [])
+                    for phase in ("pre", "post"):
+                        row[phase + "_answered"] = row["question_count"] if row[phase + "_completed"] else answered.get((row["id"], phase), 0)
+            return rows
 
     def set_assignment_active(self, token: str, assignment_id: str, active: bool) -> None:
         """Remove/reinstate a project assignment without disabling its account."""

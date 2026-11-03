@@ -205,6 +205,71 @@ def run_app(app: AppTest) -> AppTest:
     return app._run(states, timeout=30)
 
 
+class ProgressBoardTests(unittest.TestCase):
+    def test_status_follows_the_furthest_phase_and_inactive_wins(self):
+        from tap.account_admin_ui import participant_status
+        self.assertEqual(participant_status({}), ("미시작", ""))
+        self.assertEqual(participant_status({"pre_answered": 12, "question_count": 24}), ("진행 중", "교육 전 12/24"))
+        self.assertEqual(participant_status({"pre_completed": True, "pre_answered": 24}), ("교육 전 완료", ""))
+        self.assertEqual(participant_status({"pre_completed": True, "post_answered": 3, "question_count": 24}), ("진행 중", "교육 후 3/24"))
+        self.assertEqual(participant_status({"post_completed": True}), ("교육 후 완료", ""))
+        self.assertEqual(participant_status({"active": False, "post_completed": True}), ("배정 해제", ""))
+
+    def test_initial_ranges_are_balanced_and_cover_every_consonant(self):
+        from tap.account_admin_ui import initial_ranges
+        self.assertEqual([label for label, _ in initial_ranges([{"user_name": f"김{i}"} for i in range(10)])], [""])
+        surnames = "김이박최정강조윤장임한오서신권황안송류홍"
+        rows = [{"user_name": surnames[i % len(surnames)] + str(i)} for i in range(34)] + [{"user_name": "Alice"}]
+        ranges = initial_ranges(rows)
+        self.assertEqual(len(ranges), 4)
+        self.assertEqual(sum(len(members) for _, members in ranges), len(rows))
+        self.assertTrue(ranges[0][0].startswith("ㄱ"))
+        self.assertIn("ㅎ·기타", ranges[-1][0])
+        self.assertLessEqual(max(len(m) for _, m in ranges), len(rows) // 2)
+
+    def test_incomplete_csv_lists_current_phase_only_and_blocks_formulas(self):
+        from tap.account_admin_ui import incomplete_csv
+        rows = [{"id": "a1", "user_name": "=cmd", "login_id": "x1", "department": "영업", "pre_answered": 3, "question_count": 24},
+                {"id": "a2", "user_name": "끝냄", "login_id": "x2", "pre_completed": True},
+                {"id": "a3", "user_name": "해제", "login_id": "x3", "active": False}]
+        label, content, count = incomplete_csv({"config": {"post_start_date": "2999-01-01"}}, rows)
+        self.assertEqual((label, count), ("교육 전 미완료자 명단 CSV (1명)", 1))
+        text = content.decode("utf-8-sig")
+        self.assertIn("'=cmd,x1,영업,,진행 중,교육 전 3/24", text)
+        self.assertNotIn("끝냄", text)
+        label, _, count = incomplete_csv({"config": {"post_start_date": "2000-01-01"}}, rows)
+        self.assertEqual((label, count), ("교육 후 미완료자 명단 CSV (2명)", 2))
+
+    def test_board_filters_by_status_groups_departments_and_pages(self):
+        app = AppTest.from_string('''
+import streamlit as st
+from tap.account_admin_ui import _render_assignments
+rows = []
+for i in range(23):
+    rows.append({"id": f"s{i}", "user_id": f"s{i}", "user_name": "가나다라마바사아자차카타파하"[i % 14] + "영업" + str(i),
+                 "login_id": f"sales{i}", "active": True, "question_count": 24,
+                 "pre_completed": i < 10, "pre_answered": 24 if i < 10 else (5 if i < 15 else 0)})
+rows.append({"id": "h1", "user_id": "h1", "user_name": "인사담당", "login_id": "hr1", "active": True, "question_count": 24})
+users = [{"id": row["user_id"], "role": "participant", "company_id": "co1", "active": True,
+          "department": "영업본부" if row["id"].startswith("s") else ""} for row in rows]
+class Store:
+    def list_assignments(self, token, project_id):
+        return rows
+_render_assignments(Store(), "token", {"id": "p1", "company_id": "co1", "config": {"post_start_date": "2999-01-01"}}, users)
+''').run(timeout=30)
+        self.assertEqual(list(app.exception), [])
+        expanders = [item.label for item in app.expander if "완료" in item.label]
+        self.assertEqual(expanders, ["영업본부 · 교육 전 완료 10/23명", "부서 미등록 · 교육 전 완료 0/1명"])
+        ranges = app.segmented_control(key="account_admin_board_range_p1_" + __import__("hashlib").sha256("영업본부".encode()).hexdigest()[:10])
+        self.assertEqual(len(ranges.options), 3)
+        self.assertEqual(len(app.dataframe[0].value), int(ranges.value.rsplit(" ", 1)[1]))
+        app.session_state["account_admin_board_status_p1"] = "미시작"
+        run_app(app)
+        self.assertEqual(list(app.exception), [])
+        statuses = {status for frame in app.dataframe for status in frame.value["상태"]}
+        self.assertEqual(statuses, {"미시작"})
+        self.assertEqual(sum(len(frame.value) for frame in app.dataframe), 9)
+
 class AccountAdminRenderTests(unittest.TestCase):
     def test_assignment_can_be_removed_and_reactivated_without_deleting_account(self):
         app = AppTest.from_string('''

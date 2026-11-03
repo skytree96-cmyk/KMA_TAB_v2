@@ -551,6 +551,169 @@ def _participant_matches(row: Mapping[str, Any], query: str) -> bool:
     )
 
 
+# Progress board: one status per assigned person, grouped by department. With
+# 100 people a flat table hid who had not started or stopped half-way.
+BOARD_PAGE_SIZE = 10
+BOARD_MAX_RANGES = 4
+STATUS_ORDER = ("미시작", "진행 중", "교육 전 완료", "교육 후 완료", "배정 해제")
+NO_DEPARTMENT = "부서 미등록"
+_CHOSEONG = "ㄱㄲㄴㄷㄸㄹㅁㅂㅃㅅㅆㅇㅈㅉㅊㅋㅌㅍㅎ"
+_INITIAL_ORDER = "ㄱㄴㄷㄹㅁㅂㅅㅇㅈㅊㅋㅌㅍㅎ"
+
+
+def participant_status(row: Mapping[str, Any]) -> tuple[str, str]:
+    """Return (status, progress text) for one assignment row."""
+    if not row.get("active", True):
+        return "배정 해제", ""
+    total = int(row.get("question_count") or 0)
+    if row.get("post_completed"):
+        return "교육 후 완료", ""
+    if row.get("post_answered"):
+        return "진행 중", f"교육 후 {row['post_answered']}/{total}"
+    if row.get("pre_completed"):
+        return "교육 전 완료", ""
+    if row.get("pre_answered"):
+        return "진행 중", f"교육 전 {row['pre_answered']}/{total}"
+    return "미시작", ""
+
+
+def name_initial(name: Any) -> str:
+    first = str(name or "").strip()[:1]
+    if "가" <= first <= "힣":
+        initial = _CHOSEONG[(ord(first) - 0xAC00) // 588]
+        # Double consonants sort with their base letter (ㄲ under ㄱ).
+        return {"ㄲ": "ㄱ", "ㄸ": "ㄷ", "ㅃ": "ㅂ", "ㅆ": "ㅅ", "ㅉ": "ㅈ"}.get(initial, initial)
+    return "기타"
+
+
+def initial_ranges(rows: list[Mapping[str, Any]], name_key: str = "user_name") -> list[tuple[str, list[Mapping[str, Any]]]]:
+    """Split a long list into up to four initial-consonant tabs of similar size."""
+    ordered = sorted(rows, key=lambda row: str(row.get(name_key) or ""))
+    if len(ordered) <= BOARD_PAGE_SIZE:
+        return [("", ordered)]
+    letters = [*_INITIAL_ORDER, "기타"]
+    buckets = {letter: [row for row in ordered if name_initial(row.get(name_key)) == letter] for letter in letters}
+    letters = [letter for letter in letters if buckets[letter]]
+    count = min(BOARD_MAX_RANGES, -(-len(ordered) // BOARD_PAGE_SIZE), len(letters))
+    groups: list[list[str]] = [[]]
+    taken = 0
+    for index, letter in enumerate(letters):
+        remaining_letters = len(letters) - index
+        remaining_groups = count - len(groups)
+        # Close the group near its proportional share, but leave a letter for every later group.
+        if groups[-1] and remaining_groups and (taken >= len(ordered) * len(groups) / count or remaining_letters == remaining_groups):
+            groups.append([])
+        groups[-1].append(letter)
+        taken += len(buckets[letter])
+    result = []
+    start = 0
+    for number, group in enumerate(groups):
+        members = [row for letter in group for row in buckets[letter]]
+        # Labels cover the whole ㄱ~ㅎ span, including letters nobody starts with.
+        consonants = [letter for letter in group if letter != "기타"]
+        end = len(_INITIAL_ORDER) - 1 if number == len(groups) - 1 else _INITIAL_ORDER.index(consonants[-1])
+        span = ""
+        if consonants:
+            span = _INITIAL_ORDER[start] if start == end else f"{_INITIAL_ORDER[start]}~{_INITIAL_ORDER[end]}"
+            start = end + 1
+        label = "·".join(part for part in (span, "기타" if "기타" in group else "") if part)
+        result.append((f"{label} {len(members)}", members))
+    return result
+
+
+def _incomplete_phase(project: Mapping[str, Any]) -> str:
+    """The phase whose non-completers need a reminder today."""
+    config = project.get("config") or {}
+    try:
+        post_start = date.fromisoformat(str(config.get("post_start_date", "")))
+    except ValueError:
+        return "pre"
+    return "post" if datetime.now(ZoneInfo("Asia/Seoul")).date() >= post_start else "pre"
+
+
+def _board_row(row: Mapping[str, Any]) -> dict[str, str]:
+    status, progress = participant_status(row)
+    return {"이름": row.get("user_name", ""), "로그인 아이디": row.get("login_id", ""), "부서": row.get("department", ""),
+            "직급": row.get("job_title", ""), "상태": status, "진행": progress}
+
+
+def incomplete_csv(project: Mapping[str, Any], rows: list[Mapping[str, Any]]) -> tuple[str, bytes, int]:
+    """Reminder list for the current phase: (button label, CSV bytes, people)."""
+    phase = _incomplete_phase(project)
+    pending = [row for row in rows if row.get("active", True) and not row.get(phase + "_completed")]
+    output = io.StringIO(newline="")
+    writer = csv.writer(output)
+    writer.writerow(["이름", "로그인 아이디", "부서", "직급", "상태", "진행"])
+    for row in sorted(pending, key=lambda item: (str(item.get("department") or "~"), str(item.get("user_name") or ""))):
+        writer.writerow([_csv_cell(value) for value in _board_row(row).values()])
+    label = "교육 전" if phase == "pre" else "교육 후"
+    return f"{label} 미완료자 명단 CSV ({len(pending)}명)", output.getvalue().encode("utf-8-sig"), len(pending)
+
+
+def _board_page(page_key: str, page: int) -> None:
+    st.session_state[page_key] = page
+
+
+def _render_department(project_id: str, department: str, members: list[Mapping[str, Any]], everyone: list[Mapping[str, Any]], expanded: bool) -> None:
+    active = [row for row in everyone if row.get("active", True)]
+    phase = "post" if any(row.get("post_answered") or row.get("post_completed") for row in active) else "pre"
+    done = sum(bool(row.get(phase + "_completed")) for row in active)
+    phase_label = "교육 전" if phase == "pre" else "교육 후"
+    digest = hashlib.sha256(department.encode("utf-8")).hexdigest()[:10]
+    label = f"{department} · {phase_label} 완료 {done}/{len(active)}명" + (f" · 표시 {len(members)}명" if len(members) != len(everyone) else "")
+    with st.expander(label, expanded=expanded, key=PREFIX + f"board_{project_id}_{digest}"):
+        if active:
+            st.progress(done / len(active))
+        ranges = initial_ranges(members)
+        visible = ranges[0][1]
+        if len(ranges) > 1:
+            labels = [name for name, _ in ranges]
+            range_key = PREFIX + f"board_range_{project_id}_{digest}"
+            if st.session_state.get(range_key) not in labels:
+                st.session_state[range_key] = labels[0]
+            chosen = st.segmented_control("이름 구간", labels, key=range_key, label_visibility="collapsed") or labels[0]
+            visible = dict(ranges)[chosen]
+        page_key = PREFIX + f"board_page_{project_id}_{digest}"
+        pages = max(1, -(-len(visible) // BOARD_PAGE_SIZE))
+        page = max(0, min(int(st.session_state.get(page_key, 0)), pages - 1))
+        st.session_state[page_key] = page
+        rows = visible[page * BOARD_PAGE_SIZE:(page + 1) * BOARD_PAGE_SIZE]
+        st.dataframe([_board_row(row) for row in rows], hide_index=True, width="stretch")
+        if pages > 1:
+            left, center, right = st.columns([1, 1, 1], vertical_alignment="center")
+            with left:
+                st.button("이전", key=page_key + "_previous", disabled=page == 0, on_click=_board_page, args=(page_key, page - 1))
+            with center:
+                st.caption(f"{len(visible)}명 중 {page * BOARD_PAGE_SIZE + 1}~{page * BOARD_PAGE_SIZE + len(rows)} · {page + 1} / {pages} 페이지")
+            with right:
+                st.button("다음", key=page_key + "_next", disabled=page == pages - 1, on_click=_board_page, args=(page_key, page + 1))
+
+
+def _render_progress_board(project: Mapping[str, Any], everyone: list[Mapping[str, Any]], matched: list[Mapping[str, Any]]) -> None:
+    project_id = _identifier(project)
+    statuses = {str(row["id"]): participant_status(row)[0] for row in everyone}
+    counts = {status: sum(value == status for value in statuses.values()) for status in STATUS_ORDER}
+    options = ["전체", *(status for status in STATUS_ORDER if status != "배정 해제" or counts[status])]
+    filter_key = PREFIX + f"board_status_{project_id}"
+    if st.session_state.get(filter_key) not in options:
+        st.session_state[filter_key] = "전체"
+    chosen = st.pills("검사 상태", options, key=filter_key, label_visibility="collapsed",
+                      format_func=lambda value: f"{value} {len(everyone) if value == '전체' else counts[value]}") or "전체"
+    shown = [row for row in matched if chosen == "전체" or statuses[str(row["id"])] == chosen]
+    label, content, pending = incomplete_csv(project, everyone)
+    st.download_button(label, content, f"tap_incomplete_{project_id}.csv", "text/csv", disabled=not pending,
+                       key=PREFIX + f"board_csv_{project_id}", help="이름·아이디·부서·직급·상태만 담습니다. 사내 메신저로 독려할 때 사용하세요.")
+    if not shown:
+        st.info("이 상태에 해당하는 참여자가 없습니다.")
+        return
+    def department(row: Mapping[str, Any]) -> str:
+        return str(row.get("department") or "").strip() or NO_DEPARTMENT
+    names = sorted({department(row) for row in shown}, key=lambda name: (name == NO_DEPARTMENT, name))
+    for name in names:
+        _render_department(project_id, name, [row for row in shown if department(row) == name],
+                           [row for row in everyone if department(row) == name], expanded=len(names) == 1)
+
+
 def _render_assignments(store: Any, token: str, project: Mapping[str, Any], users: list[dict[str, Any]]) -> None:
     project_id = _identifier(project)
     ok, assignments = _attempt(lambda: store.list_assignments(token, project_id))
@@ -576,7 +739,7 @@ def _render_assignments(store: Any, token: str, project: Mapping[str, Any], user
             st.session_state[change_key] = None
         st.caption(f"검색 결과 {len(matched)}명 · 배정된 참여자 {len(assignments)}명")
         if matched:
-            st.dataframe([{"이름": row.get("user_name", ""), "로그인 아이디": row.get("login_id", ""), "부서": row.get("department", ""), "직급": row.get("job_title", ""), "배정 상태": "배정 중" if row.get("active", True) else "배정 해제", "교육 전 검사": "완료" if row.get("pre_completed") else "미완료", "교육 후 검사": "완료" if row.get("post_completed") else "미완료"} for row in matched], hide_index=True, width="stretch")
+            _render_progress_board(project, assignments, matched)
             with st.expander("참여자 배정 변경", key=PREFIX + f"assignment_panel_{project_id}"):
                 assignment_id = st.selectbox("배정을 변경할 참여자", list(by_assignment), format_func=lambda value: f"{by_assignment[value].get('user_name', '')} · {by_assignment[value].get('login_id', '')}", key=change_key, index=None, placeholder="참여자를 선택하세요")
                 if assignment_id is not None:

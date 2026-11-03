@@ -168,6 +168,17 @@ class AccountStoreTests(unittest.TestCase):
             with self.assertRaisesRegex(AuthenticationError, "ID 또는 비밀번호"):
                 self.store.login(record["login_id"], CHANGED)
 
+    def test_manager_project_view_counts_saved_answers_but_participant_view_does_not(self):
+        user, token, project, assignment = self.assignment()
+        codes = project["config"]["question_snapshot_codes"]
+        draft = {"responses": {code: 3 for code in codes[:2]}, "current_question": 2, "started_at": self.now, "duration_seconds": 5}
+        self.store.save_assessment(token, assignment["id"], "pre", draft, False)
+        row = self.store.list_assignments(self.admin, project["id"])[0]
+        self.assertEqual((row["question_count"], row["pre_answered"], row["post_answered"]), (len(codes), 2, 0))
+        self.assertNotIn("pre_answered", self.store.list_assignments(token)[0])
+        self.store.save_assessment(token, assignment["id"], "pre", self.payload(project), True)
+        self.assertEqual(self.store.list_assignments(self.admin, project["id"])[0]["pre_answered"], len(codes))
+
     def test_idle_and_absolute_session_expiry(self):
         self.now += SESSION_IDLE_SECONDS + 1
         with self.assertRaises(AuthenticationError):
