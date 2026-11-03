@@ -26,12 +26,15 @@ fi
 echo "== Deploying $SERVICE"
 # Streamlit keeps per-browser state in memory over a websocket, so session
 # affinity and a long request timeout are required.
+# One vCPU stays responsive up to ~30 participants answering at once (load
+# test 2026-11-03), so --concurrency=30 sends the next browsers to another
+# instance: 50 concurrent participants fit in 2 of the 3 instances.
 gcloud run deploy "$SERVICE" --image="$image" --region="$REGION" \
   --service-account="$RUN_SA" \
   --add-cloudsql-instances="$SQL_CONNECTION" \
   --set-secrets="$secrets" \
   --set-env-vars="TAP_APP_MODE=production,GITHUB_DEMO_STORE_ENABLED=false,TAP_POSTGRES_PREFLIGHT=0,BOOTSTRAP_ADMIN_LOGIN=kma.admin" \
-  --port=8080 --cpu=1 --memory=1Gi --concurrency=80 \
+  --port=8080 --cpu=1 --memory=1Gi --concurrency=30 \
   --min-instances="${MIN_INSTANCES:-1}" --max-instances="${MAX_INSTANCES:-3}" \
   --session-affinity --timeout=3600 --cpu-boost \
   --allow-unauthenticated "${traffic_args[@]}"
