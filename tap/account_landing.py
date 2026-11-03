@@ -19,6 +19,7 @@ LANDING_BRAND_CSS = """
   .site-header .tap-ci .tap-ci-description {font-size:9px !important;line-height:1.6 !important;}
   .footer-brand .tap-ci {margin:0;gap:10px;}
   .footer-brand .tap-ci .tap-ci-wordmark {font-size:34px;}
+  @media(min-width:1061px) {.role-grid {grid-template-columns:repeat(2,minmax(0,1fr));max-width:920px;margin-inline:auto;}}
   @media(max-width:1150px) {.site-header .tap-ci .tap-ci-description {display:none;}}
   @media(max-width:640px) {.site-header .tap-ci .tap-ci-wordmark {font-size:29px;}}
   @media(prefers-color-scheme:dark) {.site-header .tap-ci {--ci-kma:#e7f6f3;--ci-tap:#7dded0;--ci-caption:#b9cfd0;}}
@@ -36,12 +37,18 @@ def account_landing_html() -> str:
     source, notices = re.subn(r'\s*<div class="notice" role="note">.*?</div>', "", source, count=1, flags=re.DOTALL)
     if notices != 1:
         raise ValueError("Landing notice structure has changed")
+    # KMA operators sign in directly; the public page introduces customer roles only.
+    source, operator_cards = re.subn(
+        r'\s*<article class="role-card">\s*<span class="role-kicker">KMA OPERATOR</span>.*?</article>', "", source, count=1, flags=re.DOTALL,
+    )
+    if operator_cards != 1:
+        raise ValueError("Landing role card structure has changed")
 
     def login_link(match: re.Match[str]) -> str:
         return re.sub(r'href="[^"]*"', 'href="/login"', match.group(0), count=1)
 
     source, links = re.subn(r'<a\b(?=[^>]*\bdata-app-link\b)[^>]*>', login_link, source)
-    if links != 8:
+    if links != 7:
         raise ValueError("Landing account link count has changed")
 
     replacements = {
@@ -55,10 +62,6 @@ def account_landing_html() -> str:
         "같은 ID와 같은 문항으로": "같은 계정과 같은 문항으로",
         "동일 문항과 동일 참여자 ID로 다시 측정": "같은 계정에서 동일 문항으로 다시 측정",
         "목적에 맞는 화면으로 바로 이동할 수 있습니다.": "발급받은 계정으로 로그인하면 담당 역할에 맞는 화면이 열립니다.",
-        "평가도구와 문항, 교육과정 매핑의 품질을 관리합니다.": "회원사와 교육담당자 계정을 관리하고 프로젝트 운영 현황을 확인합니다.",
-        "기획검증 프로젝트 현황": "회원사·교육담당자 계정 관리",
-        "문항은행 및 검수 근거": "프로젝트 운영 현황 확인",
-        "역량·교육과정 매핑 확인": "회사별 결과 집계 확인",
         "교육 전/후에 같은 ID를 사용하는 이유는 무엇인가요?": "교육 전/후에 같은 계정을 사용하는 이유는 무엇인가요?",
         "동일 참여자의 결과를 연결하기 위해서입니다. 실명이나 사번 대신 기관에서 정한 가명 교육 참여자 ID를 사용해야 합니다.": "동일 참여자의 교육 전/후 결과를 연결하기 위해서입니다. 교육담당자가 발급한 아이디로 로그인한 뒤, 본인에게 배정된 프로젝트에서 검사를 진행해 주세요.",
         "승인된 기업 범위의 프로젝트 설정과 검사 완료 결과만 기획검증용 저장소에 보관합니다. 사업자등록번호 원문, 참여자 원문 ID, 입력 중인 응답은 저장하지 않습니다.": "회사별 프로젝트와 검사 결과를 구분하여 저장합니다. 참여자는 본인에게 배정된 검사를 진행하고, 교육담당자는 담당 회사의 운영 현황과 공개 기준을 충족한 조직 리포트를 확인합니다.",
