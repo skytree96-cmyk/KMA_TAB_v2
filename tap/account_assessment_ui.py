@@ -241,24 +241,24 @@ def _render_results(questions: list[dict[str, Any]], config: Mapping[str, Any], 
             for r in results
         ], hide_index=True, width="stretch")
         st.caption("0(수행 기회 없음)은 점수에 합산하지 않습니다. 유효응답이 부족한 역량은 산출하지 않습니다. 교육 후 검사까지 완료하면 동일 문항의 변화를 확인할 수 있습니다.")
+        _render_followup_courses(config, results, phase="pre")
 
 
-def _render_followup_courses(config: Mapping[str, Any], results: list[dict[str, Any]]) -> None:
+def _render_followup_courses(config: Mapping[str, Any], results: list[dict[str, Any]], *, phase: str = "post") -> None:
+    from tap.account_course_ui import render_course_cards
     from tap.account_insights import recommend_courses
-    courses = recommend_courses(config, results, limit=3)
-    st.subheader("보완 학습 제안")
+
+    # Three competencies, each with one public course and one e-learning course.
+    courses = recommend_courses(config, results, limit=6, score_key="post_score" if phase == "post" else "score_1_to_5")
+    st.subheader("보완 학습 제안" if phase == "post" else "지금 보완하면 좋은 역량과 KMA 추천 과정")
     if not courses:
         st.success("모든 역량이 목표 수준에 도달했거나 차이가 0.2점 미만입니다. 지금의 실천을 유지하며 적용 사례를 기록해 보세요.")
         return
-    for course in courses:
-        with st.container(border=True):
-            st.markdown(f"**{course['title']}** · {course['delivery_label']}")
-            st.caption(f"관련 역량 {course['factor_name_ko']} · {course['reason']}")
-            if course["advice"]:
-                st.markdown(course["advice"])
-            if course.get("url"):
-                st.link_button("KMA에서 과정 찾기", course["url"])
-    st.caption("교육 후 점수가 목표보다 0.2점 이상 낮은 역량을 기준으로 골랐습니다. 본인 응답(자기보고)에 근거한 제안이므로 수강 여부는 교육담당자와 상의해 주세요.")
+    render_course_cards(courses)
+    phase_label = "교육 후" if phase == "post" else "교육 전"
+    st.caption(f"{phase_label} 점수가 목표보다 0.2점 이상 낮은 역량을 부족한 정도가 큰 순서로 골라 역량마다 공개교육 1개와 이러닝 1개를 제안합니다. "
+               "공개교육은 다음 기수가 열린 과정만 보여 주며 버튼은 최신 일정 페이지로 연결됩니다. "
+               "본인 응답(자기보고)에 근거한 제안이므로 수강 여부는 교육담당자와 상의해 주세요.")
 
 
 def _render_report_download(assignment: Mapping[str, Any], config: Mapping[str, Any], questions: list[dict[str, Any]],

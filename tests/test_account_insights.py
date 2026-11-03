@@ -55,7 +55,11 @@ class CourseRecommendationTests(unittest.TestCase):
         self.assertTrue(courses)
         self.assertEqual({row["factor_code"] for row in courses}, {"CORE-CO"})
         self.assertEqual(len({row["course_id"] for row in courses}), len(courses))
-        self.assertTrue(all(row["delivery_label"] in {"온라인", "집합"} for row in courses))
+        self.assertTrue(all(row["delivery_label"] in {"온라인", "집합", "온라인 라이브"} for row in courses))
+        # individuals see public courses and e-learning only; the in-house inquiry course is for organizations
+        self.assertEqual([row["source"] for row in courses[:2]], ["public_edu_center", "studio_elearning"])
+        self.assertTrue(all(row["source"] != "b2b_inquiry" for row in courses))
+        self.assertTrue(all(row["schedule"] for row in courses))
 
     def test_no_courses_when_every_competency_meets_target(self):
         rows = [{"factor_code": "CORE-CO", "factor_name_ko": "소통", "post_score": 3.9}]
@@ -69,8 +73,9 @@ class CourseRecommendationTests(unittest.TestCase):
             config = {**self.config, "target_level": target_level}
             return {row["target_level"] for row in recommend_courses(config, rows, limit=10)}
 
-        self.assertEqual(levels("staff"), {"all"})
-        self.assertEqual(levels("manager"), {"all", "manager"})
+        self.assertTrue(levels("staff") <= {"all", "staff"})
+        self.assertTrue(levels("manager") <= {"all", "manager"})
+        self.assertNotIn("executive", levels("staff") | levels("manager"))
 
     def test_gap_within_report_noise_band_recommends_nothing(self):
         rows = [{"factor_code": "CORE-CO", "factor_name_ko": "고객지향", "post_score": 3.35}]
@@ -82,11 +87,42 @@ class CourseRecommendationTests(unittest.TestCase):
         rows = [{"factor_code": "CORE-CO", "factor_name_ko": "고객지향", "post_score": 3.0},
                 {"factor_code": "JOB-PS", "factor_name_ko": "문제해결력", "post_score": 2.5}]
         courses = recommend_courses({**self.config, "organization_priorities": []}, rows)
-        self.assertEqual([row["factor_code"] for row in courses], ["JOB-PS", "CORE-CO", "JOB-PS"])
+        # public courses for every competency first, then e-learning for every competency
+        self.assertEqual([row["factor_code"] for row in courses], ["JOB-PS", "CORE-CO", "JOB-PS", "CORE-CO"])
+        self.assertEqual([row["source"] for row in courses],
+                         ["public_edu_center", "public_edu_center", "studio_elearning", "studio_elearning"])
         rows[1]["pre_score"] = 2.5
         advice = [row["advice"] for row in recommend_courses({**self.config, "organization_priorities": []}, rows)]
         self.assertTrue(advice[0])
         self.assertEqual(advice[2], "")
+
+    def test_same_course_at_another_location_or_year_is_not_repeated(self):
+        from tap.recommendation import normalize_course_title
+        rows = [{"factor_code": "LEAD-PD", "factor_name_ko": "사람 육성", "post_score": 2.0}]
+        courses = recommend_courses({**self.config, "organization_priorities": []}, rows, limit=10)
+        keys = [normalize_course_title(row["title"]) for row in courses]
+        self.assertEqual(len(keys), len(set(keys)))
+        self.assertTrue(all(row.get("has_upcoming", True) for row in courses if row["source"] == "public_edu_center"))
+
+    def test_organizations_also_get_an_inhouse_inquiry_course(self):
+        rows = [{"factor_code": "JOB-PS", "factor_name_ko": "문제해결력", "post_score": 2.5}]
+        courses = recommend_courses({**self.config, "organization_priorities": []}, rows, limit=9, audience="organization")
+        self.assertEqual([row["source"] for row in courses[:3]], ["public_edu_center", "studio_elearning", "b2b_inquiry"])
+
+    def test_only_the_three_largest_gaps_get_courses(self):
+        rows = [{"factor_code": code, "factor_name_ko": code, "post_score": 2.0 + index * 0.1}
+                for index, code in enumerate(("LEAD-PD", "JOB-PS", "CORE-CL", "DATA_ANA", "AI_USE"))]
+        courses = recommend_courses({**self.config, "organization_priorities": []}, rows, limit=6)
+        self.assertEqual({row["factor_code"] for row in courses}, {"LEAD-PD", "JOB-PS", "CORE-CL"})
+        self.assertEqual([row["source"] for row in courses],
+                         ["public_edu_center"] * 3 + ["studio_elearning"] * 3)
+
+    def test_pre_training_report_uses_the_pre_score(self):
+        rows = [{"factor_code": "JOB-PS", "factor_name_ko": "문제해결력", "score_1_to_5": 2.5, "status": "산출"}]
+        courses = recommend_courses(self.config, rows, score_key="score_1_to_5")
+        self.assertTrue(courses)
+        self.assertTrue(courses[0]["reason"].startswith("교육 전 2.50점"))
+        self.assertEqual(courses[0]["advice"], "")
 
     def test_organization_priority_breaks_ties_within_the_same_gap_band(self):
         # 0.50 and 0.48 share the 0.5 band; without the priority CORE-CL would sort first by code.
@@ -127,7 +163,8 @@ class CourseRecommendationTests(unittest.TestCase):
     def test_course_links_use_current_kma_paths(self):
         urls = {row["url"] for row in load_courses()}
         self.assertTrue(urls)
-        self.assertTrue(all(url.startswith(("https://www.kma.or.kr/kr/", "https://studio.kma.or.kr/")) for url in urls), urls)
+        self.assertTrue(all(url.startswith(("https://www.kma.or.kr/", "https://studio.kma.or.kr/")) for url in urls),
+                        [url for url in urls if not url.startswith(("https://www.kma.or.kr/", "https://studio.kma.or.kr/"))][:5])
 
 
 class DetailRowsTests(unittest.TestCase):

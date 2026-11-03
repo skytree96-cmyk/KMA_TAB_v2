@@ -49,6 +49,7 @@ def load_courses() -> list[dict[str, Any]]:
     rows = _read_csv(DATA_DIR / "courses.csv")
     for row in rows:
         row["active"] = row["active"].lower() == "true"
+        row["has_upcoming"] = str(row.get("has_upcoming", "true")).lower() == "true"
     return rows
 
 
