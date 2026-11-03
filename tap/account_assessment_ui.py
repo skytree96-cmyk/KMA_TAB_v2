@@ -213,12 +213,15 @@ def _render_results(questions: list[dict[str, Any]], config: Mapping[str, Any], 
             for r in results
         ], hide_index=True, width="stretch")
         st.caption("두 시점 모두 1~5로 답한 동일 문항만 비교합니다. 0(수행 기회 없음)은 제외하며, 공통 유효문항이 부족한 역량은 산출하지 않습니다. 관찰된 자기보고 변화이며 교육의 인과효과를 뜻하지 않습니다.")
-        chart_rows = [{"역량": r["factor_name_ko"], "시점": label, "행동빈도": r[key]}
-                      for r in results for key, label in (("pre_score", "교육 전"), ("post_score", "교육 후"))
-                      if r[key] is not None]
-        if chart_rows:
-            st.bar_chart(chart_rows, x="역량", y="행동빈도", color="시점", stack=False,
-                         horizontal=True, height=max(240, len(results) * 64), width="stretch")
+        scored = [r for r in results if r["pre_score"] is not None or r["post_score"] is not None]
+        if scored:
+            import pandas as pd
+
+            # Same shape and teal pair as the manager report chart.
+            chart = pd.DataFrame({"교육 전": [r["pre_score"] for r in scored], "교육 후": [r["post_score"] for r in scored]},
+                                 index=pd.Index([r["factor_name_ko"] for r in scored], name="역량"))
+            st.bar_chart(chart, color=["#7ac7bd", "#087b76"], stack=False,
+                         horizontal=True, height=max(240, len(scored) * 64), width="stretch")
         transfer = post["payload"].get("post_transfer_responses", {})
         if transfer:
             with st.expander("내 현업전이 환경 응답", key=PREFIX + "transfer_panel"):
@@ -228,6 +231,7 @@ def _render_results(questions: list[dict[str, Any]], config: Mapping[str, Any], 
                     st.write("적용 방해요인: " + ", ".join(transfer["barriers"]))
                 if transfer.get("applied_content"):
                     st.write(transfer["applied_content"])
+        _render_followup_courses(config, results)
     else:
         st.subheader("나의 교육 전 검사 결과")
         results = score_responses(questions, pre_responses, targets, assessment_phase="pre")
@@ -237,6 +241,22 @@ def _render_results(questions: list[dict[str, Any]], config: Mapping[str, Any], 
             for r in results
         ], hide_index=True, width="stretch")
         st.caption("0(수행 기회 없음)은 점수에 합산하지 않습니다. 유효응답이 부족한 역량은 산출하지 않습니다. 교육 후 검사까지 완료하면 동일 문항의 변화를 확인할 수 있습니다.")
+
+
+def _render_followup_courses(config: Mapping[str, Any], results: list[dict[str, Any]]) -> None:
+    from tap.account_insights import recommend_courses
+    courses = recommend_courses(config, results, limit=3)
+    st.subheader("추천 후속 과정")
+    if not courses:
+        st.success("모든 역량이 목표 수준 이상입니다. 지금의 실천을 유지하며 적용 사례를 기록해 보세요.")
+        return
+    for course in courses:
+        with st.container(border=True):
+            st.markdown(f"**{course['title']}** · {course['delivery_label']}")
+            st.caption(f"관련 역량 {course['factor_name_ko']} · {course['mapping_rationale']}")
+            if course.get("url"):
+                st.link_button("과정 안내 보기", course["url"])
+    st.caption("교육 후 점수가 목표 수준에 못 미친 역량을 기준으로 골랐습니다. 수강 여부는 교육담당자와 상의해 주세요.")
 
 
 def _render_report_download(assignment: Mapping[str, Any], config: Mapping[str, Any], questions: list[dict[str, Any]],

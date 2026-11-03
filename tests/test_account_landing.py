@@ -39,8 +39,10 @@ class AccountLandingTests(unittest.TestCase):
         page = account_landing_html()
         parser = LandingParser()
         parser.feed(page)
-        self.assertEqual(parser.app_links, ["/login"] * 8)
+        self.assertEqual(parser.app_links, ["/login"] * 7)
         copy = " ".join(parser.visible_copy)
+        self.assertNotIn("KMA 관리자", copy)
+        self.assertEqual(page.count('class="role-card'), 2)
         for phrase in ("데모", "기획검증", "MVP", "합성", "개인정보를 입력하지", "프로젝트 코드", "tap_role", "원문 ID 미저장"):
             self.assertNotIn(phrase, copy)
         self.assertIn("로그인하고 검사 참여", copy)

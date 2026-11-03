@@ -235,8 +235,47 @@ def _chart_groups(rows: list[Mapping[str, Any]]) -> list[list[Mapping[str, Any]]
     return [rows[i:i + size] for i in range(0, len(rows), size)]
 
 
+def _followup_story(transfer: Mapping[str, Any] | None, courses: list[Mapping[str, Any]] | None, width: float) -> list[Any]:
+    """Transfer climate (organization only) and follow-up courses, on their own page."""
+    from tap.account_insights import transfer_notes
+    is_org = transfer is not None
+    story: list[Any] = [PageBreak(), _p("현업 적용과 후속 과정" if is_org else "추천 후속 과정", size=20, bold=True), Spacer(1, 6),
+                        _p("변화의 조건과 다음 교육 검토 후보를 함께 안내합니다." if is_org
+                           else "교육 후에도 목표 수준에 못 미친 역량을 보완할 과정을 안내합니다.", size=9, color=MUTED), Spacer(1, 15)]
+    if transfer is not None:
+        if transfer.get("disclosed"):
+            cells = [[_p(row["label"], size=8.5, color=MUTED), _p(f"{row['mean']:.2f}", size=17, bold=True, color=TEAL)]
+                     for row in transfer["factors"]]
+            grid = Table([cells], colWidths=[(width - 32) / 4] * 4)
+            grid.setStyle(TableStyle([("VALIGN", (0, 0), (-1, -1), "TOP"), ("LEFTPADDING", (0, 0), (-1, -1), 0)]))
+            barriers = Table([[_p(row["label"], size=8.6), _p(f"{row['count']}명", size=8.6, align=2), _p(f"{row['rate']}%", size=8.6, bold=True, align=2)]
+                              for row in transfer["barriers"]], colWidths=[width - 172, 60, 60])
+            barriers.setStyle(TableStyle([("LINEBELOW", (0, 0), (-1, -2), .4, LINE), ("LEFTPADDING", (0, 0), (-1, -1), 0),
+                                          ("TOPPADDING", (0, 0), (-1, -1), 3), ("BOTTOMPADDING", (0, 0), (-1, -1), 3)]))
+            body = [_p(f"현업전이 환경  ·  사후검사 응답 {transfer['n']}명 평균(1~5)", size=12, bold=True), Spacer(1, 9), grid,
+                    Spacer(1, 10), _p("적용 장애요인(복수 선택)", size=9, bold=True, color=TEAL), Spacer(1, 3), barriers,
+                    Spacer(1, 9), *[_p("· " + note, size=9) for note in transfer_notes(transfer)]]
+        else:
+            body = [_p("현업전이 환경", size=12, bold=True), Spacer(1, 7),
+                    _p(f"사후검사 현업전이 응답이 5명 미만({transfer.get('n', 0)}명)이므로 평균과 장애요인을 공개하지 않습니다.", size=9)]
+        story.extend([_panel(body, width), Spacer(1, 12)])
+    if courses:
+        items: list[Any] = [_p("교육과정 검토 우선순위" if is_org else "추천 과정", size=12, bold=True), Spacer(1, 4),
+                            _p("교육 후 점수가 목표 수준에 못 미친 역량과 역량-과정 매핑을 기준으로 정렬했습니다.", size=8, color=MUTED)]
+        for index, course in enumerate(courses, 1):
+            items.extend([Spacer(1, 10), _p(f"{index}. {course['title']}  ({course['delivery_label']})", size=10.5, bold=True),
+                          _p(f"관련 역량 {course['factor_name_ko']}  ·  {course['mapping_rationale']}", size=8.4, color=MUTED)])
+        items.extend([Spacer(1, 9), _p("개설 여부와 일정은 KMA 교육 페이지(www.kma.or.kr)에서 확인해 주세요.", size=7.8, color=MUTED)])
+        story.append(_panel(items, width))
+    elif courses is not None:
+        story.append(_panel([_p("교육과정 검토 우선순위" if is_org else "추천 과정", size=12, bold=True), Spacer(1, 7),
+                             _p("모든 역량이 목표 수준 이상이어서 우선 검토할 후속 과정이 없습니다.", size=9)], width))
+    return story
+
+
 def build_report_pdf(project: Mapping[str, Any], rows: list[Mapping[str, Any]], *, kind: str,
-                     subject: str, participant_count: int = 1) -> bytes:
+                     subject: str, participant_count: int = 1, transfer: Mapping[str, Any] | None = None,
+                     courses: list[Mapping[str, Any]] | None = None) -> bytes:
     prepared = prepare_rows(rows, kind)
     _fonts()
     summary = report_summary(prepared)
@@ -309,6 +348,8 @@ def build_report_pdf(project: Mapping[str, Any], rows: list[Mapping[str, Any]], 
             if is_org and not hidden:
                 detail.extend([Spacer(1, 4), _p(f"전·후 유효 인원 {row['valid_n']}명", size=8, color=MUTED)])
             story.extend([_panel(detail, width), Spacer(1, 11)])
+    if transfer is not None or courses is not None:
+        story.extend(_followup_story(transfer, courses, width))
     story.extend([Spacer(1, 4), _p(f"평가 규칙 {RULE_VERSION} · 고정 구간에 따른 평가", size=7.5, color=MUTED),
         _p("교육 후 빈도 구간: 4.20 이상 / 3.40~4.19 / 2.60~3.39 / 1.80~2.59 / 1.00~1.79. 규준·합격 기준이 아닌 운영 참고 구간입니다.", size=7.5, color=MUTED)])
 

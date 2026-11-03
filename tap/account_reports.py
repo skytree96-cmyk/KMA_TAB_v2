@@ -6,6 +6,7 @@ from typing import Any, Mapping
 import pandas as pd
 import streamlit as st
 
+from tap.account_insights import organization_detail_rows, recommend_courses, summarize_transfer, transfer_notes
 from tap.aggregation import aggregate_paired_factor_results
 from tap.config import MIN_GROUP_N
 from tap.data import questions_for_factors
@@ -33,7 +34,9 @@ def individual_report_pdf(project: Mapping[str, Any], questions: list[dict[str, 
     from tap.account_report_pdf import build_report_pdf
     scores = score_pre_post_responses(questions, pre_responses, post_responses, (project.get("config") or {}).get("target_means"))
     rows = [{**row, "change": row["self_reported_change"], "valid_n": row["paired_valid_items"]} for row in scores]
-    return build_report_pdf(project, rows, kind="individual", subject=subject, participant_count=1)
+    # Personal transfer answers stay out of the PDF: managers can also download it.
+    courses = recommend_courses(project.get("config") or {}, scores)
+    return build_report_pdf(project, rows, kind="individual", subject=subject, participant_count=1, courses=courses)
 
 
 def export_report_pdf(store: Any, token: str, project: Mapping[str, Any], assignment_id: str | None = None) -> bytes:
@@ -61,7 +64,44 @@ def export_report_pdf(store: Any, token: str, project: Mapping[str, Any], assign
                      "pre_score":row.get("pre_mean"),"post_score":row.get("post_mean"),"change":row.get("observed_change"),
                      "valid_n":row.get("paired_n",0)})
     count = len({row["user_id"] for row in results if row.get("pre_completed") and row.get("post_completed")})
-    return build_report_pdf(project, rows, kind="organization", subject="조직 전체", participant_count=count)
+    return build_report_pdf(project, rows, kind="organization", subject="조직 전체", participant_count=count,
+                            transfer=summarize_transfer(results), courses=_organization_courses(config, summaries.values()))
+
+
+def _organization_courses(config: Mapping[str, Any], summaries: Any) -> list[dict[str, Any]]:
+    disclosed = [{**row, "post_score": row["post_mean"]} for row in summaries if row["paired_n"] >= MIN_GROUP_N]
+    return recommend_courses(config, disclosed)
+
+
+def _render_transfer(results: list[dict[str, Any]]) -> dict[str, Any]:
+    transfer = summarize_transfer(results)
+    st.subheader("현업전이 환경")
+    if not transfer["disclosed"]:
+        st.info(f"사후검사 현업전이 응답이 {MIN_GROUP_N}명 이상일 때 평균과 적용 장애요인을 공개합니다. (현재 {transfer['n']}명)")
+        return transfer
+    columns = st.columns(len(transfer["factors"]))
+    for column, row in zip(columns, transfer["factors"]):
+        column.metric(row["label"], f"{row['mean']:.2f} / 5")
+    barriers = pd.DataFrame([{"장애요인": row["label"], "응답 비율(%)": row["rate"]} for row in transfer["barriers"]])
+    st.bar_chart(barriers.set_index("장애요인"), horizontal=True, color="#087b76")
+    for note in transfer_notes(transfer):
+        st.markdown("- " + note)
+    st.caption(f"사후검사 응답 {transfer['n']}명 기준입니다. 적용 장애요인은 복수 선택이며, 서술형 적용 사례는 조직 리포트에 표시하지 않습니다.")
+    return transfer
+
+
+def _render_courses(courses: list[dict[str, Any]]) -> None:
+    st.subheader("교육과정 검토 우선순위")
+    if not courses:
+        st.success("공개된 역량이 모두 목표 수준 이상이어서 우선 검토할 후속 과정이 없습니다.")
+        return
+    for index, course in enumerate(courses, 1):
+        with st.container(border=True):
+            st.markdown(f"**{index}. {course['title']}** · {course['delivery_label']}")
+            st.caption(f"관련 역량 {course['factor_name_ko']} · {course['mapping_rationale']}")
+            if course.get("url"):
+                st.link_button("과정 안내 보기", course["url"])
+    st.caption("교육 후 점수가 목표 수준에 못 미친 역량과 역량-과정 매핑을 기준으로 정렬했습니다. 개설 여부와 일정은 과정 안내 페이지에서 확인해 주세요.")
 
 
 def _render_individual_report(store: Any, token: str, project: Mapping[str, Any], results: list[dict[str, Any]]) -> None:
@@ -96,7 +136,7 @@ def _render_individual_report(store: Any, token: str, project: Mapping[str, Any]
     st.dataframe(frame, hide_index=True, width="stretch")
     plot = frame.dropna(subset=["교육 전", "교육 후"])
     if not plot.empty:
-        st.bar_chart(plot.set_index("역량")[["교육 전", "교육 후"]], horizontal=True, color=["#7ac7bd", "#087b76"])
+        st.bar_chart(plot.set_index("역량")[["교육 전", "교육 후"]], horizontal=True, stack=False, color=["#7ac7bd", "#087b76"])
     st.caption("동일 참여자의 두 시점 모두 1~5로 응답한 문항만 비교합니다. 0(수행 기회 없음)은 제외하며, 유효 문항이 부족하면 점수를 표시하지 않습니다. 자기보고 변화로 교육의 인과효과를 의미하지 않습니다.")
 
 
@@ -126,6 +166,14 @@ def render_project_report(store: Any, token: str, project: Mapping[str, Any]) ->
     frame = pd.DataFrame(display_rows)
     st.dataframe(frame, hide_index=True, use_container_width=True)
     plot = pd.DataFrame([{"역량": row["factor_name_ko"], "교육 전": row["pre_mean"], "교육 후": row["post_mean"]} for row in disclosed]).set_index("역량")
-    st.bar_chart(plot, horizontal=True)
+    # Side by side, not stacked: pre and post are two readings of the same 1~5 scale.
+    st.bar_chart(plot, horizontal=True, stack=False, color=["#7ac7bd", "#087b76"])
     st.caption("동일 참여자·동일 문항의 자기보고 변화입니다. 수행 기회 없음(0)은 점수에서 제외하며, 교육의 인과적 효과를 의미하지 않습니다.")
-    st.download_button("조직 변화 요약 CSV", frame.to_csv(index=False).encode("utf-8-sig"), file_name="kma-tap-summary.csv", mime="text/csv", key=f"account_report_download_{project['id']}")
+    transfer = _render_transfer(results)
+    _render_courses(_organization_courses(project["config"], summaries))
+    detail = pd.DataFrame(organization_detail_rows(summaries, project["config"], transfer))
+    # Mixed row types leave blanks; nullable integers keep counts as 8, not 8.0, in the CSV.
+    detail = detail.astype({column: "Int64" for column in ("사전 응답", "사후 응답", "전·후 유효 인원", "사후 미응답", "응답 수", "비율(%)")
+                            if column in detail})
+    st.download_button("조직 리포트 상세 CSV", detail.to_csv(index=False).encode("utf-8-sig"), file_name="kma-tap-detail.csv", mime="text/csv", key=f"account_report_download_{project['id']}")
+    st.caption("상세 CSV에는 역량별 응답 인원·전후 점수·목표 대비 차이와 현업전이 환경·장애요인 집계가 담깁니다. 개인별 응답은 포함하지 않습니다.")
