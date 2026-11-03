@@ -48,6 +48,8 @@ MANIFEST_EXCLUDED_TOP_LEVEL = {
     "output",
     "tmp",
 }
+# Local-only files: a git worktree keeps ".git" as a file, and config.env is gitignored.
+MANIFEST_EXCLUDED_FILES = {".git", "deploy/gcp/config.env"}
 MANIFEST_EXCLUDED_DIRECTORY_NAMES = {
     ".wrangler",
     "__pycache__",
@@ -78,6 +80,8 @@ def deployable_paths() -> set[str]:
         for filename in filenames:
             path = directory_path / filename
             relative = path.relative_to(ROOT)
+            if relative.as_posix() in MANIFEST_EXCLUDED_FILES:
+                continue
             if relative.as_posix() != MANIFEST_PATH.name:
                 paths.add(relative.as_posix())
     return paths
