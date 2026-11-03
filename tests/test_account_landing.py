@@ -4,7 +4,7 @@ from html.parser import HTMLParser
 import re
 import unittest
 
-from tap.account_landing import account_landing_html
+from tap.account_landing import LANDING_REPLACEMENTS, account_landing_html
 from tap.brand import BRAND_VARIANTS, brand_html
 from tap.open_page import GUIDE_PDF_PATH, OPEN_PAGE_PATH
 
@@ -48,10 +48,19 @@ class AccountLandingTests(unittest.TestCase):
         self.assertIn("로그인하고 검사 참여", copy)
         self.assertIn("본인에게 배정된 프로젝트", copy)
         self.assertIn("리포트 예시", copy)
+        self.assertIn("KMA 교육과정을 추천합니다", copy)
+        self.assertIn('href="#recommend"', page)
+        for phrase in ("인사평가", "채용", "승진", "교육 전/후", "교육 전·후", "사전·사후"):
+            self.assertNotIn(phrase, copy)
         self.assertIn('id="heroRadar"', page)
         self.assertIn('id="reportRadar"', page)
         self.assertNotIn('class="brand-mark"', page)
         self.assertIn("tap-ci--reverse", page)
+
+    def test_every_production_replacement_still_matches_the_open_page(self):
+        source = OPEN_PAGE_PATH.read_text(encoding="utf-8")
+        stale = [old for old in LANDING_REPLACEMENTS if old not in source]
+        self.assertEqual(stale, [])
 
     def test_guide_opens_current_instructions_and_legacy_sources_are_preserved(self):
         before = OPEN_PAGE_PATH.read_bytes()
@@ -70,7 +79,7 @@ class AccountLandingTests(unittest.TestCase):
         for variant in BRAND_VARIANTS:
             html = brand_html(variant=variant)
             self.assertIn('role="img"', html)
-            self.assertIn("교육 전·후", html)
+            self.assertIn("교육 전후", html)
         with self.assertRaises(ValueError):
             brand_html(variant='navy" onclick="alert(1)')
 
