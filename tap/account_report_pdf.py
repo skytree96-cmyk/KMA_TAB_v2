@@ -18,7 +18,7 @@ from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import ParagraphStyle
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont as PDFTTFont
-from reportlab.platypus import Flowable, PageBreak, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
+from reportlab.platypus import Flowable, KeepTogether, PageBreak, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 
 TEAL = colors.HexColor("#087b76")
 INK = colors.HexColor("#103b37")
@@ -134,6 +134,12 @@ def _p(text: Any, *, size: float = 10, bold: bool = False, color=INK, align=0, l
         spaceAfter=0, allowWidows=0, allowOrphans=0))
 
 
+def _link(text: str, url: str, size: float = 8.6) -> Paragraph:
+    """A clickable line; the visible text also names the destination for printed copies."""
+    style = _p("", size=size, bold=True, color=TEAL).style
+    return Paragraph(f'<a href="{escape(url)}">{escape(text)}</a>', style)
+
+
 def _panel(items: list[Any], width: float, fill=colors.white, padding: float = 16) -> Table:
     table = Table([[items]], colWidths=[width], cornerRadii=[12, 12, 12, 12])
     table.setStyle(TableStyle([("BACKGROUND", (0, 0), (-1, -1), fill),
@@ -236,12 +242,15 @@ def _chart_groups(rows: list[Mapping[str, Any]]) -> list[list[Mapping[str, Any]]
 
 
 def _followup_story(transfer: Mapping[str, Any] | None, courses: list[Mapping[str, Any]] | None, width: float) -> list[Any]:
-    """Transfer climate (organization only) and follow-up courses, on their own page."""
-    from tap.account_insights import transfer_notes
+    """Transfer climate (organization only) and follow-up courses, continuing after the competency details."""
+    from tap.account_insights import COURSE_INQUIRY_URL, course_context_note, transfer_notes
     is_org = transfer is not None
-    story: list[Any] = [PageBreak(), _p("현업 적용과 후속 과정" if is_org else "추천 후속 과정", size=20, bold=True), Spacer(1, 6),
+    inquiry = [Spacer(1, 6), _link("맞춤형 교육 문의  ·  www.kma.or.kr 문의하기", COURSE_INQUIRY_URL)] if is_org else []
+    heading: list[Any] = [Spacer(1, 10), _p("현업 적용과 후속 과정" if is_org else "보완 학습 제안", size=20, bold=True), Spacer(1, 6),
                         _p("변화의 조건과 다음 교육 검토 후보를 함께 안내합니다." if is_org
-                           else "교육 후에도 목표 수준에 못 미친 역량을 보완할 과정을 안내합니다.", size=9, color=MUTED), Spacer(1, 15)]
+                           else "교육 후에도 목표보다 0.2점 이상 낮은 역량을 보완할 학습을 제안합니다. 본인 응답(자기보고)에 근거합니다.",
+                           size=9, color=MUTED), Spacer(1, 15)]
+    panels: list[Any] = []
     if transfer is not None:
         if transfer.get("disclosed"):
             cells = [[_p(row["label"], size=8.5, color=MUTED), _p(f"{row['mean']:.2f}", size=17, bold=True, color=TEAL)]
@@ -258,19 +267,24 @@ def _followup_story(transfer: Mapping[str, Any] | None, courses: list[Mapping[st
         else:
             body = [_p("현업전이 환경", size=12, bold=True), Spacer(1, 7),
                     _p(f"사후검사 현업전이 응답이 5명 미만({transfer.get('n', 0)}명)이므로 평균과 장애요인을 공개하지 않습니다.", size=9)]
-        story.extend([_panel(body, width), Spacer(1, 12)])
+        panels.extend([_panel(body, width), Spacer(1, 12)])
     if courses:
-        items: list[Any] = [_p("교육과정 검토 우선순위" if is_org else "추천 과정", size=12, bold=True), Spacer(1, 4),
-                            _p("교육 후 점수가 목표 수준에 못 미친 역량과 역량-과정 매핑을 기준으로 정렬했습니다.", size=8, color=MUTED)]
+        note = course_context_note(transfer)
+        items: list[Any] = [_p("교육과정 검토 우선순위" if is_org else "제안 과정", size=12, bold=True), Spacer(1, 4),
+                            _p("교육 후 점수가 목표보다 0.2점 이상 낮은 역량을 부족한 정도가 큰 순서로 골랐고, 역량마다 가장 잘 맞는 과정을 먼저 보여 줍니다.",
+                               size=8, color=MUTED),
+                            *([Spacer(1, 8), _p(note, size=8.8, bold=True, color=TEAL)] if note else [])]
         for index, course in enumerate(courses, 1):
             items.extend([Spacer(1, 10), _p(f"{index}. {course['title']}  ({course['delivery_label']})", size=10.5, bold=True),
-                          _p(f"관련 역량 {course['factor_name_ko']}  ·  {course['mapping_rationale']}", size=8.4, color=MUTED)])
-        items.extend([Spacer(1, 9), _p("개설 여부와 일정은 KMA 교육 페이지(www.kma.or.kr)에서 확인해 주세요.", size=7.8, color=MUTED)])
-        story.append(_panel(items, width))
+                          _p(f"관련 역량 {course['factor_name_ko']}  ·  {course['reason']}", size=8.4, color=MUTED),
+                          *([_p(course["advice"], size=8.4)] if course.get("advice") else [])])
+        items.extend([Spacer(1, 9), _p("개설 여부와 일정은 KMA 교육 페이지(www.kma.or.kr)에서 확인해 주세요.", size=7.8, color=MUTED), *inquiry])
+        panels.append(_panel(items, width))
     elif courses is not None:
-        story.append(_panel([_p("교육과정 검토 우선순위" if is_org else "추천 과정", size=12, bold=True), Spacer(1, 7),
-                             _p("모든 역량이 목표 수준 이상이어서 우선 검토할 후속 과정이 없습니다.", size=9)], width))
-    return story
+        panels.append(_panel([_p("교육과정 검토 우선순위" if is_org else "제안 과정", size=12, bold=True), Spacer(1, 7),
+                              _p("모든 역량이 목표 수준에 도달했거나 차이가 0.2점 미만이어서 우선 검토할 후속 과정이 없습니다.", size=9), *inquiry], width))
+    # No forced page break: the heading travels with its first panel, so a half-empty page is filled first.
+    return [KeepTogether(heading + panels[:1]), *panels[1:]]
 
 
 def build_report_pdf(project: Mapping[str, Any], rows: list[Mapping[str, Any]], *, kind: str,

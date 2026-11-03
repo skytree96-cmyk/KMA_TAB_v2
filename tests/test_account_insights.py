@@ -2,7 +2,9 @@ from __future__ import annotations
 
 import unittest
 
-from tap.account_insights import organization_detail_rows, recommend_courses, summarize_transfer, transfer_notes
+from tap.account_insights import (course_context_note, organization_detail_rows, recommend_courses, summarize_transfer,
+                                  transfer_notes)
+from tap.data import load_courses
 
 
 def _result(opportunity: int, barriers: list[str], *, post_completed: bool = True, applied: str = "") -> dict:
@@ -58,6 +60,74 @@ class CourseRecommendationTests(unittest.TestCase):
     def test_no_courses_when_every_competency_meets_target(self):
         rows = [{"factor_code": "CORE-CO", "factor_name_ko": "소통", "post_score": 3.9}]
         self.assertEqual(recommend_courses(self.config, rows), [])
+
+    def test_courses_for_another_level_are_never_offered(self):
+        rows = [{"factor_code": "JOB-EX", "factor_name_ko": "실행력", "post_score": 2.0},
+                {"factor_code": "FIN_CORE", "factor_name_ko": "재무", "post_score": 2.0}]
+
+        def levels(target_level):
+            config = {**self.config, "target_level": target_level}
+            return {row["target_level"] for row in recommend_courses(config, rows, limit=10)}
+
+        self.assertEqual(levels("staff"), {"all"})
+        self.assertEqual(levels("manager"), {"all", "manager"})
+
+    def test_gap_within_report_noise_band_recommends_nothing(self):
+        rows = [{"factor_code": "CORE-CO", "factor_name_ko": "고객지향", "post_score": 3.35}]
+        self.assertEqual(recommend_courses(self.config, rows), [])
+        rows[0]["post_score"] = 3.3
+        self.assertEqual({row["factor_code"] for row in recommend_courses(self.config, rows)}, {"CORE-CO"})
+
+    def test_larger_gap_first_and_every_competency_before_second_courses(self):
+        rows = [{"factor_code": "CORE-CO", "factor_name_ko": "고객지향", "post_score": 3.0},
+                {"factor_code": "JOB-PS", "factor_name_ko": "문제해결력", "post_score": 2.5}]
+        courses = recommend_courses({**self.config, "organization_priorities": []}, rows)
+        self.assertEqual([row["factor_code"] for row in courses], ["JOB-PS", "CORE-CO", "JOB-PS"])
+        rows[1]["pre_score"] = 2.5
+        advice = [row["advice"] for row in recommend_courses({**self.config, "organization_priorities": []}, rows)]
+        self.assertTrue(advice[0])
+        self.assertEqual(advice[2], "")
+
+    def test_organization_priority_breaks_ties_within_the_same_gap_band(self):
+        # 0.50 and 0.48 share the 0.5 band; without the priority CORE-CL would sort first by code.
+        rows = [{"factor_code": "CORE-CL", "factor_name_ko": "협업", "post_score": 3.0},
+                {"factor_code": "CORE-CO", "factor_name_ko": "고객지향", "post_score": 3.02}]
+        self.assertEqual(recommend_courses({**self.config, "organization_priorities": []}, rows, limit=1)[0]["factor_code"], "CORE-CL")
+        self.assertEqual(recommend_courses({**self.config, "organization_priorities": ["CORE-CO"]}, rows, limit=1)[0]["factor_code"], "CORE-CO")
+
+    def test_delivery_preference_orders_courses_within_a_competency(self):
+        rows = [{"factor_code": "JOB-PS", "factor_name_ko": "문제해결력", "post_score": 2.5}]
+        first = recommend_courses({**self.config, "delivery_preference": "online"}, rows, limit=1)[0]
+        self.assertEqual(first["delivery"], "online")
+
+    def test_reason_and_advice_follow_the_pre_post_change(self):
+        def advice(pre):
+            row = {"factor_code": "CORE-CO", "factor_name_ko": "고객지향", "pre_score": pre, "post_score": 3.0}
+            return recommend_courses(self.config, [row])[0]
+
+        rising = advice(2.4)
+        self.assertEqual(rising["reason"], "교육 후 3.00점, 목표 3.50점보다 0.50점 낮음 · 교육 전보다 +0.60점")
+        self.assertIn("심화", rising["advice"])
+        self.assertIn("큰 차이가 없습니다", advice(3.1)["advice"])
+        self.assertIn("낮아졌습니다", advice(3.4)["advice"])
+        self.assertEqual(advice(None)["advice"], "")
+
+    def test_training_that_cannot_fix_the_cause_recommends_nothing(self):
+        rows = [{"factor_code": "CORE-CO", "factor_name_ko": "고객지향", "post_score": 2.0}]
+        self.assertEqual(recommend_courses({**self.config, "training_cause": "system_only"}, rows), [])
+
+    def test_weak_transfer_conditions_come_before_the_course_list(self):
+        weak = summarize_transfer([_result(4, []) for _ in range(5)])
+        note = course_context_note(weak)
+        self.assertIn("상사·리더 지원", note)
+        self.assertNotIn("적용 기회", note)
+        self.assertIsNone(course_context_note(summarize_transfer([_result(4, [])])))
+        self.assertIsNone(course_context_note(None))
+
+    def test_course_links_use_current_kma_paths(self):
+        urls = {row["url"] for row in load_courses()}
+        self.assertTrue(urls)
+        self.assertTrue(all(url.startswith(("https://www.kma.or.kr/kr/", "https://studio.kma.or.kr/")) for url in urls), urls)
 
 
 class DetailRowsTests(unittest.TestCase):

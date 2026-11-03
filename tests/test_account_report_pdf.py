@@ -3,6 +3,7 @@ from __future__ import annotations
 from io import BytesIO
 import unittest
 
+from tap.account_insights import COURSE_INQUIRY_URL
 from tap.account_report_pdf import build_report_pdf, effect_level, prepare_rows, report_summary, _chart_groups
 
 PROJECT = {"company_name": "테스트 회원사", "name": "리더십 적용 프로젝트", "config": {
@@ -75,6 +76,30 @@ class AccountReportPDFTests(unittest.TestCase):
                     self.assertIn("복합 문제 해결", text)
                 if count > 2:
                     self.assertIn(f"성장 역량 {count - 1}", text)
+
+    def test_followup_continues_on_the_details_page_when_it_fits(self):
+        try:
+            from pypdf import PdfReader
+        except ImportError:
+            self.skipTest("pypdf is not installed")
+        courses = [{"title": "논리적 문제해결과 의사결정", "delivery_label": "집합", "factor_name_ko": "문제해결력",
+                    "reason": "교육 후 3.00점, 목표 3.50점보다 0.50점 낮음", "advice": ""}]
+        pdf = build_report_pdf(PROJECT, [row()], kind="individual", subject="참여자", courses=courses)
+        last = PdfReader(BytesIO(pdf)).pages[-1].extract_text()
+        self.assertIn("역량별 결과와 보완 가이드", last)
+        self.assertIn("보완 학습 제안", last)
+        self.assertNotIn("맞춤형 교육 문의", last)
+
+    def test_organization_followup_links_to_custom_training_inquiry(self):
+        try:
+            from pypdf import PdfReader
+        except ImportError:
+            self.skipTest("pypdf is not installed")
+        transfer = {"n": 3, "disclosed": False, "factors": [], "barriers": []}
+        pdf = build_report_pdf(PROJECT, [row()], kind="organization", subject="조직 전체", participant_count=5,
+                               transfer=transfer, courses=[])
+        uris = [annot.get_object()["/A"]["/URI"] for page in PdfReader(BytesIO(pdf)).pages for annot in page.get("/Annots", [])]
+        self.assertEqual(uris, [COURSE_INQUIRY_URL])
 
     def test_invalid_kind_rejected(self):
         with self.assertRaises(ValueError):

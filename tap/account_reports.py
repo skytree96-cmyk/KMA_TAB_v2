@@ -6,7 +6,8 @@ from typing import Any, Mapping
 import pandas as pd
 import streamlit as st
 
-from tap.account_insights import organization_detail_rows, recommend_courses, summarize_transfer, transfer_notes
+from tap.account_insights import (COURSE_INQUIRY_URL, course_context_note, organization_detail_rows, recommend_courses,
+                                  summarize_transfer, transfer_notes)
 from tap.aggregation import aggregate_paired_factor_results
 from tap.config import MIN_GROUP_N
 from tap.data import questions_for_factors
@@ -69,7 +70,8 @@ def export_report_pdf(store: Any, token: str, project: Mapping[str, Any], assign
 
 
 def _organization_courses(config: Mapping[str, Any], summaries: Any) -> list[dict[str, Any]]:
-    disclosed = [{**row, "post_score": row["post_mean"]} for row in summaries if row["paired_n"] >= MIN_GROUP_N]
+    disclosed = [{**row, "pre_score": row["pre_mean"], "post_score": row["post_mean"]}
+                 for row in summaries if row["paired_n"] >= MIN_GROUP_N]
     return recommend_courses(config, disclosed)
 
 
@@ -90,18 +92,25 @@ def _render_transfer(results: list[dict[str, Any]]) -> dict[str, Any]:
     return transfer
 
 
-def _render_courses(courses: list[dict[str, Any]]) -> None:
+def _render_courses(courses: list[dict[str, Any]], transfer: Mapping[str, Any]) -> None:
     st.subheader("교육과정 검토 우선순위")
     if not courses:
-        st.success("공개된 역량이 모두 목표 수준 이상이어서 우선 검토할 후속 과정이 없습니다.")
-        return
+        st.success("공개된 역량이 모두 목표 수준에 도달했거나 차이가 0.2점 미만이어서 우선 검토할 후속 과정이 없습니다.")
+    elif note := course_context_note(transfer):
+        st.warning(note)
     for index, course in enumerate(courses, 1):
         with st.container(border=True):
             st.markdown(f"**{index}. {course['title']}** · {course['delivery_label']}")
-            st.caption(f"관련 역량 {course['factor_name_ko']} · {course['mapping_rationale']}")
+            st.caption(f"관련 역량 {course['factor_name_ko']} · {course['reason']}")
+            if course["advice"]:
+                st.markdown(course["advice"])
             if course.get("url"):
-                st.link_button("과정 안내 보기", course["url"])
-    st.caption("교육 후 점수가 목표 수준에 못 미친 역량과 역량-과정 매핑을 기준으로 정렬했습니다. 개설 여부와 일정은 과정 안내 페이지에서 확인해 주세요.")
+                st.link_button("KMA에서 과정 찾기", course["url"])
+    if courses:
+        st.caption("교육 후 점수가 목표보다 0.2점 이상 낮은 역량을 부족한 정도가 큰 순서로 골랐고, 역량마다 가장 잘 맞는 과정을 먼저 보여 줍니다. "
+                   "개설 여부와 일정은 KMA 교육 페이지에서 확인해 주세요.")
+    st.markdown("회사 상황에 맞춘 과정이 필요하면 KMA에 맞춤형 교육을 문의할 수 있습니다.")
+    st.link_button("맞춤형 교육 문의", COURSE_INQUIRY_URL)
 
 
 def _render_individual_report(store: Any, token: str, project: Mapping[str, Any], results: list[dict[str, Any]]) -> None:
@@ -170,7 +179,7 @@ def render_project_report(store: Any, token: str, project: Mapping[str, Any]) ->
     st.bar_chart(plot, horizontal=True, stack=False, color=["#7ac7bd", "#087b76"])
     st.caption("동일 참여자·동일 문항의 자기보고 변화입니다. 수행 기회 없음(0)은 점수에서 제외하며, 교육의 인과적 효과를 의미하지 않습니다.")
     transfer = _render_transfer(results)
-    _render_courses(_organization_courses(project["config"], summaries))
+    _render_courses(_organization_courses(project["config"], summaries), transfer)
     detail = pd.DataFrame(organization_detail_rows(summaries, project["config"], transfer))
     # Mixed row types leave blanks; nullable integers keep counts as 8, not 8.0, in the CSV.
     detail = detail.astype({column: "Int64" for column in ("사전 응답", "사후 응답", "전·후 유효 인원", "사후 미응답", "응답 수", "비율(%)")

@@ -9,7 +9,7 @@ from typing import Any, Iterable, Mapping
 
 from tap.config import MIN_GROUP_N
 from tap.data import load_course_map, load_courses
-from tap.recommendation import rank_courses
+from tap.recommendation import TRAINING_GATE
 
 
 TRANSFER_FACTORS = (
@@ -20,8 +20,13 @@ TRANSFER_FACTORS = (
 )
 BARRIERS = ("적용 기회 부족", "상사·동료 지원 부족", "도구·정보·권한 부족", "시간·프로세스 제약", "특별한 방해요인 없음")
 DELIVERY_LABELS = {"online": "온라인", "offline": "집합"}
+# KMA's inquiry page, where HR teams request training tailored to their company.
+COURSE_INQUIRY_URL = "https://www.kma.or.kr/kr/usrs/eduRegMgnt/eduRegMgntForm.do?cateNm=customerInquiry"
 # Below this mean the transfer factor is called out as a follow-up item.
 TRANSFER_ATTENTION_MEAN = 3.0
+# The report calls a pre/post difference under 0.2 "유지". A gap to target that small is within
+# self-report noise, so it does not call for a course; a rise of 0.2 or more means change is under way.
+MEANINGFUL_DIFFERENCE = 0.2
 
 
 def _complete_transfer(transfer: Any) -> bool:
@@ -67,32 +72,84 @@ def transfer_notes(summary: Mapping[str, Any]) -> list[str]:
 
 
 def recommend_courses(config: Mapping[str, Any], factor_rows: Iterable[Mapping[str, Any]], limit: int = 4) -> list[dict[str, Any]]:
-    """Rank follow-up courses for competencies whose post score is still below the project target.
+    """Pick follow-up courses for competencies still at least 0.2 below the project target after training.
 
-    factor_rows need factor_code, factor_name_ko and post_score; rows without a post score are skipped.
-    Each course appears once, under the competency that ranked it highest.
+    factor_rows need factor_code, factor_name_ko and post_score, and may carry pre_score; rows without a
+    post score are skipped. Larger gaps come first (gaps in the same 0.1 band tie, and the organization's
+    priority competencies break the tie). Every competency gets its best course before any gets a second,
+    and each course appears once.
     """
+    if TRAINING_GATE.get(str(config.get("training_cause") or "mixed_or_unknown"), 0.0) == 0.0:
+        return []
     targets = config.get("target_means") or {}
-    factor_results = [{"factor_code": str(row["factor_code"]), "factor_name_ko": row["factor_name_ko"], "status": "산출",
-                       "post_score": row["post_score"],
-                       "gap_to_target": round(float(targets.get(str(row["factor_code"]), 3.5)) - float(row["post_score"]), 2)}
-                      for row in factor_rows if row.get("post_score") is not None]
-    ranked = rank_courses(
-        factor_results, load_courses(), load_course_map(),
-        organization_priorities=set(config.get("organization_priorities") or []),
-        learner_interests=set(config.get("learner_interests") or []),
-        target_level=str(config.get("target_level") or "all"),
-        delivery_preference=str(config.get("delivery_preference") or "all"),
-        training_cause=str(config.get("training_cause") or "mixed_or_unknown"),
-        limit=len(factor_results) * 10,
-    )
-    picked: dict[str, dict[str, Any]] = {}
-    for row in ranked:
-        picked.setdefault(str(row["course_id"]), row)
-    courses = list(picked.values())[:limit]
-    for row in courses:
-        row["delivery_label"] = DELIVERY_LABELS.get(str(row.get("delivery")), "온라인·집합")
-    return courses
+    priorities = {str(code) for code in config.get("organization_priorities") or []}
+    needs = []
+    for row in factor_rows:
+        if row.get("post_score") is None:
+            continue
+        code, post = str(row["factor_code"]), float(row["post_score"])
+        target = float(targets.get(code, 3.5))
+        gap = round(target - post, 2)
+        if gap < MEANINGFUL_DIFFERENCE:
+            continue
+        pre = row.get("pre_score")
+        needs.append({"factor_code": code, "factor_name_ko": row["factor_name_ko"], "post": post, "target": target,
+                      "gap": gap, "change": None if pre is None else round(post - float(pre), 2)})
+    needs.sort(key=lambda need: (-round(need["gap"], 1), need["factor_code"] not in priorities, need["factor_code"]))
+
+    level = str(config.get("target_level") or "all")
+    preference = str(config.get("delivery_preference") or "all")
+    # A course written for one level (e.g. team leaders) is never offered to another level.
+    catalog = {str(row["course_id"]): row for row in load_courses()
+               if row.get("active", True) and row.get("target_level", "all") in {"all", level}}
+    queues = {need["factor_code"]: [str(mapping["course_id"]) for mapping in sorted(
+        (mapping for mapping in load_course_map()
+         if mapping["factor_code"] == need["factor_code"] and str(mapping["course_id"]) in catalog),
+        key=lambda mapping: (preference != "all" and catalog[str(mapping["course_id"])].get("delivery") != preference,
+                             -float(mapping["content_fit"]), str(mapping["course_id"])))] for need in needs}
+    picked: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    while len(picked) < limit and any(queues.values()):
+        for need in needs:
+            queue = queues[need["factor_code"]]
+            while queue and queue[0] in seen:
+                queue.pop(0)
+            if queue and len(picked) < limit:
+                course = catalog[queue.pop(0)]
+                seen.add(str(course["course_id"]))
+                reason = _course_reason(need)
+                if any(row["factor_code"] == need["factor_code"] for row in picked):
+                    reason["advice"] = ""  # say what the change suggests once per competency, not under every course
+                picked.append({**course, "factor_code": need["factor_code"], "factor_name_ko": need["factor_name_ko"],
+                               "delivery_label": DELIVERY_LABELS.get(str(course.get("delivery")), "온라인·집합"), **reason})
+    return picked
+
+
+def _course_reason(need: Mapping[str, Any]) -> dict[str, Any]:
+    """The numbers behind a pick, and what the pre/post change suggests doing with it."""
+    reason = f"교육 후 {need['post']:.2f}점, 목표 {need['target']:.2f}점보다 {need['gap']:.2f}점 낮음"
+    change = need["change"]
+    if change is None:
+        return {"reason": reason, "advice": ""}
+    reason += f" · 교육 전보다 {change:+.2f}점"
+    if change >= MEANINGFUL_DIFFERENCE:
+        advice = "교육 후 점수가 오르고 있습니다. 같은 주제의 심화 학습이나 현업 적용 과제로 이어가 보세요."
+    elif change <= -MEANINGFUL_DIFFERENCE:
+        advice = "교육 전보다 낮아졌습니다. 업무 변화나 적용 기회 감소가 있었는지 먼저 확인해 보세요."
+    else:
+        advice = "교육 전과 큰 차이가 없습니다. 과정 내용이 맞았는지와 현업 적용 여건을 함께 점검해 보세요."
+    return {"reason": reason, "advice": advice}
+
+
+def course_context_note(transfer: Mapping[str, Any] | None) -> str | None:
+    """Put weak transfer conditions ahead of the course list: more training rarely fixes the work environment."""
+    if not transfer or not transfer.get("disclosed"):
+        return None
+    weak = [row["label"] for row in transfer["factors"] if row["mean"] < TRANSFER_ATTENTION_MEAN]
+    if not weak:
+        return None
+    return (f"현업 적용 조건({', '.join(weak)}) 평균이 {TRANSFER_ATTENTION_MEAN:.1f}점 미만입니다. "
+            "과정을 더 듣기 전에 이 조건부터 보완해야 배운 내용이 현업에서 쓰일 수 있습니다.")
 
 
 def organization_detail_rows(summaries: Iterable[Mapping[str, Any]], config: Mapping[str, Any],
