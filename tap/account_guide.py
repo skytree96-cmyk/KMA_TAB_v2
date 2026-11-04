@@ -6,6 +6,8 @@ KMA administrator workflows are intentionally excluded.
 """
 from __future__ import annotations
 
+from functools import lru_cache
+from pathlib import Path
 from typing import Iterable
 
 import streamlit as st
@@ -553,6 +555,15 @@ def guide_sections() -> dict[str, list[str]]:
     }
 
 
+# Replace this file to publish a new manual; the download name stays the same.
+GUIDE_PDF_PATH = Path(__file__).resolve().parents[1] / "docs" / "TAP_사용설명서.pdf"
+
+
+@lru_cache(maxsize=1)
+def _guide_pdf() -> bytes | None:
+    return GUIDE_PDF_PATH.read_bytes() if GUIDE_PDF_PATH.is_file() else None
+
+
 def render_account_guide():
     from tap.account_portal import TOKEN_KEY
 
@@ -568,6 +579,10 @@ def render_account_guide():
                     switch_to_page("home")
             else:
                 st.markdown("[로그인하기](/login)")
+            guide_pdf = _guide_pdf()
+            if guide_pdf:
+                st.download_button("PDF 사용설명서 내려받기", guide_pdf, "TAP_사용설명서.pdf", "application/pdf",
+                                   icon=":material/download:", key="tap_guide_pdf")
 
         st.html(_intro())
         sections = guide_sections()

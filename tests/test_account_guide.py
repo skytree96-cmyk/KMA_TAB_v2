@@ -82,6 +82,14 @@ class AccountGuideTests(unittest.TestCase):
         self.assertEqual([tab.label for tab in app.tabs], ["교육담당자", "참여자"])
         self.assertEqual(app.title[0].value, "이용 안내")
 
+    def test_guide_offers_the_pdf_manual(self):
+        from tap.account_guide import GUIDE_PDF_PATH
+
+        self.assertTrue(GUIDE_PDF_PATH.read_bytes().startswith(b"%PDF-"))
+        app = AppTest.from_function(_guide_entry).run()
+        self.assertFalse(app.exception)
+        self.assertIn("PDF 사용설명서 내려받기", [button.label for button in app.get("download_button")])
+
 
 
 class RootRedirectTests(unittest.TestCase):
