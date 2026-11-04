@@ -3,8 +3,11 @@ from functools import lru_cache
 from pathlib import Path
 
 ASSETS = Path(__file__).resolve().parents[1] / "assets"
-# Paperlogy (OFL) dynamic subset, the same source PAI uses; browsers fetch only the glyph ranges in use.
-FONT_IMPORT = ('<style>@import url("https://cdn.jsdelivr.net/gh/fonts-archive/Paperlogy/subsets/'
+# Dynamic subsets (OFL): browsers fetch only the glyph ranges in use. Pretendard is
+# the reading face (console v2); Paperlogy stays for headings that still name it.
+FONT_IMPORT = ('<style>@import url("https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/'
+               'pretendardvariable-dynamic-subset.min.css");'
+               '@import url("https://cdn.jsdelivr.net/gh/fonts-archive/Paperlogy/subsets/'
                'Paperlogy-dynamic-subset.css");</style>')
 
 # Action panels (st.expander) by widget-key prefix: tone, Material Symbols icon, one-line description.
@@ -35,10 +38,11 @@ def _panel_css() -> str:
 
 @lru_cache(maxsize=1)
 def account_theme_css() -> str:
-    # The premium layer follows account-ui.css so its tokens and components win.
-    return FONT_IMPORT + "<style>" + _read("account-ui.css") + _read("premium-base.css") + _panel_css() + "</style>"
+    # Each layer overrides the one before: premium follows account-ui, and
+    # console-v2 (sidebar, sheet, pills) comes last.
+    return FONT_IMPORT + "<style>" + _read("account-ui.css") + _read("premium-base.css") + _panel_css() + _read("console-v2.css") + "</style>"
 
 
 @lru_cache(maxsize=1)
 def workspace_theme_css() -> str:
-    return "<style>" + _read("workspace-ui.css") + _read("premium-workspace.css") + "</style>"
+    return "<style>" + _read("workspace-ui.css") + _read("premium-workspace.css") + _read("console-v2.css") + "</style>"

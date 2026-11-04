@@ -19,3 +19,6 @@ tests
 *.sqlite3
 *.pptx
 render.yaml
+# Legacy demo pages: the account app uses st.navigation, and a pages/ folder
+# next to streamlit_app.py makes Streamlit show "Page not found" on direct URLs.
+pages
