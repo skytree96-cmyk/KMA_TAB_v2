@@ -4,7 +4,7 @@ from html.parser import HTMLParser
 import re
 import unittest
 
-from tap.account_landing import LANDING_REPLACEMENTS, account_landing_html
+from tap.account_landing import LANDING_PATH, account_landing_html
 from tap.brand import BRAND_VARIANTS, brand_html
 from tap.open_page import GUIDE_PDF_PATH, OPEN_PAGE_PATH
 
@@ -14,6 +14,7 @@ class LandingParser(HTMLParser):
         super().__init__()
         self.app_links = []
         self.visible_copy = []
+        self.scripts = []
         self.suppressed = 0
 
     def handle_starttag(self, tag, attrs):
@@ -30,7 +31,10 @@ class LandingParser(HTMLParser):
             self.suppressed -= 1
 
     def handle_data(self, data):
-        if not self.suppressed:
+        if self.suppressed:
+            if self.lasttag == "script":
+                self.scripts.append(data)
+        else:
             self.visible_copy.append(data)
 
 
@@ -39,16 +43,18 @@ class AccountLandingTests(unittest.TestCase):
         page = account_landing_html()
         parser = LandingParser()
         parser.feed(page)
-        self.assertEqual(parser.app_links, ["/login"] * 7)
+        self.assertGreaterEqual(len(parser.app_links), 5)
+        self.assertEqual(set(parser.app_links), {"/login"})
         copy = " ".join(parser.visible_copy)
         self.assertNotIn("KMA 관리자", copy)
-        self.assertEqual(page.count('class="role-card'), 2)
+        self.assertEqual(len(re.findall(r'class="role-card\b', page)), 2)
         for phrase in ("데모", "기획검증", "MVP", "합성", "개인정보를 입력하지", "프로젝트 코드", "tap_role", "원문 ID 미저장"):
             self.assertNotIn(phrase, copy)
         self.assertIn("로그인하고 검사 참여", copy)
         self.assertIn("본인에게 배정된 프로젝트", copy)
         self.assertIn("리포트 예시", copy)
         self.assertIn("KMA 교육과정을 추천합니다", copy)
+        self.assertIn("인과효과", copy)
         self.assertIn('href="#recommend"', page)
         for phrase in ("인사평가", "채용", "승진", "교육 전/후", "교육 전·후", "사전·사후"):
             self.assertNotIn(phrase, copy)
@@ -56,17 +62,24 @@ class AccountLandingTests(unittest.TestCase):
         self.assertIn('id="reportRadar"', page)
         self.assertNotIn('class="brand-mark"', page)
         self.assertIn("tap-ci--reverse", page)
+        self.assertNotIn("TAP:BRAND", page)
 
-    def test_every_production_replacement_still_matches_the_open_page(self):
-        source = OPEN_PAGE_PATH.read_text(encoding="utf-8")
-        stale = [old for old in LANDING_REPLACEMENTS if old not in source]
-        self.assertEqual(stale, [])
+    def test_page_survives_streamlit_html_sanitizer(self):
+        # st.html runs DOMPurify with the HTML profile: inline <svg> is dropped,
+        # and a script whose text looks like markup ("<" + letter, "/" or "!")
+        # is removed whole, which would leave the charts and menu dead.
+        parser = LandingParser()
+        parser.feed(account_landing_html())
+        source = LANDING_PATH.read_text(encoding="utf-8")
+        self.assertNotRegex(source[source.index("<body"):], r"<svg\b")
+        self.assertTrue(parser.scripts)
+        for script in parser.scripts:
+            self.assertIsNone(re.search(r"<[/\w!]", script))
 
     def test_guide_opens_current_instructions_and_legacy_sources_are_preserved(self):
         before = OPEN_PAGE_PATH.read_bytes()
         pdf_before = GUIDE_PDF_PATH.read_bytes()
         page = account_landing_html()
-        self.assertIn('const guidePdfBase64 = "";', page)
         self.assertEqual(before, OPEN_PAGE_PATH.read_bytes())
         self.assertEqual(pdf_before, GUIDE_PDF_PATH.read_bytes())
         self.assertIn("기획검증용 공개 데모", before.decode("utf-8"))

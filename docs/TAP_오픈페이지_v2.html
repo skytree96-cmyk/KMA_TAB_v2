@@ -1,0 +1,512 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>KMA TAP · 교육 전후 변화 평가 플랫폼</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+<style>
+/* KMA TAP 오픈페이지 v2 (운영). tap/account_landing.py가 워드마크와 글꼴을 넣어 /open에서 보여 준다.
+   색: CI 네이비 #192c48, 틸 #087b76, 점 #20c7dc. 나머지는 회색 단계.
+   글꼴: 본문과 제목은 Pretendard, 워드마크만 Paperlogy.
+   대비: 흰 바탕 본문 10:1, 작은 글자 5.9:1 이상, 짙은 바탕 위 글자 8:1 이상. 버튼 흰 글자 5.1:1. */
+.tap-landing{
+  --navy:#192c48; --navy-900:#0c1a2c;
+  --teal:#087b76; --teal-strong:#06605c; --teal-tint:#e8f4f2; --teal-on-dark:#72dccf;
+  --ink:#121b26; --ink-2:#36414d; --ink-3:#5b6672; --ink-2-on-dark:#c9d4df; --ink-3-on-dark:#9fb0c1;
+  --line:#e2e6ea; --line-2:#eef1f3; --soft:#f3f5f7; --soft-2:#f8f9fa;
+  --orange:#a65f00; --orange-tint:#fff5e6;
+  --r-sm:12px; --r-md:16px; --r-lg:22px; --r-xl:28px; --max:1200px;
+  --font:'Pretendard Variable',Pretendard,-apple-system,BlinkMacSystemFont,'Apple SD Gothic Neo','Malgun Gothic',system-ui,sans-serif;
+  background:#fff;color:var(--ink-2);font-family:var(--font);font-size:17px;line-height:1.7;
+  word-break:keep-all;overflow-wrap:break-word;-webkit-font-smoothing:antialiased;
+}
+body{margin:0;background:#fff}
+.tap-landing *{box-sizing:border-box}
+.tap-landing a{color:inherit}
+.tap-landing :is(h1,h2,h3,p,ul,dl,dd){margin:0}
+.tap-landing section[id]{scroll-margin-top:80px}
+.tap-landing :focus-visible{outline:3px solid #20c7dc;outline-offset:3px;border-radius:8px}
+.tap-landing .container{width:min(100% - 48px,var(--max));margin:0 auto}
+.tap-landing .sr-only{position:absolute!important;width:1px!important;height:1px!important;overflow:hidden!important;clip:rect(0,0,0,0)!important;white-space:nowrap!important}
+.tap-landing .skip{position:fixed;left:16px;top:-80px;z-index:200;padding:12px 16px;border-radius:10px;background:var(--teal-strong);color:#fff;font-weight:700;text-decoration:none}
+.tap-landing .skip:focus{top:16px}
+
+/* 워드마크 크기 (모양은 tap/brand.py) */
+.tap-landing .brand{text-decoration:none;flex:none}
+.tap-landing .brand .tap-ci,.tap-landing .foot-brand .tap-ci{flex-direction:row;align-items:center;gap:12px;margin:0;flex-wrap:nowrap}
+.tap-landing .brand .tap-ci-wordmark,.tap-landing .foot-brand .tap-ci-wordmark{font-size:28px}
+.tap-landing .brand .tap-ci-description{font-size:12px!important;line-height:1.35!important;color:#51657f}
+.tap-landing .foot-brand .tap-ci-description{font-size:12px!important;line-height:1.35!important;color:var(--ink-3-on-dark)}
+
+/* 버튼 */
+.tap-landing .btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;height:44px;padding:0 20px;border-radius:999px;border:1px solid transparent;
+  font-size:15px;font-weight:700;text-decoration:none;white-space:nowrap;transition:background .15s,border-color .15s}
+.tap-landing .btn-lg{height:56px;padding:0 28px;font-size:17px}
+.tap-landing .btn-primary{background:var(--teal);color:#fff}
+.tap-landing .btn-primary:hover{background:var(--teal-strong)}
+.tap-landing .btn-gray{background:var(--soft);color:var(--ink)}
+.tap-landing .btn-gray:hover{background:#e7eaed}
+.tap-landing .btn-line{background:#fff;color:var(--ink);border-color:#d3d9df}
+.tap-landing .btn-line:hover{border-color:#9aa5b0}
+.tap-landing .btn-on-dark{background:rgba(255,255,255,.1);color:#fff;border-color:rgba(255,255,255,.32)}
+.tap-landing .btn-on-dark:hover{background:rgba(255,255,255,.18)}
+.tap-landing .btn-white{background:#fff;color:var(--teal-strong)}
+.tap-landing .btn-white:hover{background:#eef7f6}
+.tap-landing .btn-navy{background:var(--navy);color:#fff}
+.tap-landing .btn-navy:hover{background:#0f1f35}
+
+/* 머리글 */
+.tap-landing .site-header{position:sticky;top:0;z-index:50;background:rgba(255,255,255,.97);border-bottom:1px solid var(--line)}
+.tap-landing .header-inner{height:72px;display:flex;align-items:center;justify-content:space-between;gap:24px}
+.tap-landing .nav{display:flex;align-items:center;gap:6px}
+.tap-landing .nav-list{display:flex;gap:4px;list-style:none;padding:0;margin:0 12px 0 0}
+.tap-landing .nav-list a{display:inline-flex;align-items:center;height:40px;padding:0 14px;border-radius:999px;text-decoration:none;font-size:16px;font-weight:600;color:var(--ink-2)}
+.tap-landing .nav-list a:hover{background:var(--soft);color:var(--ink)}
+.tap-landing .nav-list .mobile-only{display:none}
+.tap-landing .menu-btn{display:none;width:44px;height:44px;border:0;border-radius:999px;background:var(--soft);color:var(--ink);font-size:20px;cursor:pointer}
+
+/* 첫 화면 */
+.tap-landing .hero{position:relative;overflow:hidden;background:var(--navy-900);color:#fff}
+.tap-landing .hero::before{content:"";position:absolute;inset:0;pointer-events:none;background:
+  radial-gradient(60% 70% at 85% 30%,rgba(8,123,118,.45),transparent 70%),radial-gradient(40% 50% at 10% 100%,rgba(32,199,220,.12),transparent 70%)}
+.tap-landing .hero-grid{position:relative;display:grid;grid-template-columns:minmax(0,1.05fr) minmax(0,.95fr);gap:64px;align-items:center;padding:104px 0 112px}
+.tap-landing .eyebrow{display:block;margin-bottom:16px;font-size:15px;font-weight:700;color:var(--teal-strong)}
+.tap-landing .hero .eyebrow{color:var(--teal-on-dark)}
+.tap-landing .hero h1{font-size:clamp(40px,5.4vw,68px);font-weight:800;line-height:1.16;letter-spacing:-.04em;color:#fff}
+.tap-landing .hero h1 em{font-style:normal;color:var(--teal-on-dark)}
+.tap-landing .hero .lead{margin-top:28px;max-width:31em;font-size:19px;line-height:1.75;color:var(--ink-2-on-dark)}
+.tap-landing .actions{display:flex;flex-wrap:wrap;gap:12px}
+.tap-landing .hero .actions{margin-top:40px}
+.tap-landing .product{position:relative;background:#fff;border-radius:var(--r-xl);padding:28px;color:var(--ink-2);box-shadow:0 40px 80px -30px rgba(0,0,0,.55)}
+.tap-landing .product-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}
+.tap-landing .product-head h3{font-size:20px;font-weight:700;letter-spacing:-.02em;color:var(--ink)}
+.tap-landing .product-head p{margin-top:2px;font-size:14px;color:var(--ink-3)}
+.tap-landing .tag{display:inline-flex;align-items:center;height:28px;padding:0 12px;border-radius:999px;background:var(--teal-tint);color:var(--teal-strong);font-size:13px;font-weight:700;white-space:nowrap}
+.tap-landing .metrics{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-top:20px}
+.tap-landing .metric{background:var(--soft-2);border-radius:var(--r-md);padding:14px 16px}
+.tap-landing .metric span{display:block;font-size:14px;font-weight:600;color:var(--ink-3)}
+.tap-landing .metric strong{display:block;margin-top:4px;font-size:28px;font-weight:800;letter-spacing:-.03em;color:var(--ink);font-variant-numeric:tabular-nums}
+.tap-landing .metric.up strong{color:var(--teal)}
+.tap-landing .radar{width:100%;max-width:340px;margin:12px auto 0;aspect-ratio:340/300}
+.tap-landing .radar svg{display:block;width:100%;height:100%}
+.tap-landing .legend{display:flex;justify-content:center;gap:20px;font-size:14px;font-weight:600;color:var(--ink-3)}
+.tap-landing .legend i{display:inline-block;width:14px;height:3px;margin-right:6px;border-radius:2px;vertical-align:middle;background:#8f9ba7}
+.tap-landing .legend i.post{background:var(--teal)}
+.tap-landing .float-chip{position:absolute;right:-28px;bottom:-24px;padding:14px 18px;border-radius:var(--r-md);background:var(--navy);color:#fff;box-shadow:0 18px 40px -16px rgba(0,0,0,.5)}
+.tap-landing .float-chip span{display:block;font-size:13px;color:var(--ink-2-on-dark)}
+.tap-landing .float-chip strong{display:block;font-size:30px;font-weight:800;line-height:1.2;letter-spacing:-.03em;color:var(--teal-on-dark)}
+
+/* 숫자 띠 */
+.tap-landing .facts{border-bottom:1px solid var(--line)}
+.tap-landing .facts-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr))}
+.tap-landing .fact{padding:36px 28px;border-left:1px solid var(--line)}
+.tap-landing .fact:first-child{padding-left:0;border-left:0}
+.tap-landing .fact strong{display:block;font-size:34px;font-weight:800;line-height:1.2;letter-spacing:-.03em;color:var(--teal)}
+.tap-landing .fact span{display:block;margin-top:6px;font-size:16px;font-weight:600;color:var(--ink-2)}
+
+/* 섹션 공통 */
+.tap-landing .section{padding:120px 0}
+.tap-landing .section.gray{background:var(--soft-2)}
+.tap-landing .head{max-width:720px}
+.tap-landing .head.center{margin:0 auto;text-align:center}
+.tap-landing .head h2{font-size:clamp(30px,3.8vw,46px);font-weight:800;line-height:1.28;letter-spacing:-.035em;color:var(--ink)}
+.tap-landing .head p{margin-top:18px;font-size:19px;line-height:1.7;color:var(--ink-2)}
+.tap-landing .body{margin-top:56px}
+
+/* 서비스 소개 */
+.tap-landing .split{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:72px;align-items:center}
+.tap-landing .compare{border-top:2px solid var(--ink)}
+.tap-landing .compare-row{display:grid;grid-template-columns:96px minmax(0,1fr);gap:20px;padding:24px 0;border-bottom:1px solid var(--line)}
+.tap-landing .compare-row .lab{padding-top:2px;font-size:15px;font-weight:700;color:var(--ink-3)}
+.tap-landing .compare-row.tap .lab{color:var(--teal-strong)}
+.tap-landing .compare-row strong{display:block;font-size:21px;font-weight:700;letter-spacing:-.02em;color:var(--ink)}
+.tap-landing .compare-row p{margin-top:4px;font-size:16.5px;color:var(--ink-2)}
+
+/* 진행 순서 */
+.tap-landing .steps{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:12px;list-style:none;padding:0}
+.tap-landing .step{background:#fff;border:1px solid var(--line);border-radius:var(--r-lg);padding:28px 24px 30px}
+.tap-landing .step-no{display:inline-grid;place-items:center;width:36px;height:36px;border-radius:50%;background:var(--teal-tint);color:var(--teal-strong);font-size:15px;font-weight:800}
+.tap-landing .step.mid .step-no{background:var(--navy);color:#fff}
+.tap-landing .step h3{margin-top:20px;font-size:20px;font-weight:700;letter-spacing:-.02em;color:var(--ink)}
+.tap-landing .step p{margin-top:6px;font-size:16px;line-height:1.6;color:var(--ink-2)}
+
+/* 리포트 */
+.tap-landing .report-surface{background:var(--soft);border-radius:var(--r-xl);padding:28px}
+.tap-landing .report-card{background:#fff;border-radius:var(--r-lg);padding:24px}
+.tap-landing .report-top{display:flex;justify-content:space-between;align-items:center;gap:10px;padding-bottom:16px;border-bottom:1px solid var(--line-2)}
+.tap-landing .report-top strong{font-size:18px;font-weight:700;color:var(--ink)}
+.tap-landing .report-top small{font-size:14px;color:var(--ink-3)}
+.tap-landing .report-body{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,.8fr);gap:16px;align-items:center;margin-top:12px}
+.tap-landing .change-list{display:grid;gap:8px}
+.tap-landing .change{display:flex;justify-content:space-between;align-items:baseline;gap:8px;padding:12px 14px;border-radius:var(--r-sm);background:var(--soft-2)}
+.tap-landing .change span{font-size:15px;font-weight:600;color:var(--ink-2)}
+.tap-landing .change strong{font-size:20px;font-weight:800;letter-spacing:-.02em;color:var(--ink);font-variant-numeric:tabular-nums}
+.tap-landing .change strong.up{color:var(--teal)}
+.tap-landing .checks{display:grid;gap:14px;margin-top:32px;padding:0;list-style:none}
+.tap-landing .checks li{display:flex;gap:12px;align-items:flex-start;font-size:17px;font-weight:500;color:var(--ink)}
+.tap-landing .checks li::before{content:"";flex:none;width:22px;height:22px;margin-top:3px;border-radius:50%;background:var(--teal) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M6 12.5l4 4 8-9' fill='none' stroke='%23fff' stroke-width='2.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center/16px no-repeat}
+.tap-landing .report-copy .btn{margin-top:36px}
+
+/* 카드 */
+.tap-landing .cards{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+.tap-landing .card{background:#fff;border:1px solid var(--line);border-radius:var(--r-lg);padding:28px 26px}
+.tap-landing .card .no{font-size:15px;font-weight:800;color:var(--teal-strong)}
+.tap-landing .card h3{margin-top:12px;font-size:20px;font-weight:700;letter-spacing:-.025em;color:var(--ink)}
+.tap-landing .card p{margin-top:8px;font-size:16px;line-height:1.65;color:var(--ink-2)}
+.tap-landing .caution{display:flex;gap:14px;margin-top:12px;padding:22px 26px;border-radius:var(--r-lg);background:var(--orange-tint)}
+.tap-landing .caution .ic{flex:none;display:grid;place-items:center;width:26px;height:26px;margin-top:1px;border-radius:50%;background:var(--orange);color:#fff;font-size:15px;font-weight:800}
+.tap-landing .caution strong{display:block;font-size:17px;font-weight:700;color:#5c3500}
+.tap-landing .caution p{margin-top:2px;font-size:16px;color:#5c4320}
+
+/* 역할 */
+.tap-landing .roles{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;max-width:980px;margin-inline:auto}
+.tap-landing .role-card{display:flex;flex-direction:column;border-radius:var(--r-xl);padding:40px}
+.tap-landing .role-card.hrd{background:var(--navy);color:var(--ink-2-on-dark)}
+.tap-landing .role-card.learner{background:var(--soft)}
+.tap-landing .role-card .kicker{font-size:15px;font-weight:700;color:var(--teal-strong)}
+.tap-landing .role-card.hrd .kicker{color:var(--teal-on-dark)}
+.tap-landing .role-card h3{margin-top:8px;font-size:30px;font-weight:800;letter-spacing:-.035em;color:var(--ink)}
+.tap-landing .role-card.hrd h3{color:#fff}
+.tap-landing .role-card > p{margin-top:10px;font-size:17.5px}
+.tap-landing .role-card.learner > p{color:var(--ink-2)}
+.tap-landing .role-card ul{flex:1;display:grid;gap:10px;align-content:start;margin:24px 0 0;padding:24px 0 0;list-style:none;border-top:1px solid #d9dee3}
+.tap-landing .role-card.hrd ul{border-color:rgba(255,255,255,.16)}
+.tap-landing .role-card li{display:flex;gap:10px;font-size:16.5px;font-weight:500;color:var(--ink)}
+.tap-landing .role-card.hrd li{color:#fff}
+.tap-landing .role-card li::before{content:"";flex:none;width:6px;height:6px;margin-top:11px;border-radius:50%;background:var(--teal)}
+.tap-landing .role-card.hrd li::before{background:var(--teal-on-dark)}
+.tap-landing .role-card .actions{margin-top:32px}
+
+/* FAQ */
+.tap-landing .faq-list{border-top:2px solid var(--ink)}
+.tap-landing .faq-list details{border-bottom:1px solid var(--line)}
+.tap-landing .faq-list summary{display:flex;justify-content:space-between;align-items:center;gap:16px;padding:24px 0;cursor:pointer;list-style:none;font-size:19px;font-weight:700;letter-spacing:-.02em;color:var(--ink)}
+.tap-landing .faq-list summary::-webkit-details-marker{display:none}
+.tap-landing .faq-list summary::after{content:"";flex:none;width:28px;height:28px;border-radius:50%;background:var(--soft) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M7 10l5 5 5-5' fill='none' stroke='%2336414d' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center/18px no-repeat;transition:transform .2s}
+.tap-landing .faq-list details[open] summary::after{transform:rotate(180deg)}
+.tap-landing .faq-list details p{padding:0 48px 26px 0;font-size:17px;line-height:1.75;color:var(--ink-2)}
+
+/* 마지막 안내 · 바닥글 */
+.tap-landing .final{background:linear-gradient(120deg,var(--teal) 0%,var(--teal-strong) 100%);color:#fff}
+.tap-landing .final-inner{display:flex;justify-content:space-between;align-items:center;gap:40px;padding:80px 0}
+.tap-landing .final h2{font-size:clamp(28px,3.4vw,40px);font-weight:800;line-height:1.3;letter-spacing:-.035em;color:#fff}
+.tap-landing .site-footer{padding:56px 0 48px;background:var(--navy-900);color:var(--ink-3-on-dark);font-size:15px}
+.tap-landing .foot-grid{display:flex;justify-content:space-between;align-items:center;gap:24px;flex-wrap:wrap}
+.tap-landing .foot-links{display:flex;flex-wrap:wrap;gap:8px}
+.tap-landing .foot-links a{display:inline-flex;align-items:center;height:40px;padding:0 16px;border-radius:999px;border:1px solid rgba(255,255,255,.24);color:#fff;font-weight:600;text-decoration:none}
+.tap-landing .foot-links a:hover{background:rgba(255,255,255,.08)}
+.tap-landing .foot-note{margin-top:32px;padding-top:24px;border-top:1px solid rgba(255,255,255,.12)}
+
+@media (max-width:1080px){
+  .tap-landing .nav-list{display:none}
+  .tap-landing .menu-btn{display:inline-grid;place-items:center}
+  .tap-landing .nav.open .nav-list{position:absolute;top:72px;left:0;right:0;display:grid;gap:0;margin:0;padding:8px 24px 16px;background:#fff;border-bottom:1px solid var(--line)}
+  .tap-landing .nav.open .nav-list a{height:48px;border-radius:12px}
+  .tap-landing .hero-grid,.tap-landing .split{grid-template-columns:minmax(0,1fr);gap:48px}
+  .tap-landing .steps{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .tap-landing .cards,.tap-landing .facts-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .tap-landing .fact{padding:28px 20px}
+  .tap-landing .fact:nth-child(3){padding-left:0;border-left:0}
+  .tap-landing .fact:nth-child(n+3){border-top:1px solid var(--line)}
+  .tap-landing .float-chip{right:12px}
+}
+@media (max-width:720px){
+  .tap-landing{font-size:16px}
+  .tap-landing .container{width:min(100% - 32px,var(--max))}
+  .tap-landing .header-inner{height:64px}
+  .tap-landing .nav > .btn-gray{display:none}
+  .tap-landing .nav-list .mobile-only{display:block}
+  .tap-landing .nav.open .nav-list{top:64px}
+  .tap-landing .brand .tap-ci-description{display:none}
+  .tap-landing .hero-grid{padding:72px 0 80px}
+  .tap-landing .hero .lead,.tap-landing .head p{font-size:17px}
+  .tap-landing .section{padding:84px 0}
+  .tap-landing .steps,.tap-landing .cards,.tap-landing .roles{grid-template-columns:minmax(0,1fr)}
+  .tap-landing .fact{padding:22px 16px}
+  .tap-landing .fact strong{font-size:28px}
+  .tap-landing .metrics{gap:6px}
+  .tap-landing .metric{padding:12px}
+  .tap-landing .metric strong{font-size:22px}
+  .tap-landing .product{padding:20px}
+  .tap-landing .float-chip{position:static;margin-top:12px}
+  .tap-landing .report-body{grid-template-columns:minmax(0,1fr)}
+  .tap-landing .card,.tap-landing .role-card{padding:28px 24px}
+  .tap-landing .final-inner{flex-direction:column;align-items:flex-start;padding:64px 0}
+  .tap-landing .faq-list details p{padding-right:0}
+}
+</style>
+</head>
+<body>
+<div class="tap-landing">
+<a class="skip" href="#main">본문 바로가기</a>
+<header class="site-header">
+  <div class="container header-inner">
+    <a class="brand" href="#top" aria-label="KMA TAP 첫 화면으로 이동"><!-- TAP:BRAND_HEADER --><span class="tap-ci-wordmark">KMA TAP</span><!-- /TAP:BRAND_HEADER --></a>
+    <div class="nav" id="tapNav">
+      <nav aria-label="주요 메뉴">
+        <ul class="nav-list">
+          <li><a href="#about">서비스 소개</a></li>
+          <li><a href="#process">진행 순서</a></li>
+          <li><a href="#report">리포트</a></li>
+          <li><a href="#recommend">교육 추천</a></li>
+          <li><a href="#faq">FAQ</a></li>
+          <li class="mobile-only"><a href="/guide">사용설명서</a></li>
+        </ul>
+      </nav>
+      <a class="btn btn-gray" href="/guide">사용설명서</a>
+      <a class="btn btn-primary" data-app-link href="/login">로그인</a>
+      <button class="menu-btn" id="tapMenu" type="button" aria-expanded="false" aria-label="메뉴 열기">☰</button>
+    </div>
+  </div>
+</header>
+
+<main id="main">
+  <section class="hero" id="top">
+    <div class="container hero-grid">
+      <div>
+        <span class="eyebrow">교육 전후 변화 평가 플랫폼</span>
+        <h1>교육 전후,<br><em>현업 행동의 변화</em>를<br>확인합니다.</h1>
+        <p class="lead">같은 참여자가 같은 문항에 교육 전과 후 두 번 응답합니다. 행동 변화, 부족한 역량, 추천 KMA 과정이 리포트 하나에 나옵니다.</p>
+        <div class="actions">
+          <a class="btn btn-primary btn-lg" href="#report">리포트 예시 보기</a>
+          <a class="btn btn-on-dark btn-lg" data-app-link href="/login">로그인하고 검사 참여</a>
+        </div>
+      </div>
+      <div class="product" aria-label="리포트 예시 화면">
+        <div class="product-head">
+          <div><h3>공통역량 교육 전후 변화</h3><p>동일 참여자 10명 · 역량별 유효 N≥5</p></div>
+          <span class="tag">리포트 예시</span>
+        </div>
+        <div class="metrics">
+          <div class="metric"><span>교육 전 평균</span><strong>3.06</strong></div>
+          <div class="metric"><span>교육 후 평균</span><strong>3.71</strong></div>
+          <div class="metric up"><span>관찰 변화</span><strong>+0.65</strong></div>
+        </div>
+        <div class="radar" id="heroRadar" role="img" aria-label="8개 역량의 교육 전후 점수 비교 그래프"></div>
+        <div class="legend"><span><i></i>교육 전</span><span><i class="post"></i>교육 후</span></div>
+        <div class="float-chip" aria-hidden="true"><span>가장 큰 변화 · 문제해결</span><strong>+0.92</strong></div>
+        <table class="sr-only">
+          <caption>리포트 예시의 역량별 교육 전후 점수</caption>
+          <thead><tr><th>역량</th><th>교육 전</th><th>교육 후</th></tr></thead>
+          <tbody><tr><td>문제해결</td><td>2.70</td><td>3.62</td></tr><tr><td>협업</td><td>3.10</td><td>3.81</td></tr><tr><td>실행력</td><td>3.00</td><td>3.66</td></tr><tr><td>소통</td><td>3.40</td><td>3.92</td></tr><tr><td>고객지향</td><td>3.20</td><td>3.74</td></tr><tr><td>디지털</td><td>2.60</td><td>3.38</td></tr><tr><td>학습민첩</td><td>3.00</td><td>3.61</td></tr><tr><td>자기관리</td><td>3.50</td><td>3.97</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <section class="facts" aria-label="TAP 측정 기준">
+    <div class="container facts-grid">
+      <div class="fact"><strong>2회</strong><span>교육 전후 같은 문항으로 응답</span></div>
+      <div class="fact"><strong>8주</strong><span>문항이 묻는 최근 업무 기간</span></div>
+      <div class="fact"><strong>최대 8개</strong><span>프로젝트별 측정 역량</span></div>
+      <div class="fact"><strong>5명 이상</strong><span>역량별 조직 결과 공개 기준</span></div>
+    </div>
+  </section>
+
+  <section class="section" id="about">
+    <div class="container split">
+      <div class="head">
+        <span class="eyebrow">서비스 소개</span>
+        <h2>교육 만족도만으로는<br>현업의 변화를 설명하기 어렵습니다.</h2>
+        <p>TAP은 교육 전 출발점과 교육 후 업무행동을 같은 기준으로 비교합니다.</p>
+      </div>
+      <div class="compare">
+        <div class="compare-row"><span class="lab">기존 조사</span><div><strong>교육은 만족스러웠나요?</strong><p>교육 직후 반응과 만족도</p></div></div>
+        <div class="compare-row tap"><span class="lab">TAP</span><div><strong>현업 행동은 어떻게 달라졌나요?</strong><p>같은 참여자의 교육 전후 변화와 현업 적용환경</p></div></div>
+        <div class="compare-row tap"><span class="lab">다음 교육</span><div><strong>무엇을 더 배워야 하나요?</strong><p>부족한 역량과 추천 KMA 과정</p></div></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section gray" id="process">
+    <div class="container">
+      <div class="head center">
+        <span class="eyebrow">진행 순서</span>
+        <h2>교육 전에 한 번,<br>교육 후에 같은 문항으로 한 번 더.</h2>
+      </div>
+      <ol class="body steps">
+        <li class="step"><span class="step-no">1</span><h3>프로젝트 만들기</h3><p>교육명, 검사 일정, 측정 역량 설정</p></li>
+        <li class="step"><span class="step-no">2</span><h3>교육 전 검사</h3><p>평소 업무행동을 기준으로 응답</p></li>
+        <li class="step mid"><span class="step-no">3</span><h3>교육과 현업 적용</h3><p>교육 후 8~10주 동안 업무에 적용</p></li>
+        <li class="step"><span class="step-no">4</span><h3>교육 후 검사</h3><p>같은 계정으로 같은 문항에 다시 응답</p></li>
+        <li class="step"><span class="step-no">5</span><h3>변화 리포트</h3><p>교육 전후 변화와 추천 과정 확인</p></li>
+      </ol>
+    </div>
+  </section>
+
+  <section class="section" id="report">
+    <div class="container split">
+      <div class="report-surface" aria-label="조직 리포트 예시">
+        <div class="report-card">
+          <div class="report-top"><strong>조직 리포트</strong><small>리포트 예시 · N=10</small></div>
+          <div class="report-body">
+            <div class="radar" id="reportRadar" role="img" aria-label="8개 역량의 교육 전후 변화 그래프"></div>
+            <div class="change-list">
+              <div class="change"><span>문제해결</span><strong class="up">+0.92</strong></div>
+              <div class="change"><span>협업</span><strong class="up">+0.71</strong></div>
+              <div class="change"><span>실행력</span><strong class="up">+0.66</strong></div>
+              <div class="change"><span>적용 기회</span><strong>3.8 / 5</strong></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="report-copy head">
+        <span class="eyebrow">리포트</span>
+        <h2>교육 전후 변화와<br>현업 적용환경을 같이 봅니다.</h2>
+        <ul class="checks">
+          <li>역량별 교육 전후 레이더 그래프</li>
+          <li>역량별 유효 응답자 수</li>
+          <li>현업 적용 요인과 장애 요인</li>
+          <li>A4 인쇄용 리포트와 상세 CSV</li>
+        </ul>
+        <a class="btn btn-line btn-lg" data-app-link href="/login">리포트 화면 열기</a>
+      </div>
+    </div>
+  </section>
+
+  <section class="section gray" id="recommend">
+    <div class="container">
+      <div class="head">
+        <span class="eyebrow">교육 추천</span>
+        <h2>부족한 역량에 맞는<br>KMA 교육과정을 추천합니다.</h2>
+        <p>KMA 공개교육과 이러닝 가운데 지금 신청할 수 있는 과정을 연결합니다.</p>
+      </div>
+      <div class="body cards">
+        <article class="card"><span class="no">01</span><h3>부족한 역량부터</h3><p>목표보다 0.2점 이상 낮은 역량을 차이가 큰 순서로 최대 3개 고릅니다.</p></article>
+        <article class="card"><span class="no">02</span><h3>공개교육과 이러닝</h3><p>역량마다 공개교육 1개, 이러닝 1개를 제안합니다.</p></article>
+        <article class="card"><span class="no">03</span><h3>신청할 수 있는 과정</h3><p>다음 기수가 열린 공개교육만 보여 줍니다.</p></article>
+        <article class="card"><span class="no">04</span><h3>교육 전 결과부터</h3><p>교육 전 검사만 마쳐도 추천 과정을 볼 수 있습니다.</p></article>
+      </div>
+    </div>
+  </section>
+
+  <section class="section" id="roles">
+    <div class="container">
+      <div class="head center">
+        <span class="eyebrow">이용 방법</span>
+        <h2>로그인하면 역할에 맞는 화면이 열립니다.</h2>
+      </div>
+      <div class="body roles">
+        <article class="role-card hrd">
+          <span class="kicker">HRD · L&amp;D</span><h3>교육담당자</h3>
+          <p>프로젝트를 운영하고 조직 리포트를 받습니다.</p>
+          <ul><li>검사 일정과 측정 역량 설정</li><li>부서별 검사 진행 현황</li><li>미완료자 명단 내려받기</li></ul>
+          <div class="actions"><a class="btn btn-white btn-lg" data-app-link href="/login">담당자 로그인</a></div>
+        </article>
+        <article class="role-card learner">
+          <span class="kicker">LEARNER</span><h3>참여자</h3>
+          <p>검사에 응답하고 개인 리포트를 받습니다.</p>
+          <ul><li>교육 전후 검사 응답</li><li>중간에 멈춰도 이어서 응답</li><li>나에게 맞는 추천 과정</li></ul>
+          <div class="actions"><a class="btn btn-primary btn-lg" data-app-link href="/login">검사 참여</a></div>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <section class="section gray" id="method">
+    <div class="container">
+      <div class="head">
+        <span class="eyebrow">측정 원칙</span>
+        <h2>비교할 수 있는 응답만<br>변화로 계산합니다.</h2>
+      </div>
+      <div class="body cards">
+        <article class="card"><span class="no">01</span><h3>같은 사람, 같은 문항</h3><p>문항 버전이 같고 교육 전후에 모두 응답한 경우만 변화량을 계산합니다.</p></article>
+        <article class="card"><span class="no">02</span><h3>업무행동 기준</h3><p>Kirkpatrick 행동 수준을 참고해 업무행동의 변화를 봅니다.</p></article>
+        <article class="card"><span class="no">03</span><h3>현업 적용환경</h3><p>적용 기회, 상사 지원, 도구·권한, 시간 여건을 함께 묻습니다.</p></article>
+        <article class="card"><span class="no">04</span><h3>응답 품질</h3><p>‘수행 기회 없음’과 미응답은 점수와 따로 처리합니다.</p></article>
+      </div>
+      <div class="caution" role="note"><span class="ic" aria-hidden="true">!</span><div><strong>관찰 변화와 교육의 인과효과는 다릅니다.</strong><p>비교집단이 없는 자기보고 결과이므로, 교육 전후에 관찰된 변화로 해석해 주세요.</p></div></div>
+    </div>
+  </section>
+
+  <section class="section" id="faq">
+    <div class="container split" style="align-items:start">
+      <div class="head">
+        <span class="eyebrow">FAQ</span>
+        <h2>자주 묻는 질문</h2>
+      </div>
+      <div class="faq-list">
+        <details open><summary>교육 후 검사는 언제 하나요?</summary><p>교육이 끝나고 8~10주 뒤를 권장합니다. 문항이 ‘최근 8주’ 행동을 묻기 때문입니다.</p></details>
+        <details><summary>교육 전후에 같은 계정을 써야 하나요?</summary><p>네. 그래야 같은 사람의 교육 전후 결과가 연결됩니다. 교육담당자가 발급한 아이디로 로그인해, 본인에게 배정된 프로젝트에서 응답해 주세요.</p></details>
+        <details><summary>결과는 누가 볼 수 있나요?</summary><p>참여자는 본인 결과만, 교육담당자는 담당 회사의 진행 현황과 공개 기준을 넘은 조직 리포트만 볼 수 있습니다.</p></details>
+        <details><summary>조직 리포트는 언제 공개되나요?</summary><p>역량마다 교육 전후에 모두 응답한 사람이 5명 이상일 때 조직 평균과 변화량이 나옵니다. 5명은 개인정보 보호를 위한 최소 기준이며, 조직 전체를 대표한다는 뜻은 아닙니다.</p></details>
+      </div>
+    </div>
+  </section>
+
+  <section class="final">
+    <div class="container final-inner">
+      <h2>교육 전후 변화를<br>직접 확인해 보세요.</h2>
+      <div class="actions"><a class="btn btn-white btn-lg" href="#report">리포트 예시</a><a class="btn btn-navy btn-lg" data-app-link href="/login">로그인</a></div>
+    </div>
+  </section>
+</main>
+
+<footer class="site-footer">
+  <div class="container">
+    <div class="foot-grid">
+      <div class="foot-brand"><!-- TAP:BRAND_FOOTER --><span class="tap-ci-wordmark">KMA TAP</span><!-- /TAP:BRAND_FOOTER --></div>
+      <div class="foot-links"><a href="/guide">사용설명서</a><a href="https://www.kma.or.kr/kr/main.do" target="_blank" rel="noreferrer">KMA 홈페이지</a></div>
+    </div>
+    <p class="foot-note">© KMA TAP. 교육 전후 변화 평가 플랫폼.</p>
+  </div>
+</footer>
+</div>
+
+<script>
+(function () {
+  var labels = ["문제해결", "협업", "실행력", "소통", "고객지향", "디지털", "학습민첩", "자기관리"];
+  var pre = [2.70, 3.10, 3.00, 3.40, 3.20, 2.60, 3.00, 3.50];
+  var post = [3.62, 3.81, 3.66, 3.92, 3.74, 3.38, 3.61, 3.97];
+  var NS = "http://www.w3.org/2000/svg";
+  function el(name, attrs) { var node = document.createElementNS(NS, name); for (var key in attrs) node.setAttribute(key, attrs[key]); return node; }
+  function draw(id) {
+    // st.html (DOMPurify, HTML profile) drops inline SVG markup, so the chart is built here.
+    // Keep this script free of a less-than sign followed by a letter or slash:
+    // DOMPurify treats that as markup and removes the whole script.
+    var host = document.getElementById(id);
+    if (!host || host.childNodes.length) return;
+    var svg = el("svg", {viewBox: "0 0 340 300", "aria-hidden": "true", focusable: "false"});
+    host.appendChild(svg);
+    var cx = 170, cy = 150, R = 104, n = labels.length;
+    function pt(i, v) { var a = -Math.PI / 2 + i * 2 * Math.PI / n, r = R * (v - 1) / 4; return [cx + r * Math.cos(a), cy + r * Math.sin(a)]; }
+    for (var level = 1; level <= 5; level++) {
+      var ring = []; for (var i = 0; i < n; i++) ring.push(pt(i, level).join(","));
+      svg.appendChild(el("polygon", {points: ring.join(" "), fill: level === 5 ? "#f8f9fa" : "none", stroke: "#dfe4e8", "stroke-width": 1}));
+    }
+    for (var j = 0; j < n; j++) {
+      var end = pt(j, 5), at = pt(j, 5.9);
+      svg.appendChild(el("line", {x1: cx, y1: cy, x2: end[0], y2: end[1], stroke: "#e6eaee"}));
+      var text = el("text", {x: at[0], y: at[1] + 4, "text-anchor": "middle", "font-size": 13, "font-weight": 600, fill: "#5b6672"});
+      text.textContent = labels[j]; svg.appendChild(text);
+    }
+    function poly(values, stroke, fill, dash) {
+      var points = []; for (var k = 0; k < n; k++) points.push(pt(k, values[k]).join(","));
+      var attrs = {points: points.join(" "), fill: fill, stroke: stroke, "stroke-width": 2.4, "stroke-linejoin": "round"};
+      if (dash) attrs["stroke-dasharray"] = "5 4";
+      svg.appendChild(el("polygon", attrs));
+    }
+    poly(pre, "#8f9ba7", "rgba(143,155,167,.10)", true);
+    poly(post, "#087b76", "rgba(8,123,118,.16)");
+  }
+  function bindMenu() {
+    var nav = document.getElementById("tapNav"), menu = document.getElementById("tapMenu");
+    if (!nav || !menu || menu.dataset.bound) return;
+    menu.dataset.bound = "1";
+    menu.addEventListener("click", function () { var open = nav.classList.toggle("open"); menu.setAttribute("aria-expanded", open ? "true" : "false"); });
+    nav.querySelectorAll(".nav-list a").forEach(function (link) { link.addEventListener("click", function () { nav.classList.remove("open"); menu.setAttribute("aria-expanded", "false"); }); });
+  }
+  // Streamlit runs this script apart from the markup, sometimes before the
+  // markup is attached, so wait briefly for the elements to appear.
+  var tries = 0;
+  (function init() {
+    if (!document.getElementById("heroRadar") && tries++ < 100) { setTimeout(init, 50); return; }
+    draw("heroRadar");
+    draw("reportRadar");
+    bindMenu();
+  })();
+})();
+</script>
+</body>
+</html>

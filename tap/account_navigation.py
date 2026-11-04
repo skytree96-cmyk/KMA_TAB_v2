@@ -1,6 +1,7 @@
 """Authenticated workspace navigation; the server principal defines every menu."""
 from __future__ import annotations
 
+from html import escape
 from typing import Any, Callable, Mapping
 
 import streamlit as st
@@ -94,6 +95,16 @@ def _go_to_password() -> None:
     st.session_state[PROFILE_KEY] = False
 
 
+def _who_html(principal: Mapping[str, Any], role: str) -> str:
+    """Sidebar card: whose workspace this is. Values are escaped account data."""
+    title = principal.get("company_name") or ("KMA" if role == "kma" else ROLE_LABELS[role])
+    name = principal.get("display_name") or ""
+    if not name or name == ROLE_LABELS[role]:
+        name = principal.get("login_id") or ""
+    detail = " · ".join(str(part) for part in (ROLE_LABELS[role], name) if part)
+    return f'<div class="tap-side-who"><b>{escape(str(title))}</b><span>{escape(detail)}</span></div>'
+
+
 def render_workspace_header(principal: Mapping[str, Any], logout: Callable[[], None]) -> str:
     """Return an allowed section; menu events never supply a role or company."""
     role = str(principal["role"])
@@ -110,7 +121,7 @@ def render_workspace_header(principal: Mapping[str, Any], logout: Callable[[], N
     with st.container(key="tap_workspace_topbar"):
         brand, navigation, profile = st.columns([1.2, 4, 1.3], gap="small", vertical_alignment="center")
         with brand, st.container(key="tap_workspace_brand"):
-            st.html(brand_html(compact=True))
+            st.html(brand_html(compact=True) + _who_html(principal, role))
         with navigation, st.container(key="tap_workspace_nav"):
             columns = st.columns(len(menus), gap="small")
             for column, (value, label, icon) in zip(columns, menus):

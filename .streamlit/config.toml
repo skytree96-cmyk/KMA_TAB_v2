@@ -1,9 +1,19 @@
 [theme]
-baseFontSize = 18
+# Console v2: one teal key colour on greys.
+base = "light"
+baseFontSize = 16
 primaryColor = "#087B76"
-backgroundColor = "#F4F8F7"
-secondaryBackgroundColor = "#EFF9F7"
-textColor = "#102A2D"
+backgroundColor = "#FFFFFF"
+secondaryBackgroundColor = "#F1F3F5"
+textColor = "#111A24"
+borderColor = "#E3E7EA"
+dataframeBorderColor = "#E3E7EA"
+dataframeHeaderBackgroundColor = "#F7F8F9"
+buttonRadius = "full"
+baseRadius = "large"
+# Keep the default face here: st.dataframe draws on a canvas, and the
+# unicode-range subsets of Pretendard leave Korean glyphs half drawn there.
+# DOM text switches to Pretendard in assets/console-v2.css.
 font = "sans serif"
 
 [server]
