@@ -224,7 +224,10 @@ def recommend_courses(config: Mapping[str, Any], factor_rows: Iterable[Mapping[s
             reason["advice"] = ""  # say what the change suggests once per competency, not under every course
         picked.append({**course, "factor_code": need["factor_code"], "factor_name_ko": need["factor_name_ko"],
                        "delivery_label": DELIVERY_LABELS.get(str(course.get("delivery")), "온라인·집합"),
-                       "schedule": course_schedule_text(course), **reason})
+                       "schedule": course_schedule_text(course),
+                       # The numbers behind `reason`, for the gap bar on the cards.
+                       "score": need["score"], "target": need["target"], "gap": need["gap"], "change": need["change"],
+                       **reason})
         return True
 
     # Source by source so every competency gets its public course before any gets an e-learning one. In the

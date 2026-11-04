@@ -120,6 +120,13 @@ GUIDE_CSS = """
   .tg-note{grid-column:1/-1;border-radius:10px;padding:11px 14px;font-size:14px;line-height:1.6;
            background:#eef7f6;border:1px solid #cfe6e2;color:#145049}
   .tg-note.warn{background:#fff8f1;border-color:#f6d7bd;color:#7a3e0d}
+  .tg-sec{display:flex;gap:8px;align-items:center;font-weight:800;font-size:13px}
+  .tg-sec i{width:22px;height:22px;border-radius:7px;background:#eaf6f3;color:#087b76;display:inline-grid;place-items:center;font-style:normal;font-size:12px}
+  .tg-mini{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}
+  .tg-mini span{border:1px solid #dce9e6;border-radius:8px;background:#fff;padding:0 0 6px;font-size:11px;overflow:hidden}
+  .tg-mini span i{display:block;height:28px;background:linear-gradient(135deg,#e2ecea,#c9dedb);margin-bottom:5px}
+  .tg-mini span b{display:block;padding:0 7px;font-size:11px}
+  .tg-mini span em{display:block;padding:0 7px;font-style:normal;color:#6b8589;font-size:10.5px}
   .tg-faq{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin:0 0 8px}
   .tg-faq div{background:#fff;border:1px solid #dce9e6;border-radius:14px;padding:14px 16px;color:#102f36}
   .tg-faq strong{display:block;font-size:15px;margin-bottom:4px}
@@ -201,7 +208,7 @@ def _intro() -> str:
   <div><b>STEP 2</b><strong>비밀번호 설정</strong>
     <p>처음 로그인하면 본인만 아는 새 비밀번호(3~128자)를 정해야 다음 화면으로 넘어갈 수 있습니다.</p></div>
   <div><b>STEP 3</b><strong>메뉴로 이동</strong>
-    <p>상단 메뉴로 화면을 이동하세요. 오른쪽 위 <b style="display:inline;color:#102f36">이용 안내</b>로 이 화면을 열 수 있고, 프로필에서 비밀번호 변경과 로그아웃을 할 수 있습니다.</p></div>
+    <p>왼쪽 메뉴로 화면을 이동하세요. 메뉴 아래 <b style="display:inline;color:#102f36">이용 안내</b>로 이 화면을 열 수 있고, 프로필에서 비밀번호 변경과 로그아웃을 합니다.</p></div>
 </div>
 """
 
@@ -212,8 +219,8 @@ def _manager_steps() -> list[str]:
     steps = []
 
     steps.append(_step(
-        "화면 구성", "상단 메뉴 구성",
-        "교육담당자로 로그인하면 상단에 메뉴 4개가 보입니다. 처음에는 참여자 계정, 프로젝트 만들기, "
+        "화면 구성", "메뉴 구성",
+        "교육담당자로 로그인하면 왼쪽에 메뉴 4개가 보입니다. 처음에는 참여자 계정, 프로젝트 만들기, "
         "프로젝트(배정) 순서로 쓰고, 이후에는 대시보드에서 현황을 봅니다.",
         _frame("교육담당자 화면", _topbar(MANAGER_MENUS, "참여자 계정", "교육담당자") +
                '<div class="tg-card"><div class="tg-title">참여자 계정</div>'
@@ -377,24 +384,39 @@ def _manager_steps() -> list[str]:
         "STEP 6 · 프로젝트 메뉴 또는 대시보드 하단", "교육 전후 리포트 보기",
         "교육 후 검사까지 마친 참여자가 생기면 프로젝트 화면 아래에 리포트가 열립니다. 보고용으로는 PDF로 내려받으세요.",
         _frame("프로젝트 › 리포트", (
-            '<div class="tg-card"><div class="tg-row">' + _pin(1) + '<b>참여 현황</b><span class="tg-spacer"></span>'
-            '<span class="tg-tag">배정 인원 15명</span><span class="tg-tag">교육 전 검사 완료 12명</span><span class="tg-tag">교육 후 검사 완료 8명</span></div></div>'
-            '<div class="tg-card"><b>개인별 교육 전후 리포트</b><div class="tg-row">' +
+            '<div class="tg-card"><div class="tg-sec">' + _pin(1) + '<i>①</i>참여 현황</div><div class="tg-row">'
+            '<div class="tg-metric"><small>배정 인원</small><strong>12 명</strong></div>'
+            '<div class="tg-metric"><small>교육 전 검사 완료</small><strong>10 명 · 83%</strong></div>'
+            '<div class="tg-metric"><small>교육 후 검사 완료</small><strong>8 명 · 67%</strong></div></div></div>'
+            '<div class="tg-card"><div class="tg-sec"><i>②</i>개인별 교육 전후 리포트</div><div class="tg-row">' +
             _field("리포트 참여자", "홍길동 · 1234567890-user001", pin=2) + '</div>' + _btn("개인 리포트 PDF 다운로드", pin=3, full=True) + '</div>'
-            '<div class="tg-card"><div class="tg-row">' + _pin(4) + '<b>조직 교육 전후 리포트</b></div>'
+            '<div class="tg-card"><div class="tg-sec">' + _pin(4) + '<i>③</i>조직 교육 전후 리포트</div>'
             + _btn("조직 리포트 PDF 다운로드", pin=5, full=True) +
             '<div class="tg-bars"><div>고객지향<p><i style="width:58%"></i><i class="after" style="width:76%"></i></p></div>'
             '<div>협업과 팀워크<p><i style="width:64%"></i><i class="after" style="width:72%"></i></p></div>'
-            '<div>문제해결력<p><i style="width:50%"></i><i class="after" style="width:61%"></i></p></div></div>'
-            '<div class="tg-sub">현업전이 환경 · 교육과정 검토 우선순위</div>'
-            '<div class="tg-row">' + _btn("조직 리포트 상세 CSV", "secondary", pin=6) + '</div></div>'
+            '<div>사람 육성<p><i style="width:50%"></i><i class="after" style="width:61%"></i></p></div></div></div>'
+            '<div class="tg-card" style="background:#f7f8f9"><div class="tg-sec">' + _pin(6) + '<i>④</i>현업전이 환경</div><div class="tg-row">'
+            '<div class="tg-metric"><small>적용 기회</small><strong>4.00 / 5</strong></div>'
+            '<div class="tg-metric"><small>상사·리더 지원</small><strong>4.00 / 5</strong></div>'
+            '<div class="tg-metric"><small>도구·정보·권한</small><strong style="color:#b86e00">2.40 / 5</strong></div>'
+            '<div class="tg-metric"><small>시간·프로세스</small><strong>3.60 / 5</strong></div></div>'
+            '<div class="tg-bars"><div>도구·정보·권한 부족<p><i class="after" style="width:75%"></i></p></div>'
+            '<div>시간·프로세스 제약<p><i class="after" style="width:38%"></i></p></div></div></div>'
+            '<div class="tg-card" style="background:#eef7f6"><div class="tg-sec">' + _pin(7) + '<i>⑤</i>교육과정 검토 우선순위</div>'
+            '<div class="tg-sub">01 사람 육성 · 교육 후 2.90점, 목표 3.50점보다 0.60점 낮음</div>'
+            '<div class="tg-mini"><span><i></i><b>[강남] 코칭 리더십</b><em>공개교육 · 최신 일정 보기</em></span>'
+            '<span><i></i><b>멘탈관리 수업</b><em>이러닝 · 수강 페이지 보기</em></span>'
+            '<span><i></i><b>자기관리와 사람관리</b><em>단체교육 문의 · 과정 안내 보기</em></span></div></div>'
+            '<div class="tg-row">' + _btn("조직 리포트 상세 CSV", "secondary", pin=8) + '</div>'
         )),
         [
-            ("참여 현황", "선택한 프로젝트의 배정 인원과 교육 전후 검사 완료 인원"),
+            ("참여 현황", "선택한 프로젝트의 배정 인원, 교육 전후 검사 완료 인원과 비교 가능 인원"),
             ("리포트 참여자", "교육 전후 검사를 모두 마친 참여자 중 한 명 선택. 이름이나 아이디로 검색 가능"),
             ("개인 리포트 PDF 다운로드", "선택한 참여자의 개인별 교육 전후 변화 리포트. 개인 결과이므로 본인 면담 등 정해진 용도로만 사용"),
-            ("조직 교육 전후 리포트", "같은 참여자가 같은 문항에 답한 교육 전후 행동빈도(1~5)를 역량별로 비교. 아래에 현업전이 환경과 교육과정 검토 우선순위가 이어짐"),
-            ("조직 리포트 PDF 다운로드", "레이더 차트, 역량별 교육 전후 변화, 업무 적용 가이드를 담은 보고용 PDF"),
+            ("조직 교육 전후 리포트", "같은 참여자가 같은 문항에 답한 역량별 평균(1~5)의 교육 전후 비교. 표와 막대로 표시되며, 역량별 유효응답이 5명 이상일 때만 공개"),
+            ("조직 리포트 PDF 다운로드", "레이더 차트, 역량별 변화와 업무 적용 가이드, 현업전이 환경, 추천 과정을 담은 보고용 PDF. 과정마다 KMA 페이지로 가는 버튼이 있음"),
+            ("현업전이 환경", "교육 후 검사에서 답한 적용 기회, 상사 지원, 도구·권한, 시간 여건의 평균과 적용 장애요인. 3.0점 미만인 조건은 주황색으로 표시"),
+            ("교육과정 검토 우선순위", "교육 후 평균이 목표보다 0.2점 이상 낮은 역량마다 공개교육, 이러닝, 단체교육 문의 과정 카드. 버튼을 누르면 KMA 과정 페이지가 새 창에 열림"),
             ("조직 리포트 상세 CSV", "역량별 응답 인원, 교육 전후 점수, 목표 대비 차이와 현업전이 환경 집계를 엑셀에서 가공할 수 있는 파일. 개인별 응답은 담기지 않음"),
         ],
         note="개인 응답 보호를 위해 <b>역량별 교육 전후 유효응답이 5명 이상</b>일 때만 조직 평균과 변화량이 공개됩니다. "
@@ -438,13 +460,14 @@ def _participant_steps() -> list[str]:
 
     steps.append(_step(
         "STEP 2 · 내 교육", "참여할 교육 고르기",
-        "로그인하면 나에게 배정된 교육과 교육 전후 검사 진행 상태가 보입니다.",
+        "로그인하면 나에게 배정된 교육과, 교육 전 검사부터 나의 리포트까지 네 단계 중 지금 어디인지가 보입니다.",
         _frame("내 교육", (
             _topbar(("내 교육",), "내 교육", "참여자", pins=False) +
             '<div class="tg-row">' + _field("참여할 프로젝트", "2026 하반기 CS 역량 과정", pin=1) + '</div>'
             '<div class="tg-card"><div class="tg-title">2026 하반기 CS 역량 과정</div>'
             f'<div class="tg-sub">교육과정: {SAMPLE_PROJECT} · 교육일: 2026-11-12</div>'
-            '<div class="tg-row"><span class="tg-tag">교육 전 미완료</span><span class="tg-tag muted">교육 후 미완료</span></div>'
+            '<div class="tg-row"><span class="tg-tag muted">교육 전 미완료</span><span class="tg-tag muted">교육 후 미완료</span></div>'
+            '<div class="tg-radio"><span class="on">1 교육 전 검사</span><span>2 교육 · 현업 적용</span><span>3 교육 후 검사</span><span>4 나의 리포트</span></div>'
             '<div class="tg-split">' + _btn("교육 전 검사", pin=2, full=True) + _btn("교육 후 검사", "secondary", pin=3, full=True) + '</div></div>'
         )),
         [
@@ -521,11 +544,16 @@ def _participant_steps() -> list[str]:
                    (("고객지향", "3.2", "3.9", "+0.7"), ("협업과 팀워크", "3.6", "3.8", "+0.2"), ("문제해결력", "2.9", "3.4", "+0.5"))) +
             '<div class="tg-bars"><div>고객지향<p><i style="width:64%"></i><i class="after" style="width:78%"></i></p></div></div>'
             + _btn("⤓ 내 리포트 PDF 다운로드", pin=3) + '</div>'
+            '<div class="tg-card" style="background:#eef7f6"><div class="tg-sec">' + _pin(4) + '<i>★</i>보완 학습 제안</div>'
+            '<div class="tg-sub">01 문제해결력 · 교육 후 3.00점, 목표 3.50점보다 0.50점 낮음</div>'
+            '<div class="tg-mini"><span><i></i><b>[여의도] 논리적 문제해결</b><em>공개교육 · 최신 일정 보기</em></span>'
+            '<span><i></i><b>문제해결 프레임워크</b><em>이러닝 · 수강 페이지 보기</em></span></div></div>'
         )),
         [
             ("나의 교육 전후 리포트 보기", "교육 전후 검사를 모두 최종 제출하면 나타남. 교육 전 검사만 마쳤다면 교육 전 결과만 볼 수 있음"),
-            ("역량별 변화", "같은 문항에 두 번 모두 1~5로 답한 경우만 비교. 공통 유효문항이 부족한 역량은 점수 비공개"),
-            ("내 리포트 PDF 다운로드", "교육 전후 결과, 레이더 차트, 업무 적용 가이드를 담은 내 리포트를 PDF로 저장. 본인 결과이니 보관·공유에 주의"),
+            ("역량별 변화", "같은 문항에 두 번 모두 1~5로 답한 경우만 비교. 공통 유효문항이 부족한 역량은 점수 비공개. 아래에 내 현업전이 환경 응답이 이어짐"),
+            ("내 리포트 PDF 다운로드", "교육 전후 결과, 레이더 차트, 업무 적용 가이드, 추천 과정을 담은 내 리포트를 PDF로 저장. 본인 결과이니 보관·공유에 주의"),
+            ("보완 학습 제안", "교육 후 점수가 목표보다 0.2점 이상 낮은 역량마다 KMA 공개교육과 이러닝 카드. 버튼을 누르면 과정 페이지가 새 창에 열리며, 수강 여부는 교육담당자와 상의"),
         ],
         note="교육담당자는 교육 운영을 위해 개인별 교육 전후 리포트와, 역량별 응답자가 5명 이상일 때의 조직 결과를 볼 수 있습니다.",
     ))

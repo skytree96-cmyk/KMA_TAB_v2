@@ -53,7 +53,8 @@ class AccountLandingTests(unittest.TestCase):
         self.assertIn("로그인하고 검사 참여", copy)
         self.assertIn("본인에게 배정된 프로젝트", copy)
         self.assertIn("리포트 예시", copy)
-        self.assertIn("KMA 교육과정을 추천합니다", copy)
+        self.assertIn("KMA 교육과정 추천", copy)
+        self.assertIn('href="#features"', page)
         self.assertIn("인과효과", copy)
         self.assertIn('href="#recommend"', page)
         for phrase in ("인사평가", "채용", "승진", "교육 전/후", "교육 전·후", "사전·사후"):

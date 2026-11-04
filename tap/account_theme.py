@@ -38,11 +38,13 @@ def _panel_css() -> str:
 
 @lru_cache(maxsize=1)
 def account_theme_css() -> str:
-    # Each layer overrides the one before: premium follows account-ui, and
-    # console-v2 (sidebar, sheet, pills) comes last.
-    return FONT_IMPORT + "<style>" + _read("account-ui.css") + _read("premium-base.css") + _panel_css() + _read("console-v2.css") + "</style>"
+    # Each layer overrides the one before: premium follows account-ui, console-v2
+    # (sidebar, sheet, pills) and console-v3 (sections inside the sheet) come last.
+    return (FONT_IMPORT + "<style>" + _read("account-ui.css") + _read("premium-base.css") + _panel_css()
+            + _read("console-v2.css") + _read("console-v3.css") + "</style>")
 
 
 @lru_cache(maxsize=1)
 def workspace_theme_css() -> str:
-    return "<style>" + _read("workspace-ui.css") + _read("premium-workspace.css") + _read("console-v2.css") + "</style>"
+    return ("<style>" + _read("workspace-ui.css") + _read("premium-workspace.css") + _read("console-v2.css")
+            + _read("console-v3.css") + "</style>")

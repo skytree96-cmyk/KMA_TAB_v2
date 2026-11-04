@@ -1,0 +1,467 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>KMA TAP 사용자 화면 시안 v3</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/fonts-archive/Paperlogy/subsets/Paperlogy-dynamic-subset.css">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,300..600,0..1,0&display=block">
+<style>
+/* TAP 사용자 화면 v3 시안. 콘솔 C안 골격(연회색 바닥 · 서리 사이드바 · 흰 시트)은 그대로 두고,
+   시트 안을 "섹션"으로 나눈다. 섹션마다 아이콘 타일 + 제목 + 한 줄 설명을 두고, 성격이 다른 섹션은 바탕색을 달리한다.
+   색: TAP 틸 #087b76 하나. 회색 단계. 주의는 주황, 위험은 빨강만. */
+:root{
+  --canvas:#e6eaeb; --side-from:#d2e6e3; --side-mid:#e3eceb; --side-to:#eef1f2;
+  --sheet:#fff; --line:#e3e7ea; --line-2:#eef1f3; --soft:#f1f3f5; --soft-2:#f7f8f9; --soft-h:#e7eaed;
+  --ink:#111a24; --ink-2:#333e4a; --ink-3:#5e6a76; --ink-4:#8e98a3;
+  --teal:#087b76; --teal-strong:#06605c; --teal-tint:#e7f4f2; --teal-line:#bfe0db; --teal-pre:#7ac7bd;
+  --navy:#192c48; --orange:#b86e00; --orange-tint:#fff6e8; --red:#c42b3d; --red-tint:#fdf1f2;
+  --pill-shadow:0 1px 2px rgba(17,26,36,.06),0 2px 8px rgba(17,26,36,.05);
+  --r-sm:8px; --r-md:12px; --r-lg:16px; --r-xl:22px;
+  --font:'Pretendard Variable',Pretendard,-apple-system,BlinkMacSystemFont,'Apple SD Gothic Neo','Malgun Gothic',system-ui,sans-serif;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--canvas);color:var(--ink-2);font-family:var(--font);font-size:15px;line-height:1.6;-webkit-font-smoothing:antialiased;word-break:keep-all}
+h1,h2,h3,h4,p,ul,ol{margin:0}
+button{font:inherit}
+.ms{font-family:'Material Symbols Rounded';font-weight:normal;font-style:normal;font-size:20px;line-height:1;display:inline-block;letter-spacing:normal;text-transform:none;white-space:nowrap;direction:ltr;font-feature-settings:'liga';-webkit-font-smoothing:antialiased;font-variation-settings:'FILL' 0,'wght' 400,'opsz' 20}
+.ms.fill{font-variation-settings:'FILL' 1,'wght' 500,'opsz' 20}
+
+/* 시안 안내 띠 (실제 화면에는 없음) */
+.note{max-width:1440px;margin:0 auto;padding:14px 20px 0;display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center;font-size:13.5px;color:var(--ink-3)}
+.note b{color:var(--ink)}
+.note .role{display:inline-flex;gap:4px;padding:3px;border-radius:999px;background:rgba(255,255,255,.6)}
+.note .role button{border:0;height:32px;padding:0 14px;border-radius:999px;background:transparent;color:var(--ink-3);font-size:14px;font-weight:600;cursor:pointer}
+.note .role button[aria-pressed="true"]{background:var(--sheet);color:var(--ink);box-shadow:var(--pill-shadow)}
+
+/* 골격 */
+.frame{max-width:1440px;margin:0 auto;display:grid;grid-template-columns:264px minmax(0,1fr);gap:12px;padding:12px 12px 12px 0;min-height:calc(100vh - 56px)}
+.side{position:sticky;top:12px;align-self:start;height:calc(100vh - 80px);min-height:560px;display:flex;flex-direction:column;padding:22px 12px 16px 16px;
+  background:linear-gradient(165deg,var(--side-from) 0%,var(--side-mid) 45%,var(--side-to) 100%);border-radius:0 var(--r-xl) var(--r-xl) 0}
+.brand{display:flex;align-items:baseline;padding:0 8px;font-family:'Paperlogy',sans-serif;font-weight:800;font-size:26px;letter-spacing:-.055em;line-height:1}
+.brand .k{color:var(--navy)}.brand .t{color:#087f83;margin-left:.2em}.brand i{display:inline-block;width:.15em;height:.15em;margin-left:.08em;border-radius:50%;background:#20c7dc}
+.who{margin:18px 0 14px;padding:12px;border-radius:var(--r-lg);background:rgba(255,255,255,.5);display:grid;gap:2px}
+.who b{font-size:15px;color:var(--ink)}.who span{font-size:13px;color:var(--ink-3)}
+.nav{list-style:none;padding:0;display:grid;gap:2px}
+.nav button{all:unset;box-sizing:border-box;width:100%;display:flex;align-items:center;gap:12px;min-height:44px;padding:0 14px;border-radius:999px;font-size:15px;font-weight:500;color:var(--ink-2);cursor:pointer}
+.nav button:hover{background:rgba(255,255,255,.55)}
+.nav button .ms{font-size:22px;color:var(--ink-3)}
+.nav button[aria-current="page"]{background:var(--sheet);color:var(--ink);font-weight:700;box-shadow:var(--pill-shadow)}
+.nav button[aria-current="page"] .ms{color:var(--teal);font-variation-settings:'FILL' 1,'wght' 500,'opsz' 24}
+.side-bot{margin-top:auto;padding-top:14px;border-top:1px solid rgba(17,26,36,.1);display:grid;gap:2px}
+.sheet{background:var(--sheet);border-radius:var(--r-xl);padding:32px 36px 48px;min-width:0}
+.screen{display:none;gap:22px}.screen.on{display:grid}
+.ctx{font-size:14px;color:var(--ink-3);font-weight:500}
+.page-head{display:flex;justify-content:space-between;align-items:flex-end;gap:12px;flex-wrap:wrap}
+.page-head h1{font-size:26px;font-weight:700;letter-spacing:-.03em;color:var(--ink);line-height:1.3}
+.page-head p.sub{font-size:14.5px;color:var(--ink-3);margin-top:2px}
+
+/* 버튼 */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;height:38px;padding:0 16px;border:1px solid var(--line);border-radius:999px;background:var(--sheet);color:var(--ink-2);font-size:14px;font-weight:600;cursor:pointer;text-decoration:none;white-space:nowrap}
+.btn:hover{border-color:var(--ink-4);color:var(--ink)}
+.btn.pri{background:var(--teal);border-color:var(--teal);color:#fff}.btn.pri:hover{background:var(--teal-strong)}
+.btn.sm{height:32px;padding:0 12px;font-size:13px}
+.btn .ms{font-size:18px}
+
+/* ---------- 섹션: 아이콘 타일 + 제목 + 설명. 성격이 다르면 바탕을 달리한다 ---------- */
+.sec{border:1px solid var(--line);border-radius:var(--r-lg);background:var(--sheet);padding:22px 24px;display:grid;gap:16px}
+.sec.soft{background:var(--soft-2);border-color:transparent}
+.sec.tint{background:linear-gradient(180deg,var(--teal-tint),#fff 60%);border-color:var(--teal-line)}
+.sec-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.sec-head .l{display:flex;gap:12px;align-items:flex-start;min-width:0}
+.sec-head .ic{flex:none;width:38px;height:38px;border-radius:12px;display:grid;place-items:center;background:var(--teal-tint);color:var(--teal)}
+.sec-head .ic .ms{font-size:22px}
+.sec-head h2{font-size:18px;font-weight:700;letter-spacing:-.02em;color:var(--ink);line-height:1.3}
+.sec-head p{font-size:13.5px;color:var(--ink-3);margin-top:3px}
+.sec-head .r{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.chip{display:inline-flex;align-items:center;gap:5px;height:28px;padding:0 10px;border-radius:999px;background:var(--soft);color:var(--ink-2);font-size:12.5px;font-weight:600}
+.chip .ms{font-size:16px;color:var(--teal)}
+.chip.ok{background:var(--teal-tint);color:var(--teal-strong)}
+.chip.todo{background:var(--soft);color:var(--ink-3)}.chip.todo .ms{color:var(--ink-4)}
+.foot{font-size:13px;color:var(--ink-3);line-height:1.6;padding-top:12px;border-top:1px dashed var(--line)}
+
+/* 통계 타일 */
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
+.stat{background:var(--soft-2);border-radius:var(--r-md);padding:14px 16px;display:grid;gap:4px}
+.sec.soft .stat{background:var(--sheet)}
+.stat span{font-size:13px;font-weight:600;color:var(--ink-2)}
+.stat strong{font-size:26px;font-weight:700;letter-spacing:-.03em;color:var(--ink);line-height:1.15;font-variant-numeric:tabular-nums}
+.stat strong small{font-size:14px;font-weight:500;color:var(--ink-4);margin-left:4px}
+.stat .bar{height:5px;border-radius:999px;background:var(--soft);overflow:hidden;margin-top:6px}
+.sec.soft .stat .bar{background:var(--soft)}
+.stat .bar i{display:block;height:100%;border-radius:999px;background:var(--teal)}
+.stat.low strong{color:var(--orange)}.stat.low .bar i{background:var(--orange)}
+
+/* 입력줄 */
+.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.input{display:inline-flex;align-items:center;gap:8px;height:40px;padding:0 16px;border-radius:999px;background:var(--sheet);box-shadow:inset 0 0 0 1px var(--line);color:var(--ink-4);font-size:14px;min-width:260px}
+.input.sel{color:var(--ink);justify-content:space-between}
+.input .ms{font-size:18px;color:var(--ink-4)}
+
+/* 표 · 막대 */
+.tbl{width:100%;border-collapse:collapse;font-size:14px;border-radius:var(--r-md);overflow:hidden;box-shadow:inset 0 0 0 1px var(--line)}
+.tbl th{background:var(--soft-2);color:var(--ink-3);font-weight:600;text-align:left;padding:9px 12px;font-size:12.5px}
+.tbl td{padding:9px 12px;border-top:1px solid var(--line-2);color:var(--ink);font-variant-numeric:tabular-nums}
+.tbl td.n{text-align:right}.tbl th.n{text-align:right}
+.tbl td.up{color:var(--teal-strong);font-weight:700}
+.tbl td.mute{color:var(--ink-4)}
+.bars{display:grid;gap:8px}
+.bars .b{display:grid;grid-template-columns:120px 1fr auto;gap:12px;align-items:center;font-size:13.5px}
+.bars .b span:first-child{color:var(--ink-2);font-weight:600}
+.bars .b .t{height:8px;border-radius:999px;background:var(--soft);overflow:hidden}
+.bars .b .t i{display:block;height:100%;border-radius:999px;background:var(--teal)}
+.bars .b .t i.pre{background:var(--teal-pre)}
+.bars .b em{font-style:normal;color:var(--ink-3);font-variant-numeric:tabular-nums;min-width:84px;text-align:right}
+.bars.pair .b{grid-template-columns:120px 1fr 1fr auto}
+.legend{display:flex;gap:16px;font-size:12.5px;color:var(--ink-3)}
+.legend i{display:inline-block;width:12px;height:12px;border-radius:3px;margin-right:6px;vertical-align:-1px;background:var(--teal)}
+.legend i.pre{background:var(--teal-pre)}
+.notes{display:grid;gap:6px;font-size:14px;color:var(--ink-2)}
+.notes li{display:flex;gap:8px;align-items:flex-start;list-style:none}
+.notes li .ms{font-size:18px;color:var(--teal);flex:none;margin-top:3px}
+.notes li.warn .ms{color:var(--orange)}
+.two{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:20px;align-items:start}
+
+/* ---------- 교육과정 검토 우선순위: 역량 묶음 + 작은 과정 카드 ---------- */
+.need{border:1px solid var(--line);border-radius:var(--r-lg);background:var(--sheet);overflow:hidden}
+.need-head{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:14px;align-items:center;padding:14px 18px;background:var(--soft-2);border-bottom:1px solid var(--line-2)}
+.need-head .no{width:30px;height:30px;border-radius:9px;display:grid;place-items:center;background:var(--teal);color:#fff;font-size:13px;font-weight:700}
+.need-head b{font-size:16px;color:var(--ink);display:block}
+.need-head small{font-size:13px;color:var(--ink-3);display:block;margin-top:1px}
+.gap{display:grid;gap:4px;min-width:200px;font-size:12.5px;color:var(--ink-3);font-variant-numeric:tabular-nums}
+.gap .t{position:relative;height:6px;border-radius:999px;background:var(--soft)}
+.gap .t i{position:absolute;left:0;top:0;height:100%;border-radius:999px;background:var(--teal)}
+.gap .t b{position:absolute;top:-4px;width:2px;height:14px;background:var(--ink-2);border-radius:1px}
+.gap span{display:flex;justify-content:space-between}
+.need-body{padding:14px 18px 18px;display:grid;gap:12px}
+.advice{font-size:13.5px;color:var(--ink-2);display:flex;gap:8px;align-items:flex-start}
+.advice .ms{font-size:18px;color:var(--teal);flex:none;margin-top:2px}
+.courses{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px}
+.course{border:1px solid var(--line);border-radius:var(--r-md);background:var(--sheet);overflow:hidden;display:flex;flex-direction:column}
+.course .thumb{position:relative;height:96px;background:linear-gradient(135deg,#e2ecea,#c9dedb);display:grid;place-items:center;color:var(--ink-4);font-size:12px;overflow:hidden}
+.course .thumb.a{background:linear-gradient(135deg,#f3b59c,#d9664f)}
+.course .thumb.b{background:linear-gradient(135deg,#bdeadf,#5cc3b4)}
+.course .thumb.c{background:linear-gradient(135deg,#dfe4ee,#aab6cb)}
+.course .thumb img{width:100%;height:100%;object-fit:cover;display:block}
+.course .src{position:absolute;left:8px;top:8px;height:22px;padding:0 8px;border-radius:999px;background:rgba(255,255,255,.92);color:var(--teal-strong);font-size:11.5px;font-weight:700;display:inline-flex;align-items:center}
+.course .body{padding:10px 12px 12px;display:grid;gap:6px;flex:1;align-content:start}
+.course .title{font-size:14px;font-weight:700;color:var(--ink);line-height:1.4;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.course .meta{font-size:12.5px;color:var(--ink-3);line-height:1.45}
+.course .act{margin-top:auto;padding-top:4px}
+.course .act .btn{height:32px;padding:0 12px;font-size:13px;width:100%}
+
+/* ---------- 참여자: 내 교육 ---------- */
+.proj{border:1px solid var(--line);border-radius:var(--r-lg);padding:22px 24px;display:grid;gap:18px}
+.proj-top{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:flex-start}
+.proj-top h2{font-size:20px;font-weight:700;color:var(--ink);letter-spacing:-.02em}
+.proj-top p{font-size:14px;color:var(--ink-3);margin-top:3px}
+.journey{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
+.journey div{display:flex;gap:10px;align-items:center;padding:12px 14px;border-radius:var(--r-md);background:var(--soft-2);font-size:14px;font-weight:600;color:var(--ink-3)}
+.journey div b{width:26px;height:26px;border-radius:50%;display:grid;place-items:center;background:var(--line);color:var(--ink-3);font-size:12.5px;flex:none}
+.journey div.done{color:var(--teal-strong)}.journey div.done b{background:var(--teal);color:#fff}
+.journey div.now{background:var(--teal-tint);color:var(--ink);box-shadow:inset 0 0 0 1px var(--teal-line)}.journey div.now b{background:var(--teal);color:#fff}
+.journey div small{display:block;font-size:12px;font-weight:500;color:var(--ink-4);margin-top:1px}
+.proj .acts{display:flex;gap:10px;flex-wrap:wrap}
+
+/* ---------- 오픈페이지 문구 비교 ---------- */
+.copy{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:0;border:1px solid var(--line);border-radius:var(--r-lg);overflow:hidden;font-size:14px}
+.copy > div{padding:14px 18px;border-bottom:1px solid var(--line-2)}
+.copy > div:nth-child(odd){background:var(--soft-2);color:var(--ink-3)}
+.copy > div:nth-child(even){color:var(--ink);font-weight:600}
+.copy .h{font-size:12.5px;font-weight:700;letter-spacing:.04em;color:var(--ink-4);background:var(--soft)!important}
+.copy .h:nth-child(2){color:var(--teal)}
+.feat{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+.feat div{border:1px solid var(--line);border-radius:var(--r-md);padding:14px 16px;display:grid;gap:4px}
+.feat div .ms{color:var(--teal);font-size:22px}
+.feat div b{font-size:15px;color:var(--ink)}
+.feat div span{font-size:13px;color:var(--ink-3);line-height:1.5}
+
+@media (max-width:980px){.frame{grid-template-columns:1fr;padding:12px}.side{position:static;height:auto;min-height:0;border-radius:var(--r-xl)}.sheet{padding:22px 18px 36px}.two,.copy{grid-template-columns:1fr}.journey,.feat{grid-template-columns:repeat(2,1fr)}}
+</style>
+</head>
+<body>
+
+<div class="note">
+  <b>사용자 화면 v3 시안</b> · 콘솔 v2 골격은 유지. 시트 안을 섹션으로 나누고, 과정 카드를 줄여 여러 개가 한눈에 보이게 함
+  <span class="role">
+    <button type="button" data-view="report" aria-pressed="true">담당자 · 리포트</button>
+    <button type="button" data-view="mine">참여자 · 내 교육</button>
+    <button type="button" data-view="open">오픈페이지 문구</button>
+  </span>
+</div>
+
+<div class="frame">
+  <aside class="side">
+    <div class="brand"><span class="k">KMA</span><span class="t">TAP</span><i></i></div>
+    <div class="who" id="who"><b>㈜한빛제조</b><span>교육담당자 · 김담당</span></div>
+    <ul class="nav" id="nav">
+      <li data-for="company"><button type="button"><span class="ms">space_dashboard</span>대시보드</button></li>
+      <li data-for="company"><button type="button"><span class="ms">group</span>참여자 계정</button></li>
+      <li data-for="company"><button type="button"><span class="ms">add_circle</span>프로젝트 만들기</button></li>
+      <li data-for="company"><button type="button" aria-current="page"><span class="ms">folder_open</span>프로젝트</button></li>
+      <li data-for="participant" hidden><button type="button" aria-current="page"><span class="ms">assignment</span>내 교육</button></li>
+    </ul>
+    <div class="side-bot nav">
+      <button type="button"><span class="ms">help</span>이용 안내</button>
+      <button type="button"><span class="ms">account_circle</span><span id="whoRole">교육담당자</span></button>
+    </div>
+  </aside>
+
+  <main class="sheet">
+
+    <!-- ================= 담당자 · 프로젝트 › 리포트 ================= -->
+    <section class="screen on" id="report">
+      <div>
+        <p class="ctx">워크스페이스 / 프로젝트</p>
+        <div class="page-head"><div><h1>2026 신임 팀장 리더십 과정</h1><p class="sub">신임 팀장 리더십 과정 · 교육일 2026-09-09 · 교육 후 검사 2026-11-02 ~ 11-15</p></div>
+          <div class="row"><button class="btn"><span class="ms">table_view</span>상세 CSV</button><button class="btn pri"><span class="ms">download</span>조직 리포트 PDF</button></div></div>
+      </div>
+
+      <!-- 1. 참여 현황 -->
+      <section class="sec">
+        <div class="sec-head"><div class="l"><span class="ic"><span class="ms">groups</span></span><div><h2>참여 현황</h2><p>배정 인원과 교육 전후 검사 완료 인원</p></div></div></div>
+        <div class="stats">
+          <div class="stat"><span>배정 인원</span><strong>12<small>명</small></strong></div>
+          <div class="stat"><span>교육 전 검사 완료</span><strong>10<small>명 · 83%</small></strong><div class="bar"><i style="width:83%"></i></div></div>
+          <div class="stat"><span>교육 후 검사 완료</span><strong>8<small>명 · 67%</small></strong><div class="bar"><i style="width:67%"></i></div></div>
+          <div class="stat"><span>교육 전후 비교 가능</span><strong>8<small>명</small></strong></div>
+        </div>
+      </section>
+
+      <!-- 2. 개인별 리포트 -->
+      <section class="sec">
+        <div class="sec-head"><div class="l"><span class="ic"><span class="ms">person</span></span><div><h2>개인별 교육 전후 리포트</h2><p>교육 전후 검사를 모두 마친 참여자의 역량별 변화. 본인 면담 등 정해진 용도로만 사용</p></div></div></div>
+        <div class="row"><span class="input"><span class="ms">search</span>이름 또는 아이디</span><span class="input sel">고서연 · hb.user003<span class="ms">expand_more</span></span><button class="btn"><span class="ms">download</span>개인 리포트 PDF</button></div>
+        <div class="two">
+          <table class="tbl"><thead><tr><th>역량</th><th class="n">교육 전</th><th class="n">교육 후</th><th class="n">변화</th><th class="n">유효 문항</th></tr></thead>
+            <tbody><tr><td>고객지향</td><td class="n">3.25</td><td class="n">4.00</td><td class="n up">+0.75</td><td class="n">4</td></tr>
+            <tr><td>협업과 팀워크</td><td class="n">3.50</td><td class="n">3.75</td><td class="n up">+0.25</td><td class="n">4</td></tr>
+            <tr><td>성장 마인드셋</td><td class="n">2.00</td><td class="n">3.00</td><td class="n up">+1.00</td><td class="n">4</td></tr>
+            <tr><td>사람 육성</td><td class="n">2.25</td><td class="n">2.75</td><td class="n up">+0.50</td><td class="n">4</td></tr></tbody></table>
+          <div class="bars pair">
+            <div class="b"><span>고객지향</span><div class="t"><i class="pre" style="width:65%"></i></div><div class="t"><i style="width:80%"></i></div><em>3.25 → 4.00</em></div>
+            <div class="b"><span>협업과 팀워크</span><div class="t"><i class="pre" style="width:70%"></i></div><div class="t"><i style="width:75%"></i></div><em>3.50 → 3.75</em></div>
+            <div class="b"><span>성장 마인드셋</span><div class="t"><i class="pre" style="width:40%"></i></div><div class="t"><i style="width:60%"></i></div><em>2.00 → 3.00</em></div>
+            <div class="b"><span>사람 육성</span><div class="t"><i class="pre" style="width:45%"></i></div><div class="t"><i style="width:55%"></i></div><em>2.25 → 2.75</em></div>
+            <div class="legend"><span><i class="pre"></i>교육 전</span><span><i></i>교육 후</span></div>
+          </div>
+        </div>
+        <p class="foot">교육 전후 모두 1~5로 답한 문항만 비교합니다. 수행 기회 없음(0)은 빼고, 유효 문항이 부족하면 점수를 비웁니다. 자기보고 변화이며 교육의 인과효과를 뜻하지 않습니다.</p>
+      </section>
+
+      <!-- 3. 조직 리포트 -->
+      <section class="sec">
+        <div class="sec-head"><div class="l"><span class="ic"><span class="ms">bar_chart</span></span><div><h2>조직 교육 전후 리포트</h2><p>같은 참여자가 같은 문항에 답한 역량별 평균 변화. 역량별 유효응답 5명 이상만 공개</p></div></div>
+          <div class="r"><span class="chip ok"><span class="ms">verified</span>공개 역량 4 / 5</span><span class="chip"><span class="ms">group</span>전후 비교 8명</span></div></div>
+        <div class="two">
+          <table class="tbl"><thead><tr><th>역량</th><th class="n">전후 유효 인원</th><th class="n">교육 전</th><th class="n">교육 후</th><th class="n">변화</th><th>상태</th></tr></thead>
+            <tbody><tr><td>고객지향</td><td class="n">8</td><td class="n">3.31</td><td class="n">3.88</td><td class="n up">+0.57</td><td>공개</td></tr>
+            <tr><td>협업과 팀워크</td><td class="n">8</td><td class="n">3.44</td><td class="n">3.72</td><td class="n up">+0.28</td><td>공개</td></tr>
+            <tr><td>성장 마인드셋</td><td class="n">8</td><td class="n">2.60</td><td class="n">3.00</td><td class="n up">+0.40</td><td>공개</td></tr>
+            <tr><td>사람 육성</td><td class="n">7</td><td class="n">2.70</td><td class="n">2.90</td><td class="n up">+0.20</td><td>공개</td></tr>
+            <tr><td>전략적 사고</td><td class="n">4</td><td class="n mute">—</td><td class="n mute">—</td><td class="n mute">—</td><td class="mute">5명 미만 · 비공개</td></tr></tbody></table>
+          <div class="bars pair">
+            <div class="b"><span>고객지향</span><div class="t"><i class="pre" style="width:66%"></i></div><div class="t"><i style="width:78%"></i></div><em>3.31 → 3.88</em></div>
+            <div class="b"><span>협업과 팀워크</span><div class="t"><i class="pre" style="width:69%"></i></div><div class="t"><i style="width:74%"></i></div><em>3.44 → 3.72</em></div>
+            <div class="b"><span>성장 마인드셋</span><div class="t"><i class="pre" style="width:52%"></i></div><div class="t"><i style="width:60%"></i></div><em>2.60 → 3.00</em></div>
+            <div class="b"><span>사람 육성</span><div class="t"><i class="pre" style="width:54%"></i></div><div class="t"><i style="width:58%"></i></div><em>2.70 → 2.90</em></div>
+            <div class="legend"><span><i class="pre"></i>교육 전</span><span><i></i>교육 후</span></div>
+          </div>
+        </div>
+        <p class="foot">같은 참여자가 같은 문항에 답한 자기보고 변화입니다. 수행 기회 없음(0)은 점수에서 빼며, 교육의 인과효과를 뜻하지 않습니다.</p>
+      </section>
+
+      <!-- 4. 현업전이 환경 : 회색 바탕으로 구분 -->
+      <section class="sec soft">
+        <div class="sec-head"><div class="l"><span class="ic"><span class="ms">work_history</span></span><div><h2>현업전이 환경</h2><p>교육 후 검사에서 답한 적용 여건 4가지(1~5)와 적용 장애요인</p></div></div>
+          <div class="r"><span class="chip"><span class="ms">group</span>응답 8명</span></div></div>
+        <div class="stats">
+          <div class="stat"><span>적용 기회</span><strong>4.00<small>/ 5</small></strong><div class="bar"><i style="width:80%"></i></div></div>
+          <div class="stat"><span>상사·리더 지원</span><strong>4.00<small>/ 5</small></strong><div class="bar"><i style="width:80%"></i></div></div>
+          <div class="stat low"><span>도구·정보·권한</span><strong>2.40<small>/ 5</small></strong><div class="bar"><i style="width:48%"></i></div></div>
+          <div class="stat"><span>시간·프로세스</span><strong>3.60<small>/ 5</small></strong><div class="bar"><i style="width:72%"></i></div></div>
+        </div>
+        <div class="two">
+          <div>
+            <p style="font-size:13.5px;font-weight:700;color:var(--ink-2);margin-bottom:10px">적용 장애요인 <span style="font-weight:500;color:var(--ink-4)">· 복수 선택</span></p>
+            <div class="bars">
+              <div class="b"><span>도구·정보·권한 부족</span><div class="t"><i style="width:75%"></i></div><em>6명 · 75%</em></div>
+              <div class="b"><span>시간·프로세스 제약</span><div class="t"><i style="width:38%"></i></div><em>3명 · 38%</em></div>
+              <div class="b"><span>적용 기회 부족</span><div class="t"><i style="width:13%"></i></div><em>1명 · 13%</em></div>
+              <div class="b"><span>상사·동료 지원 부족</span><div class="t"><i style="width:0%"></i></div><em>0명 · 0%</em></div>
+              <div class="b"><span>특별한 방해요인 없음</span><div class="t"><i style="width:13%"></i></div><em>1명 · 13%</em></div>
+            </div>
+          </div>
+          <ul class="notes">
+            <li class="warn"><span class="ms">priority_high</span>평균이 3.0점 미만이라 먼저 보완할 현업 적용 조건은 도구·정보·권한(2.40점)입니다.</li>
+            <li><span class="ms">info</span>가장 많이 꼽힌 적용 장애요인은 '도구·정보·권한 부족'(75%)입니다.</li>
+          </ul>
+        </div>
+        <p class="foot">교육 후 검사 응답 8명 기준입니다. 서술형 적용 사례는 조직 리포트에 넣지 않습니다.</p>
+      </section>
+
+      <!-- 5. 교육과정 검토 우선순위 : 틸 그러데이션 머리 + 역량 묶음 -->
+      <section class="sec tint">
+        <div class="sec-head"><div class="l"><span class="ic"><span class="ms">school</span></span><div><h2>교육과정 검토 우선순위</h2><p>교육 후 평균이 목표보다 0.2점 이상 낮은 역량과, 역량마다 연결된 KMA 과정(공개교육 · 이러닝 · 단체교육 문의)</p></div></div>
+          <div class="r"><button class="btn sm"><span class="ms">mail</span>맞춤형 교육 문의</button></div></div>
+        <ul class="notes"><li class="warn"><span class="ms">priority_high</span>현업 적용 조건 중 평균이 낮은 도구·정보·권한부터 보완해야 과정에서 배운 내용이 현업에서 쓰입니다.</li></ul>
+
+        <div class="need">
+          <div class="need-head"><span class="no">01</span><div><b>사람 육성</b><small>교육 후 2.90점 · 목표 3.50점보다 0.60점 낮음 · 교육 전보다 0.20점 높음</small></div>
+            <div class="gap"><div class="t"><i style="width:58%"></i><b style="left:70%"></b></div><span><span>1</span><span>목표 3.5</span><span>5</span></span></div></div>
+          <div class="need-body">
+            <p class="advice"><span class="ms">trending_up</span>교육 전보다 점수가 올랐습니다. 같은 주제의 심화 과정이나 현업 적용 과제로 이어가세요.</p>
+            <div class="courses">
+              <div class="course"><div class="thumb a"><span class="src">공개교육</span></div><div class="body"><div class="title">[강남] 팀원을 성장시키는 코칭 리더십</div><div class="meta">다음 개강 2026-11-20 · 강남 · 1일 · 7시간</div><div class="act"><a class="btn" href="#"><span class="ms">calendar_month</span>최신 일정 보기</a></div></div></div>
+              <div class="course"><div class="thumb b"><span class="src">이러닝</span></div><div class="body"><div class="title">일잘러의 멘탈관리 수업 - 회복탄력성</div><div class="meta">온라인 · 상시 수강</div><div class="act"><a class="btn" href="#"><span class="ms">play_circle</span>수강 페이지 보기</a></div></div></div>
+              <div class="course"><div class="thumb c"><span class="src">단체교육 문의</span></div><div class="body"><div class="title">역사에서 배우는 자기관리와 사람관리</div><div class="meta">사내교육 · KMA에 단체교육 문의</div><div class="act"><a class="btn" href="#"><span class="ms">open_in_new</span>과정 안내 보기</a></div></div></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="need">
+          <div class="need-head"><span class="no">02</span><div><b>성장 마인드셋</b><small>교육 후 3.00점 · 목표 3.50점보다 0.50점 낮음 · 교육 전보다 0.40점 높음</small></div>
+            <div class="gap"><div class="t"><i style="width:60%"></i><b style="left:70%"></b></div><span><span>1</span><span>목표 3.5</span><span>5</span></span></div></div>
+          <div class="need-body">
+            <p class="advice"><span class="ms">trending_up</span>교육 전보다 점수가 올랐습니다. 같은 주제의 심화 과정이나 현업 적용 과제로 이어가세요.</p>
+            <div class="courses">
+              <div class="course"><div class="thumb a"><span class="src">공개교육</span></div><div class="body"><div class="title">[강남] MBTI 기반 자기이해와 조직 관계 전략</div><div class="meta">다음 개강 2026-11-20 · 강남 · 1일 · 7시간</div><div class="act"><a class="btn" href="#"><span class="ms">calendar_month</span>최신 일정 보기</a></div></div></div>
+              <div class="course"><div class="thumb b"><span class="src">이러닝</span></div><div class="body"><div class="title">성장하는 직장인의 학습 습관 만들기</div><div class="meta">온라인 · 상시 수강</div><div class="act"><a class="btn" href="#"><span class="ms">play_circle</span>수강 페이지 보기</a></div></div></div>
+              <div class="course"><div class="thumb c"><span class="src">단체교육 문의</span></div><div class="body"><div class="title">자기개발과 비전 기반 경력개발 이해</div><div class="meta">사내교육 · KMA에 단체교육 문의</div><div class="act"><a class="btn" href="#"><span class="ms">open_in_new</span>과정 안내 보기</a></div></div></div>
+            </div>
+          </div>
+        </div>
+        <p class="foot">공개교육은 개강이 일주일 넘게 남은 기수가 있는 과정만 보여 주고, 버튼을 누르면 KMA 일정 페이지가 열립니다. 개설 여부와 교육비는 KMA 페이지에서 확인하세요.</p>
+      </section>
+
+      <div class="row" style="justify-content:flex-end"><button class="btn"><span class="ms">table_view</span>조직 리포트 상세 CSV</button></div>
+    </section>
+
+    <!-- ================= 참여자 · 내 교육 ================= -->
+    <section class="screen" id="mine">
+      <div>
+        <p class="ctx">워크스페이스 / 내 교육</p>
+        <div class="page-head"><div><h1>나의 교육평가</h1><p class="sub">고서연 님의 배정 프로젝트와 검사 결과</p></div></div>
+      </div>
+
+      <div class="proj">
+        <div class="proj-top"><div><h2>2026 신임 팀장 리더십 과정</h2><p>신임 팀장 리더십 과정 · 교육일 2026-09-09</p></div>
+          <div class="row"><span class="chip ok"><span class="ms fill">check_circle</span>교육 전 완료</span><span class="chip ok"><span class="ms fill">check_circle</span>교육 후 완료</span></div></div>
+        <div class="journey">
+          <div class="done"><b>1</b><span>교육 전 검사<small>09-01 제출</small></span></div>
+          <div class="done"><b>2</b><span>교육 · 현업 적용<small>8~10주</small></span></div>
+          <div class="done"><b>3</b><span>교육 후 검사<small>11-03 제출</small></span></div>
+          <div class="now"><b>4</b><span>나의 리포트<small>지금 볼 수 있음</small></span></div>
+        </div>
+        <div class="acts"><button class="btn pri"><span class="ms">insights</span>나의 교육 전후 리포트 보기</button><button class="btn"><span class="ms">download</span>내 리포트 PDF</button></div>
+      </div>
+
+      <section class="sec">
+        <div class="sec-head"><div class="l"><span class="ic"><span class="ms">insights</span></span><div><h2>나의 교육 전후 리포트</h2><p>같은 문항에 교육 전후로 답한 역량별 변화</p></div></div></div>
+        <div class="two">
+          <table class="tbl"><thead><tr><th>역량</th><th class="n">교육 전</th><th class="n">교육 후</th><th class="n">변화</th><th class="n">유효 문항</th></tr></thead>
+            <tbody><tr><td>고객지향</td><td class="n">3.25</td><td class="n">4.00</td><td class="n up">+0.75</td><td class="n">4</td></tr>
+            <tr><td>협업과 팀워크</td><td class="n">3.50</td><td class="n">3.75</td><td class="n up">+0.25</td><td class="n">4</td></tr>
+            <tr><td>성장 마인드셋</td><td class="n">2.00</td><td class="n">3.00</td><td class="n up">+1.00</td><td class="n">4</td></tr>
+            <tr><td>사람 육성</td><td class="n">2.25</td><td class="n">2.75</td><td class="n up">+0.50</td><td class="n">4</td></tr></tbody></table>
+          <div class="bars pair">
+            <div class="b"><span>고객지향</span><div class="t"><i class="pre" style="width:65%"></i></div><div class="t"><i style="width:80%"></i></div><em>3.25 → 4.00</em></div>
+            <div class="b"><span>협업과 팀워크</span><div class="t"><i class="pre" style="width:70%"></i></div><div class="t"><i style="width:75%"></i></div><em>3.50 → 3.75</em></div>
+            <div class="b"><span>성장 마인드셋</span><div class="t"><i class="pre" style="width:40%"></i></div><div class="t"><i style="width:60%"></i></div><em>2.00 → 3.00</em></div>
+            <div class="b"><span>사람 육성</span><div class="t"><i class="pre" style="width:45%"></i></div><div class="t"><i style="width:55%"></i></div><em>2.25 → 2.75</em></div>
+            <div class="legend"><span><i class="pre"></i>교육 전</span><span><i></i>교육 후</span></div>
+          </div>
+        </div>
+        <p class="foot">교육 전후 모두 1~5로 답한 문항만 비교합니다. 수행 기회 없음(0)은 빼고, 유효 문항이 부족한 역량은 비웁니다. 자기보고 변화이며 교육의 인과효과를 뜻하지 않습니다.</p>
+      </section>
+
+      <section class="sec soft">
+        <div class="sec-head"><div class="l"><span class="ic"><span class="ms">work_history</span></span><div><h2>내 현업전이 환경 응답</h2><p>교육 후 검사에서 답한 적용 여건. 역량 점수에는 넣지 않음</p></div></div></div>
+        <div class="stats">
+          <div class="stat"><span>적용 기회</span><strong>4<small>그런 편이다</small></strong></div>
+          <div class="stat"><span>상사·리더 지원</span><strong>4<small>그런 편이다</small></strong></div>
+          <div class="stat low"><span>도구·정보·권한</span><strong>2<small>그렇지 않은 편</small></strong></div>
+          <div class="stat"><span>시간·프로세스</span><strong>3<small>보통이다</small></strong></div>
+        </div>
+        <div class="row"><span class="chip"><span class="ms">block</span>도구·정보·권한 부족</span><span class="chip"><span class="ms">block</span>시간·프로세스 제약</span></div>
+      </section>
+
+      <section class="sec tint">
+        <div class="sec-head"><div class="l"><span class="ic"><span class="ms">school</span></span><div><h2>보완 학습 제안</h2><p>교육 후 점수가 목표보다 0.2점 이상 낮은 역량과 KMA 과정(공개교육 · 이러닝). 수강 여부는 교육담당자와 상의</p></div></div></div>
+        <div class="need">
+          <div class="need-head"><span class="no">01</span><div><b>사람 육성</b><small>교육 후 2.75점 · 목표 3.50점보다 0.75점 낮음 · 교육 전보다 0.50점 높음</small></div>
+            <div class="gap"><div class="t"><i style="width:55%"></i><b style="left:70%"></b></div><span><span>1</span><span>목표 3.5</span><span>5</span></span></div></div>
+          <div class="need-body">
+            <p class="advice"><span class="ms">trending_up</span>교육 전보다 점수가 올랐습니다. 같은 주제의 심화 과정이나 현업 적용 과제로 이어가세요.</p>
+            <div class="courses">
+              <div class="course"><div class="thumb a"><span class="src">공개교육</span></div><div class="body"><div class="title">[강남] 팀원을 성장시키는 코칭 리더십</div><div class="meta">다음 개강 2026-11-20 · 강남 · 1일 · 7시간</div><div class="act"><a class="btn" href="#"><span class="ms">calendar_month</span>최신 일정 보기</a></div></div></div>
+              <div class="course"><div class="thumb b"><span class="src">이러닝</span></div><div class="body"><div class="title">일잘러의 멘탈관리 수업 - 회복탄력성</div><div class="meta">온라인 · 상시 수강</div><div class="act"><a class="btn" href="#"><span class="ms">play_circle</span>수강 페이지 보기</a></div></div></div>
+            </div>
+          </div>
+        </div>
+        <div class="need">
+          <div class="need-head"><span class="no">02</span><div><b>성장 마인드셋</b><small>교육 후 3.00점 · 목표 3.50점보다 0.50점 낮음 · 교육 전보다 1.00점 높음</small></div>
+            <div class="gap"><div class="t"><i style="width:60%"></i><b style="left:70%"></b></div><span><span>1</span><span>목표 3.5</span><span>5</span></span></div></div>
+          <div class="need-body">
+            <div class="courses">
+              <div class="course"><div class="thumb a"><span class="src">공개교육</span></div><div class="body"><div class="title">[강남] MBTI 기반 자기이해와 조직 관계 전략</div><div class="meta">다음 개강 2026-11-20 · 강남 · 1일 · 7시간</div><div class="act"><a class="btn" href="#"><span class="ms">calendar_month</span>최신 일정 보기</a></div></div></div>
+              <div class="course"><div class="thumb b"><span class="src">이러닝</span></div><div class="body"><div class="title">성장하는 직장인의 학습 습관 만들기</div><div class="meta">온라인 · 상시 수강</div><div class="act"><a class="btn" href="#"><span class="ms">play_circle</span>수강 페이지 보기</a></div></div></div>
+            </div>
+          </div>
+        </div>
+      </section>
+    </section>
+
+    <!-- ================= 오픈페이지 문구 ================= -->
+    <section class="screen" id="open">
+      <div>
+        <p class="ctx">/open · 공개 서비스 소개</p>
+        <div class="page-head"><div><h1>오픈페이지 머리글 문구</h1><p class="sub">머리글은 명사로 끝내고, 설명은 본문 한 문장으로. 기능 소개 섹션을 새로 넣음</p></div></div>
+      </div>
+      <div class="copy">
+        <div class="h">지금</div><div class="h">바꿀 문구</div>
+        <div>교육 전후, 현업 행동의 변화를 확인합니다.</div><div>교육 전과 후,<br>현업 행동의 변화</div>
+        <div>교육 만족도만으로는 현업의 변화를 설명하기 어렵습니다.</div><div>교육 만족도 너머,<br>현업 행동의 변화</div>
+        <div>교육 전에 한 번, 교육 후에 같은 문항으로 한 번 더.</div><div>교육 전 한 번, 교육 후 한 번,<br>같은 문항으로 두 번의 검사</div>
+        <div>교육 전후 변화와 현업 적용환경을 같이 봅니다.</div><div>교육 전후 변화와 현업 적용환경,<br>한 장의 리포트</div>
+        <div>부족한 역량에 맞는 KMA 교육과정을 추천합니다.</div><div>부족한 역량에 맞춘<br>KMA 교육과정 추천</div>
+        <div>(없음)</div><div>운영부터 리포트까지,<br>TAP의 주요 기능 <span style="font-weight:500;color:var(--ink-3)">· 새 섹션</span></div>
+        <div>로그인하면 역할에 맞는 화면이 열립니다.</div><div>역할에 맞는<br>두 가지 화면</div>
+        <div>비교할 수 있는 응답만 변화로 계산합니다.</div><div>비교할 수 있는 응답만 쓰는<br>변화 계산 원칙</div>
+        <div>교육 전후 변화를 직접 확인해 보세요.</div><div>교육 전후 변화,<br>지금 바로 확인</div>
+      </div>
+      <section class="sec">
+        <div class="sec-head"><div class="l"><span class="ic"><span class="ms">apps</span></span><div><h2>주요 기능 (새 섹션)</h2><p>지금 앱에 있는 기능을 빠짐없이 8장으로. 오픈페이지에 없던 계정 발급 · 진행 보드 · 대시보드 · 단체교육 문의를 넣음</p></div></div></div>
+        <div class="feat">
+          <div><span class="ms">person_add</span><b>참여자 계정 발급</b><span>한 명씩 또는 CSV 일괄 등록, 임시 비밀번호 전달</span></div>
+          <div><span class="ms">add_circle</span><b>프로젝트 만들기</b><span>교육 일정과 측정역량 최대 8개, 조직 목표 수준</span></div>
+          <div><span class="ms">view_kanban</span><b>참여자 배정과 진행 보드</b><span>부서별 상태 칩, 미완료자 명단 CSV</span></div>
+          <div><span class="ms">space_dashboard</span><b>대시보드</b><span>참여율, 월별 완료 추세, 일정·미완료 점검</span></div>
+          <div><span class="ms">assignment</span><b>교육 전후 검사</b><span>한 화면 한 문항, 자동 저장, 이어서 응답</span></div>
+          <div><span class="ms">work_history</span><b>현업전이 환경</b><span>적용 기회·상사 지원·도구·시간 여건과 장애요인</span></div>
+          <div><span class="ms">insights</span><b>개인·조직 리포트</b><span>화면, A4 PDF, 상세 CSV. 조직은 역량별 5명 이상만 공개</span></div>
+          <div><span class="ms">school</span><b>KMA 과정 추천</b><span>공개교육·이러닝·단체교육 문의, 맞춤형 교육 문의</span></div>
+        </div>
+      </section>
+    </section>
+  </main>
+</div>
+
+<script>
+(function(){
+  var buttons=document.querySelectorAll('.note [data-view]');
+  function show(id){
+    document.querySelectorAll('.screen').forEach(function(s){s.classList.toggle('on',s.id===id)});
+    buttons.forEach(function(b){b.setAttribute('aria-pressed',b.dataset.view===id?'true':'false')});
+    var participant=id==='mine';
+    document.querySelectorAll('#nav li').forEach(function(li){li.hidden=(li.dataset.for==='participant')!==participant});
+    document.getElementById('who').innerHTML=participant?'<b>㈜한빛제조</b><span>참여자 · 고서연</span>':'<b>㈜한빛제조</b><span>교육담당자 · 김담당</span>';
+    document.getElementById('whoRole').textContent=participant?'참여자':'교육담당자';
+    window.scrollTo(0,0);
+  }
+  buttons.forEach(function(b){b.addEventListener('click',function(){show(b.dataset.view)})});
+})();
+</script>
+</body>
+</html>

@@ -240,7 +240,7 @@ def _render_trend(summary: dict[str, Any], role: str) -> None:
         pre, post = _count(current, "pre_completed"), _count(current, "post_completed")
         st.html(f'<div class="tap-dash-insight"><b>{escape(current["month"])} 검사 완료</b>'
                 f'<span>교육 전 검사 <strong>{pre:,}명</strong> · 교육 후 검사 <strong>{post:,}명</strong></span></div>')
-        st.caption("완료 시점의 한국시간 월로 집계합니다. 같은 사람이 교육 전후 검사를 모두 마치면 두 검사에 각각 집계됩니다. 과거 참여율은 추정하지 않습니다.")
+        st.caption("완료 시점의 한국시간 월로 집계합니다. 같은 사람이 교육 전후 검사를 모두 마치면 두 검사에 각각 들어갑니다.")
 
 
 def render_dashboard(store: Any, token: str, principal: Mapping[str, Any]) -> None:

@@ -6,6 +6,7 @@
 <title>KMA TAP · 교육 전후 변화 평가 플랫폼</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
 <style>
+@import url("https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,300..600,0..1,0&display=block");
 /* KMA TAP 오픈페이지 v2 (운영). tap/account_landing.py가 워드마크와 글꼴을 넣어 /open에서 보여 준다.
    색: CI 네이비 #192c48, 틸 #087b76, 점 #20c7dc. 나머지는 회색 단계.
    글꼴: 본문과 제목은 Pretendard, 워드마크만 Paperlogy.
@@ -159,6 +160,13 @@ body{margin:0;background:#fff}
 .tap-landing .caution strong{display:block;font-size:17px;font-weight:700;color:#5c3500}
 .tap-landing .caution p{margin-top:2px;font-size:16px;color:#5c4320}
 
+/* 주요 기능 */
+.tap-landing .features{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+.tap-landing .feature{background:#fff;border:1px solid var(--line);border-radius:var(--r-lg);padding:26px 24px}
+.tap-landing .feature .fi{display:grid;place-items:center;width:44px;height:44px;border-radius:12px;background:var(--teal-tint);color:var(--teal);font-family:'Material Symbols Rounded';font-size:24px;font-feature-settings:'liga';letter-spacing:normal;line-height:1;font-weight:400}
+.tap-landing .feature h3{margin-top:16px;font-size:19px;font-weight:700;letter-spacing:-.02em;color:var(--ink)}
+.tap-landing .feature p{margin-top:8px;font-size:15.5px;line-height:1.6;color:var(--ink-2)}
+.tap-landing .section.gray .role-card.learner{background:#fff;border:1px solid var(--line)}
 /* 역할 */
 .tap-landing .roles{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;max-width:980px;margin-inline:auto}
 .tap-landing .role-card{display:flex;flex-direction:column;border-radius:var(--r-xl);padding:40px}
@@ -205,7 +213,7 @@ body{margin:0;background:#fff}
   .tap-landing .nav.open .nav-list a{height:48px;border-radius:12px}
   .tap-landing .hero-grid,.tap-landing .split{grid-template-columns:minmax(0,1fr);gap:48px}
   .tap-landing .steps{grid-template-columns:repeat(2,minmax(0,1fr))}
-  .tap-landing .cards,.tap-landing .facts-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .tap-landing .cards,.tap-landing .features,.tap-landing .facts-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
   .tap-landing .fact{padding:28px 20px}
   .tap-landing .fact:nth-child(3){padding-left:0;border-left:0}
   .tap-landing .fact:nth-child(n+3){border-top:1px solid var(--line)}
@@ -222,7 +230,7 @@ body{margin:0;background:#fff}
   .tap-landing .hero-grid{padding:72px 0 80px}
   .tap-landing .hero .lead,.tap-landing .head p{font-size:17px}
   .tap-landing .section{padding:84px 0}
-  .tap-landing .steps,.tap-landing .cards,.tap-landing .roles{grid-template-columns:minmax(0,1fr)}
+  .tap-landing .steps,.tap-landing .cards,.tap-landing .features,.tap-landing .roles{grid-template-columns:minmax(0,1fr)}
   .tap-landing .fact{padding:22px 16px}
   .tap-landing .fact strong{font-size:28px}
   .tap-landing .metrics{gap:6px}
@@ -250,6 +258,7 @@ body{margin:0;background:#fff}
           <li><a href="#process">진행 순서</a></li>
           <li><a href="#report">리포트</a></li>
           <li><a href="#recommend">교육 추천</a></li>
+          <li><a href="#features">주요 기능</a></li>
           <li><a href="#faq">FAQ</a></li>
           <li class="mobile-only"><a href="/guide">사용설명서</a></li>
         </ul>
@@ -266,8 +275,8 @@ body{margin:0;background:#fff}
     <div class="container hero-grid">
       <div>
         <span class="eyebrow">교육 전후 변화 평가 플랫폼</span>
-        <h1>교육 전후,<br><em>현업 행동의 변화</em>를<br>확인합니다.</h1>
-        <p class="lead">같은 참여자가 같은 문항에 교육 전과 후 두 번 응답합니다. 행동 변화, 부족한 역량, 추천 KMA 과정이 리포트 하나에 나옵니다.</p>
+        <h1>교육 전과 후,<br><em>현업 행동의 변화</em></h1>
+        <p class="lead">같은 참여자가 같은 문항에 교육 전과 후 두 번 응답합니다. 행동 변화와 현업 적용환경, 추천 KMA 과정을 리포트 하나로 봅니다.</p>
         <div class="actions">
           <a class="btn btn-primary btn-lg" href="#report">리포트 예시 보기</a>
           <a class="btn btn-on-dark btn-lg" data-app-link href="/login">로그인하고 검사 참여</a>
@@ -308,7 +317,7 @@ body{margin:0;background:#fff}
     <div class="container split">
       <div class="head">
         <span class="eyebrow">서비스 소개</span>
-        <h2>교육 만족도만으로는<br>현업의 변화를 설명하기 어렵습니다.</h2>
+        <h2>교육 만족도 너머,<br>현업 행동의 변화</h2>
         <p>TAP은 교육 전 출발점과 교육 후 업무행동을 같은 기준으로 비교합니다.</p>
       </div>
       <div class="compare">
@@ -323,7 +332,7 @@ body{margin:0;background:#fff}
     <div class="container">
       <div class="head center">
         <span class="eyebrow">진행 순서</span>
-        <h2>교육 전에 한 번,<br>교육 후에 같은 문항으로 한 번 더.</h2>
+        <h2>교육 전 한 번, 교육 후 한 번,<br>같은 문항으로 두 번의 검사</h2>
       </div>
       <ol class="body steps">
         <li class="step"><span class="step-no">1</span><h3>프로젝트 만들기</h3><p>교육명, 검사 일정, 측정 역량 설정</p></li>
@@ -353,12 +362,13 @@ body{margin:0;background:#fff}
       </div>
       <div class="report-copy head">
         <span class="eyebrow">리포트</span>
-        <h2>교육 전후 변화와<br>현업 적용환경을 같이 봅니다.</h2>
+        <h2>교육 전후 변화와 현업 적용환경,<br>한 장의 리포트</h2>
         <ul class="checks">
           <li>역량별 교육 전후 레이더 그래프</li>
           <li>역량별 유효 응답자 수</li>
           <li>현업 적용 요인과 장애 요인</li>
-          <li>A4 인쇄용 리포트와 상세 CSV</li>
+          <li>역량별 KMA 추천 과정</li>
+          <li>PDF 리포트와 상세 CSV</li>
         </ul>
         <a class="btn btn-line btn-lg" data-app-link href="/login">리포트 화면 열기</a>
       </div>
@@ -369,46 +379,65 @@ body{margin:0;background:#fff}
     <div class="container">
       <div class="head">
         <span class="eyebrow">교육 추천</span>
-        <h2>부족한 역량에 맞는<br>KMA 교육과정을 추천합니다.</h2>
+        <h2>부족한 역량에 맞춘<br>KMA 교육과정 추천</h2>
         <p>KMA 공개교육과 이러닝 가운데 지금 신청할 수 있는 과정을 연결합니다.</p>
       </div>
       <div class="body cards">
         <article class="card"><span class="no">01</span><h3>부족한 역량부터</h3><p>목표보다 0.2점 이상 낮은 역량을 차이가 큰 순서로 최대 3개 고릅니다.</p></article>
-        <article class="card"><span class="no">02</span><h3>공개교육과 이러닝</h3><p>역량마다 공개교육 1개, 이러닝 1개를 제안합니다.</p></article>
-        <article class="card"><span class="no">03</span><h3>신청할 수 있는 과정</h3><p>다음 기수가 열린 공개교육만 보여 줍니다.</p></article>
+        <article class="card"><span class="no">02</span><h3>공개교육과 이러닝</h3><p>역량마다 공개교육과 이러닝을 하나씩, 조직 리포트에는 단체교육 문의 과정까지 제안합니다.</p></article>
+        <article class="card"><span class="no">03</span><h3>신청할 수 있는 과정</h3><p>개강이 일주일 넘게 남은 기수가 있는 공개교육만 보여 줍니다.</p></article>
         <article class="card"><span class="no">04</span><h3>교육 전 결과부터</h3><p>교육 전 검사만 마쳐도 추천 과정을 볼 수 있습니다.</p></article>
       </div>
     </div>
   </section>
 
-  <section class="section" id="roles">
+  <section class="section" id="features">
+    <div class="container">
+      <div class="head center">
+        <span class="eyebrow">주요 기능</span>
+        <h2>운영부터 리포트까지,<br>TAP의 주요 기능</h2>
+      </div>
+      <div class="body features">
+        <article class="feature"><span class="fi" aria-hidden="true">person_add</span><h3>참여자 계정 발급</h3><p>한 명씩 또는 CSV로 한 번에 등록합니다. 임시 비밀번호는 참여자가 첫 로그인 때 바꿉니다.</p></article>
+        <article class="feature"><span class="fi" aria-hidden="true">add_circle</span><h3>프로젝트 만들기</h3><p>교육 일정과 검사 기간, 측정역량 최대 8개, 조직 목표 수준을 정합니다.</p></article>
+        <article class="feature"><span class="fi" aria-hidden="true">view_kanban</span><h3>참여자 배정과 진행 보드</h3><p>부서 단위로 배정하고, 상태별 인원과 미완료자 명단 CSV를 봅니다.</p></article>
+        <article class="feature"><span class="fi" aria-hidden="true">space_dashboard</span><h3>대시보드</h3><p>참여율과 완료율, 월별 완료 추세, 마감이 가까운 일정과 미완료 인원을 한 화면에 모읍니다.</p></article>
+        <article class="feature"><span class="fi" aria-hidden="true">assignment</span><h3>교육 전후 검사</h3><p>한 화면에 한 문항씩, 고르면 바로 저장됩니다. 중간에 나가도 이어서 응답합니다.</p></article>
+        <article class="feature"><span class="fi" aria-hidden="true">work_history</span><h3>현업전이 환경</h3><p>교육 후 검사에서 적용 기회, 상사 지원, 도구와 권한, 시간 여건과 장애요인을 묻습니다.</p></article>
+        <article class="feature"><span class="fi" aria-hidden="true">insights</span><h3>개인·조직 리포트</h3><p>화면과 PDF, 상세 CSV로 받습니다. 조직 결과는 역량별 응답자 5명 이상일 때만 공개합니다.</p></article>
+        <article class="feature"><span class="fi" aria-hidden="true">school</span><h3>KMA 과정 추천</h3><p>공개교육, 이러닝, 단체교육 문의 과정을 역량별로 잇고, 맞춤형 교육 문의로 연결합니다.</p></article>
+      </div>
+    </div>
+  </section>
+
+  <section class="section gray" id="roles">
     <div class="container">
       <div class="head center">
         <span class="eyebrow">이용 방법</span>
-        <h2>로그인하면 역할에 맞는 화면이 열립니다.</h2>
+        <h2>역할에 맞는<br>두 가지 화면</h2>
       </div>
       <div class="body roles">
         <article class="role-card hrd">
           <span class="kicker">HRD · L&amp;D</span><h3>교육담당자</h3>
           <p>프로젝트를 운영하고 조직 리포트를 받습니다.</p>
-          <ul><li>검사 일정과 측정 역량 설정</li><li>부서별 검사 진행 현황</li><li>미완료자 명단 내려받기</li></ul>
+          <ul><li>참여자 계정 발급과 프로젝트 배정</li><li>부서별 진행 보드와 미완료자 명단</li><li>조직 리포트 PDF와 상세 CSV</li></ul>
           <div class="actions"><a class="btn btn-white btn-lg" data-app-link href="/login">담당자 로그인</a></div>
         </article>
         <article class="role-card learner">
           <span class="kicker">LEARNER</span><h3>참여자</h3>
           <p>검사에 응답하고 개인 리포트를 받습니다.</p>
-          <ul><li>교육 전후 검사 응답</li><li>중간에 멈춰도 이어서 응답</li><li>나에게 맞는 추천 과정</li></ul>
+          <ul><li>교육 전후 검사 응답</li><li>중간에 멈춰도 이어서 응답</li><li>내 리포트 PDF와 추천 과정</li></ul>
           <div class="actions"><a class="btn btn-primary btn-lg" data-app-link href="/login">검사 참여</a></div>
         </article>
       </div>
     </div>
   </section>
 
-  <section class="section gray" id="method">
+  <section class="section" id="method">
     <div class="container">
       <div class="head">
         <span class="eyebrow">측정 원칙</span>
-        <h2>비교할 수 있는 응답만<br>변화로 계산합니다.</h2>
+        <h2>비교할 수 있는 응답만 쓰는<br>변화 계산 원칙</h2>
       </div>
       <div class="body cards">
         <article class="card"><span class="no">01</span><h3>같은 사람, 같은 문항</h3><p>문항 버전이 같고 교육 전후에 모두 응답한 경우만 변화량을 계산합니다.</p></article>
@@ -420,7 +449,7 @@ body{margin:0;background:#fff}
     </div>
   </section>
 
-  <section class="section" id="faq">
+  <section class="section gray" id="faq">
     <div class="container split" style="align-items:start">
       <div class="head">
         <span class="eyebrow">FAQ</span>
@@ -437,7 +466,7 @@ body{margin:0;background:#fff}
 
   <section class="final">
     <div class="container final-inner">
-      <h2>교육 전후 변화를<br>직접 확인해 보세요.</h2>
+      <h2>교육 전후 변화,<br>지금 바로 확인</h2>
       <div class="actions"><a class="btn btn-white btn-lg" href="#report">리포트 예시</a><a class="btn btn-navy btn-lg" data-app-link href="/login">로그인</a></div>
     </div>
   </section>

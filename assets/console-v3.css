@@ -1,0 +1,118 @@
+/* KMA TAP console v3: sections inside the sheet (reports, participant results, follow-up
+   courses). Loaded after console-v2.css. Built by tap/account_ui_kit.py and
+   tap/account_course_ui.py. The blocks use plain divs, so the sheet heading and
+   paragraph rules of console-v2 do not apply inside them. Colour tokens come from v2. */
+.tap-ms {font-family: "Material Symbols Rounded"; font-weight: normal; font-style: normal; font-size: 20px; line-height: 1; display: inline-block; letter-spacing: normal; text-transform: none; white-space: nowrap; font-feature-settings: "liga"; -webkit-font-smoothing: antialiased;}
+
+/* Section panel: st.container(key="tap_sec_" + tone + "_" + name); no angle brackets anywhere in this file, st.html drops a style block that contains them. */
+.stApp [class*="st-key-tap_sec_"] {border: 1px solid var(--c2-line); border-radius: 16px; background: var(--c2-sheet); padding: 22px 24px; gap: 14px !important;}
+.stApp [class*="st-key-tap_sec_soft_"] {background: var(--c2-soft-2); border-color: transparent;}
+.stApp [class*="st-key-tap_sec_tint_"] {background: linear-gradient(180deg, var(--c2-teal-tint), var(--c2-sheet) 62%); border-color: var(--c2-teal-line);}
+/* The report block used to be one bordered card; its sections carry their own frame now. */
+.stApp:has(.st-key-tap_workspace_topbar) .st-key-tap_workspace_project_reports {border: 0 !important; padding: 0 !important; background: transparent !important; box-shadow: none !important;}
+.stApp:has(.st-key-tap_workspace_topbar) .st-key-tap_workspace_project_reports > [data-testid="stVerticalBlock"] {gap: 20px;}
+.stApp [class*="st-key-tap_sec_"] [data-testid="stAlertContainer"] {margin: 0;}
+.tap-sec-head {display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; flex-wrap: wrap;}
+.tap-sec-head > div:first-child {display: flex; gap: 12px; align-items: flex-start; min-width: 0;}
+.tap-sec-ic {flex: none; width: 38px; height: 38px; border-radius: 12px; display: grid; place-items: center; background: var(--c2-teal-tint); color: var(--c2-teal); font-family: "Material Symbols Rounded"; font-size: 22px; font-feature-settings: "liga"; letter-spacing: normal; line-height: 1;}
+.stApp [class*="st-key-tap_sec_soft_"] .tap-sec-ic {background: var(--c2-sheet);}
+.tap-sec-title {font-size: 18px; font-weight: 700; letter-spacing: -.02em; color: var(--c2-ink); line-height: 1.3;}
+.tap-sec-cap {margin-top: 3px; font-size: 13.5px; color: var(--c2-ink-3); line-height: 1.5;}
+.tap-chips {display: flex; gap: 8px; align-items: center; flex-wrap: wrap;}
+.tap-chip {display: inline-flex; align-items: center; gap: 5px; height: 28px; padding: 0 10px; border-radius: 999px; background: var(--c2-soft); color: var(--c2-ink-2); font-size: 12.5px; font-weight: 600; white-space: nowrap;}
+.tap-chip .tap-ms {font-size: 16px; color: var(--c2-teal);}
+.tap-chip.is-ok {background: var(--c2-teal-tint); color: var(--c2-teal-strong);}
+.tap-chip.is-todo {color: var(--c2-ink-3);}
+.tap-chip.is-todo .tap-ms {color: var(--c2-ink-4);}
+.tap-chip.is-warn {background: var(--c2-orange-tint); color: var(--c2-orange-ink);}
+.tap-chip.is-warn .tap-ms {color: var(--c2-orange);}
+.stApp [class*="st-key-tap_sec_soft_"] .tap-chip {background: var(--c2-sheet);}
+.tap-chip-row {display: flex; gap: 8px; flex-wrap: wrap;}
+.tap-sub {font-size: 13.5px; font-weight: 700; color: var(--c2-ink-2); margin-bottom: 10px;}
+.tap-sub span {font-weight: 500; color: var(--c2-ink-4);}
+.tap-quote {font-size: 14px; color: var(--c2-ink-2); line-height: 1.6; padding: 12px 14px; border-left: 3px solid var(--c2-teal-line); background: var(--c2-sheet); border-radius: 0 10px 10px 0; white-space: pre-line;}
+
+/* Stat tiles. */
+.tap-stats {display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px;}
+.tap-stat {background: var(--c2-soft-2); border-radius: 12px; padding: 14px 16px; display: grid; gap: 4px; min-width: 0; align-content: start;}
+.stApp [class*="st-key-tap_sec_soft_"] .tap-stat {background: var(--c2-sheet);}
+.tap-stat > span {font-size: 13px; font-weight: 600; color: var(--c2-ink-2);}
+.tap-stat strong {font-size: 26px; font-weight: 700; letter-spacing: -.03em; color: var(--c2-ink); line-height: 1.15; font-variant-numeric: tabular-nums;}
+.tap-stat strong small {font-size: 14px; font-weight: 500; color: var(--c2-ink-4); margin-left: 4px; letter-spacing: 0;}
+.tap-stat .tap-bar {height: 5px; border-radius: 999px; background: var(--c2-soft); overflow: hidden; margin-top: 6px;}
+.tap-stat .tap-bar i {display: block; height: 100%; border-radius: 999px; background: var(--c2-teal);}
+.tap-stat.is-low strong {color: var(--c2-orange);}
+.tap-stat.is-low .tap-bar i {background: var(--c2-orange);}
+
+/* Horizontal bars; the pair variant puts pre and post side by side. */
+.tap-bars {display: grid; gap: 8px;}
+.tap-brow {display: grid; grid-template-columns: minmax(96px, 150px) 1fr auto; gap: 12px; align-items: center; font-size: 13.5px;}
+.tap-bars.is-pair .tap-brow {grid-template-columns: minmax(96px, 150px) 1fr 1fr auto;}
+.tap-brow > span:first-child {color: var(--c2-ink-2); font-weight: 600; overflow-wrap: anywhere;}
+.tap-track {height: 8px; border-radius: 999px; background: var(--c2-soft); overflow: hidden;}
+.tap-track i {display: block; height: 100%; border-radius: 999px; background: var(--c2-teal);}
+.tap-track i.is-pre {background: #7ac7bd;}
+.tap-brow em {font-style: normal; color: var(--c2-ink-3); font-variant-numeric: tabular-nums; white-space: nowrap; font-size: 13px;}
+.tap-legend {display: flex; gap: 16px; font-size: 12.5px; color: var(--c2-ink-3); margin-top: 2px;}
+.tap-legend i {display: inline-block; width: 12px; height: 12px; border-radius: 3px; margin-right: 6px; vertical-align: -1px; background: var(--c2-teal);}
+.tap-legend i.is-pre {background: #7ac7bd;}
+
+/* Follow-up notes and small print. */
+.tap-notes {display: grid; gap: 6px; margin: 0; padding: 0; list-style: none;}
+.tap-notes li {display: flex; gap: 8px; align-items: flex-start; font-size: 14px; color: var(--c2-ink-2); line-height: 1.55;}
+.tap-notes li .tap-ms {flex: none; margin-top: 2px; font-size: 18px; color: var(--c2-teal);}
+.tap-notes li.is-warn .tap-ms {color: var(--c2-orange);}
+.tap-foot {font-size: 13px; color: var(--c2-ink-3); line-height: 1.6; padding-top: 12px; border-top: 1px dashed var(--c2-line);}
+
+/* Course picks: one numbered block per competency, small cards inside. */
+.tap-needs {display: grid; gap: 12px;}
+.tap-need {border: 1px solid var(--c2-line); border-radius: 16px; background: var(--c2-sheet); overflow: hidden;}
+.tap-need__head {display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 14px; align-items: center; padding: 14px 18px; background: var(--c2-soft-2); border-bottom: 1px solid var(--c2-line-2);}
+.tap-need__no {width: 30px; height: 30px; border-radius: 9px; display: grid; place-items: center; background: var(--c2-teal); color: #fff; font-size: 13px; font-weight: 700;}
+.tap-need__head b {display: block; font-size: 16px; color: var(--c2-ink);}
+.tap-need__head small {display: block; font-size: 13px; color: var(--c2-ink-3); margin-top: 1px;}
+.tap-gap {display: grid; gap: 4px; min-width: 200px; font-size: 12px; color: var(--c2-ink-3); font-variant-numeric: tabular-nums;}
+.tap-gap__track {position: relative; height: 6px; border-radius: 999px; background: var(--c2-soft);}
+.tap-gap__track i {position: absolute; left: 0; top: 0; height: 100%; border-radius: 999px; background: var(--c2-teal);}
+.tap-gap__track b {position: absolute; top: -4px; width: 2px; height: 14px; background: var(--c2-ink-2); border-radius: 1px;}
+.tap-gap > span {display: flex; justify-content: space-between;}
+.tap-need__body {padding: 14px 18px 18px; display: grid; gap: 12px;}
+.tap-advice {display: flex; gap: 8px; align-items: flex-start; font-size: 13.5px; color: var(--c2-ink-2); line-height: 1.55;}
+.tap-advice .tap-ms {flex: none; margin-top: 2px; font-size: 18px; color: var(--c2-teal);}
+.tap-courses {display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px;}
+.tap-course {display: flex; flex-direction: column; border: 1px solid var(--c2-line); border-radius: 12px; background: var(--c2-sheet); overflow: hidden; color: inherit; text-decoration: none !important; transition: border-color .15s, box-shadow .15s;}
+a.tap-course:hover {border-color: var(--c2-teal-line); box-shadow: var(--c2-pill-shadow);}
+/* KMA thumbnails are square with the title in the middle, so they are shown whole on a soft field instead of cropped. */
+.tap-course__thumb {position: relative; height: 118px; background: linear-gradient(135deg, #e9efee, #d8e5e2); overflow: hidden;}
+.tap-course__thumb img {width: 100%; height: 100%; object-fit: contain; display: block;}
+.tap-course__src {position: absolute; left: 8px; top: 8px; height: 22px; padding: 0 8px; border-radius: 999px; background: rgb(255 255 255 / .92); color: var(--c2-teal-strong); font-size: 11.5px; font-weight: 700; display: inline-flex; align-items: center;}
+.tap-course__body {padding: 10px 12px 12px; display: flex; flex-direction: column; gap: 6px; flex: 1;}
+.tap-course__title {font-size: 14px; font-weight: 700; color: var(--c2-ink); line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;}
+.tap-course__meta {font-size: 12.5px; color: var(--c2-ink-3); line-height: 1.45;}
+.tap-course__btn {margin-top: auto; display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: 32px; padding: 0 12px; border: 1px solid var(--c2-line); border-radius: 999px; font-size: 13px; font-weight: 600; color: var(--c2-ink-2); background: var(--c2-sheet);}
+.tap-course__btn .tap-ms {font-size: 17px; color: var(--c2-teal);}
+a.tap-course:hover .tap-course__btn {border-color: var(--c2-teal); color: var(--c2-teal-strong);}
+
+/* Participant: project card with the four-step journey. */
+.tap-proj {display: grid; gap: 14px;}
+.tap-proj__top {display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; align-items: flex-start;}
+.tap-proj__top > div:first-child {min-width: 0;}
+.tap-proj__title {font-size: 20px; font-weight: 700; color: var(--c2-ink); letter-spacing: -.02em; line-height: 1.3;}
+.tap-proj__cap {font-size: 14px; color: var(--c2-ink-3); margin-top: 3px;}
+.tap-journey {display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px;}
+.tap-journey > div {display: flex; gap: 10px; align-items: center; padding: 12px 14px; border-radius: 12px; background: var(--c2-soft-2); font-size: 14px; font-weight: 600; color: var(--c2-ink-3); min-width: 0;}
+.tap-journey b {width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; background: var(--c2-line); color: var(--c2-ink-3); font-size: 12.5px; flex: none;}
+.tap-journey .is-done {color: var(--c2-teal-strong);}
+.tap-journey .is-done b {background: var(--c2-teal); color: #fff;}
+.tap-journey .is-now {background: var(--c2-teal-tint); color: var(--c2-ink); box-shadow: inset 0 0 0 1px var(--c2-teal-line);}
+.tap-journey .is-now b {background: var(--c2-teal); color: #fff;}
+.tap-journey small {display: block; font-size: 12px; font-weight: 500; color: var(--c2-ink-4); margin-top: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;}
+.stApp:has(.st-key-tap_workspace_topbar) .st-key-_tap_participant_project_card {padding: 22px 24px !important; gap: 14px !important;}
+@media (max-width: 760px) {
+  .tap-journey {grid-template-columns: repeat(2, minmax(0, 1fr));}
+  .tap-bars.is-pair .tap-brow {grid-template-columns: minmax(80px, 110px) 1fr 1fr;}
+  .tap-bars.is-pair .tap-brow em {grid-column: 2 / -1; text-align: right;}
+  .tap-need__head {grid-template-columns: auto minmax(0, 1fr);}
+  .tap-gap {grid-column: 1 / -1;}
+  .stApp [class*="st-key-tap_sec_"] {padding: 18px 16px;}
+}
