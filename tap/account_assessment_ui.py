@@ -11,11 +11,14 @@ import hashlib
 from copy import deepcopy
 from collections.abc import Mapping, MutableMapping
 from datetime import date, datetime, timedelta, timezone
+from html import escape
 from time import time
 from typing import Any
 
 import streamlit as st
 
+from tap.account_insights import TRANSFER_FACTORS
+from tap.account_ui_kit import chip, fmt, foot, pair_bar_rows, section, stat_tiles
 from tap.config import LIKERT_OPTIONS
 from tap.data import questions_for_factors
 from tap.scoring import score_pre_post_responses, score_responses
@@ -201,46 +204,56 @@ def _current_payload(record: Mapping[str, Any] | None, phase: str) -> dict[str, 
     return payload
 
 
+def _render_transfer_answers(transfer: Mapping[str, Any]) -> None:
+    """The participant's own transfer answers: four tiles, barrier chips and the applied example."""
+    with section("my_transfer", "work_history", "내 현업전이 환경 응답", "교육 후 검사에서 답한 적용 여건. 역량 점수에는 넣지 않음", tone="soft"):
+        tiles = []
+        for code, label in TRANSFER_FACTORS:
+            value = transfer.get(code)
+            scored = type(value) is int and 1 <= value <= 5
+            tiles.append((label, str(value) if scored else "—", TRANSFER_LABELS[value] if scored else "미응답",
+                          value / 5 * 100 if scored else None, scored and value < 3))
+        st.html(stat_tiles(tiles))
+        if transfer.get("barriers"):
+            st.html('<div class="tap-chip-row">' + "".join(
+                chip(barrier, icon_name="check_circle" if barrier == "특별한 방해요인 없음" else "block",
+                     tone="ok" if barrier == "특별한 방해요인 없음" else "warn") for barrier in transfer["barriers"]) + "</div>")
+        if transfer.get("applied_content"):
+            st.html('<div class="tap-sub">실제 업무에 적용한 교육 내용</div>'
+                    f'<div class="tap-quote">{escape(str(transfer["applied_content"]))}</div>')
+
+
 def _render_results(questions: list[dict[str, Any]], config: Mapping[str, Any], pre: Mapping[str, Any], post: Mapping[str, Any] | None = None) -> None:
     targets = config.get("target_means", {})
     pre_responses = pre["payload"]["responses"]
     if post is not None and post.get("completed"):
-        st.subheader("나의 교육 전후 리포트")
         results = score_pre_post_responses(questions, pre_responses, post["payload"]["responses"], targets)
-        st.dataframe([
-            {"역량": r["factor_name_ko"], "교육 전(1~5)": r["pre_score"], "교육 후(1~5)": r["post_score"],
-             "관찰 변화": r["self_reported_change"], "공통 유효문항": r["paired_valid_items"], "문항 수": r["total_items"], "산출 상태": r["status"]}
-            for r in results
-        ], hide_index=True, width="stretch")
-        st.caption("교육 전후 모두 1~5로 답한 문항만 비교합니다. 0(수행 기회 없음)은 빼고, 공통 유효문항이 부족한 역량은 산출하지 않습니다. 자기보고로 관찰된 변화이며 교육의 인과효과를 뜻하지 않습니다.")
-        scored = [r for r in results if r["pre_score"] is not None or r["post_score"] is not None]
-        if scored:
-            import pandas as pd
-
-            # Same shape and teal pair as the manager report chart.
-            chart = pd.DataFrame({"교육 전": [r["pre_score"] for r in scored], "교육 후": [r["post_score"] for r in scored]},
-                                 index=pd.Index([r["factor_name_ko"] for r in scored], name="역량"))
-            st.bar_chart(chart, color=["#7ac7bd", "#087b76"], stack=False,
-                         horizontal=True, height=max(240, len(scored) * 64), width="stretch")
+        with section("my_report", "insights", "나의 교육 전후 리포트", "같은 문항에 교육 전후로 답한 역량별 변화"):
+            st.dataframe([
+                {"역량": r["factor_name_ko"], "교육 전(1~5)": r["pre_score"], "교육 후(1~5)": r["post_score"],
+                 "관찰 변화": r["self_reported_change"], "공통 유효문항": r["paired_valid_items"], "문항 수": r["total_items"], "산출 상태": r["status"]}
+                for r in results
+            ], hide_index=True, width="stretch")
+            scored = [r for r in results if r["pre_score"] is not None and r["post_score"] is not None]
+            if scored:
+                # Same shape and teal pair as the manager report.
+                st.html(pair_bar_rows([(r["factor_name_ko"], r["pre_score"], r["post_score"],
+                                        f"{fmt(r['pre_score'])} → {fmt(r['post_score'])}") for r in scored]))
+            st.html(foot("교육 전후 모두 1~5로 답한 문항만 비교합니다. 0(수행 기회 없음)은 빼고, 공통 유효문항이 부족한 역량은 비웁니다. "
+                         "자기보고로 관찰된 변화이며 교육의 인과효과를 뜻하지 않습니다."))
         transfer = post["payload"].get("post_transfer_responses", {})
         if transfer:
-            with st.expander("내 현업전이 환경 응답", key=PREFIX + "transfer_panel"):
-                for code, label in TRANSFER_ITEMS:
-                    st.write(f"{label} ({TRANSFER_LABELS.get(transfer.get(code), '미응답')})")
-                if transfer.get("barriers"):
-                    st.write("적용 방해요인: " + ", ".join(transfer["barriers"]))
-                if transfer.get("applied_content"):
-                    st.write(transfer["applied_content"])
+            _render_transfer_answers(transfer)
         _render_followup_courses(config, results)
     else:
-        st.subheader("나의 교육 전 검사 결과")
         results = score_responses(questions, pre_responses, targets, assessment_phase="pre")
-        st.dataframe([
-            {"역량": r["factor_name_ko"], "행동빈도(1~5)": r["score_1_to_5"], "유효문항": r["valid_items"],
-             "수행 기회 없음": r["na_items"], "문항 수": r["total_items"], "산출 상태": r["status"]}
-            for r in results
-        ], hide_index=True, width="stretch")
-        st.caption("0(수행 기회 없음)은 점수에 합산하지 않습니다. 유효응답이 부족한 역량은 산출하지 않습니다. 교육 후 검사까지 완료하면 동일 문항의 변화를 확인할 수 있습니다.")
+        with section("my_pre", "insights", "나의 교육 전 검사 결과", "최근 8주 행동빈도(1~5). 교육 후 검사까지 마치면 같은 문항의 변화가 나옴"):
+            st.dataframe([
+                {"역량": r["factor_name_ko"], "행동빈도(1~5)": r["score_1_to_5"], "유효문항": r["valid_items"],
+                 "수행 기회 없음": r["na_items"], "문항 수": r["total_items"], "산출 상태": r["status"]}
+                for r in results
+            ], hide_index=True, width="stretch")
+            st.html(foot("0(수행 기회 없음)은 점수에 합산하지 않습니다. 유효응답이 부족한 역량은 산출하지 않습니다."))
         _render_followup_courses(config, results, phase="pre")
 
 
@@ -250,15 +263,35 @@ def _render_followup_courses(config: Mapping[str, Any], results: list[dict[str, 
 
     # Three competencies, each with one public course and one e-learning course.
     courses = recommend_courses(config, results, limit=6, score_key="post_score" if phase == "post" else "score_1_to_5")
-    st.subheader("보완 학습 제안" if phase == "post" else "보완할 역량과 KMA 추천 과정")
-    if not courses:
-        st.success("목표보다 0.2점 이상 낮은 역량이 없습니다. 지금처럼 실천하면서 적용 사례를 기록해 두세요.")
-        return
-    render_course_cards(courses)
     phase_label = "교육 후" if phase == "post" else "교육 전"
-    st.caption(f"{phase_label} 점수가 목표보다 0.2점 이상 낮은 역량을 차이가 큰 순서로 골라, 역량마다 공개교육과 이러닝 과정을 제안합니다. "
-               "공개교육은 개강이 일주일 넘게 남은 기수가 있는 과정만 보여 주고, 버튼을 누르면 최신 일정 페이지가 열립니다. "
-               "본인 응답에 근거한 제안이니 수강 여부는 교육담당자와 상의해 주세요.")
+    with section("my_courses", "school", "보완 학습 제안" if phase == "post" else "보완할 역량과 KMA 추천 과정",
+                 f"{phase_label} 점수가 목표보다 0.2점 이상 낮은 역량과 KMA 과정(공개교육 · 이러닝). 본인 응답에 근거한 제안이니 수강 여부는 교육담당자와 상의",
+                 tone="tint"):
+        if not courses:
+            st.success("목표보다 0.2점 이상 낮은 역량이 없습니다. 지금처럼 실천하면서 적용 사례를 기록해 두세요.")
+            return
+        render_course_cards(courses)
+        st.html(foot("공개교육은 개강이 일주일 넘게 남은 기수가 있는 과정만 보여 주고, 버튼을 누르면 KMA 과정 페이지가 새 창에 열립니다."))
+
+
+def _journey_html(assignment: Mapping[str, Any], config: Mapping[str, Any], pre_complete: bool, post_complete: bool) -> str:
+    """Project card: title, phase chips and the four steps with the current one highlighted."""
+    def window(phase: str) -> str:
+        start, end = config.get(f"{phase}_start_date"), config.get(f"{phase}_end_date")
+        return f"{start} ~ {end}" if start and end else "기간 미설정"
+    steps = [("교육 전 검사", window("pre"), pre_complete, not pre_complete),
+             ("교육 · 현업 적용", f"교육일 {config.get('training_date') or '미설정'}", pre_complete, False),
+             ("교육 후 검사", window("post"), post_complete, pre_complete and not post_complete),
+             ("나의 리포트", "두 검사를 마치면 열림" if not post_complete else "지금 볼 수 있음", False, post_complete)]
+    journey = "".join(
+        f'<div class="{"is-done" if done else "is-now" if now else ""}"><b>{index}</b><span>{escape(label)}<small>{escape(detail)}</small></span></div>'
+        for index, (label, detail, done, now) in enumerate(steps, 1))
+    chips = "".join(chip(f"{label} {'완료' if done else '미완료'}", icon_name="check_circle" if done else "radio_button_unchecked",
+                         tone="ok" if done else "todo") for label, done in (("교육 전", pre_complete), ("교육 후", post_complete)))
+    course = config.get("course_name") or assignment["project_name"]
+    return (f'<div class="tap-proj"><div class="tap-proj__top"><div><div class="tap-proj__title">{escape(str(assignment["project_name"]))}</div>'
+            f'<div class="tap-proj__cap">{escape(str(course))} · 교육일 {escape(str(config.get("training_date") or "미설정"))}</div></div>'
+            f'<div class="tap-chip-row">{chips}</div></div><div class="tap-journey">{journey}</div></div>')
 
 
 def _render_report_download(assignment: Mapping[str, Any], config: Mapping[str, Any], questions: list[dict[str, Any]],
@@ -417,12 +450,7 @@ def render_participant(store: Any, token: str, principal: Mapping[str, Any]) -> 
     post_complete = bool(assignment.get("post_completed"))
     if not st.session_state.get(PREFIX + "focus"):
         with st.container(key=PREFIX + "project_card"):
-            st.subheader(str(assignment["project_name"]))
-            st.caption(f"교육과정: {config.get('course_name', assignment['project_name'])} · 교육일: {config.get('training_date', '미설정')}")
-            st.html('<div class="tap-phase-status">'
-                    + "".join(f'<span class="{"is-done" if done else "is-todo"}">{label} {"완료" if done else "미완료"}</span>'
-                              for label, done in (("교육 전", pre_complete), ("교육 후", post_complete)))
-                    + "</div>")
+            st.html(_journey_html(assignment, config, pre_complete, post_complete))
             if pre_complete and post_complete:
                 st.button("나의 교육 전후 리포트 보기", key=PREFIX + "open_report", on_click=_choose_phase,
                           args=("post",), type="primary", width="stretch")

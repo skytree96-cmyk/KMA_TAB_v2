@@ -199,7 +199,7 @@ class AccountAssessmentTests(unittest.TestCase):
         self.assertEqual(float(comparison.iloc[0]["관찰 변화"]), 1.0)
         click(app, "내 교육으로 돌아가기")
         click(app, "나의 교육 전후 리포트 보기")
-        self.assertTrue(any(item.value == "나의 교육 전후 리포트" for item in app.subheader))
+        self.assertTrue(any("나의 교육 전후 리포트" in item.proto.body for item in app.get("html")))
         self.assertEqual(float(app.dataframe[0].value.iloc[0]["관찰 변화"]), 1.0)
 
     def test_assignment_switch_cannot_reuse_response_widgets(self):
@@ -326,7 +326,7 @@ class AccountAssessmentTests(unittest.TestCase):
             ("assessment", "a", "pre"), ("assignments", "session-token"), ("assessment", "a", "pre"),
         ])
         self.assertTrue(app.dataframe)
-        self.assertIn("나의 교육 전 검사 결과", [title.value for title in app.subheader])
+        self.assertTrue(any("나의 교육 전 검사 결과" in item.proto.body for item in app.get("html")))
         self.assertFalse(any(r.label == "응답" for r in app.radio))
         self.assertNotIn(PREFIX + "saved_record", app.session_state)
 

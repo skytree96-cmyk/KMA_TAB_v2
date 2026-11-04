@@ -140,10 +140,34 @@ def _p(text: Any, *, size: float = 10, bold: bool = False, color=INK, align=0, l
         spaceAfter=0, allowWidows=0, allowOrphans=0))
 
 
-def _link(text: str, url: str, size: float = 8.6) -> Paragraph:
-    """A clickable line; the visible text also names the destination for printed copies."""
-    style = _p("", size=size, bold=True, color=TEAL).style
-    return Paragraph(f'<a href="{escape(url)}">{escape(text)}</a>', style)
+class LinkButton(Flowable):
+    """A rounded teal button; its whole area opens the URL. The label says where it goes, for printed copies."""
+
+    def __init__(self, text: str, url: str, *, width: float = 112, height: float = 22, size: float = 8.4):
+        super().__init__()
+        self.text, self.url, self.width, self.height, self.size = text, url, width, height, size
+
+    def wrap(self, available_width, available_height):
+        return self.width, self.height
+
+    def draw(self):
+        c = self.canv
+        c.saveState()
+        c.setFillColor(TEAL)
+        c.roundRect(0, 0, self.width, self.height, self.height / 2, stroke=0, fill=1)
+        c.setFillColor(colors.white)
+        c.setFont("TAPBold", self.size)
+        c.drawCentredString(self.width / 2, (self.height - self.size) / 2 + 1, self.text)
+        c.linkURL(self.url, (0, 0, self.width, self.height), relative=1, thickness=0)
+        c.restoreState()
+
+
+def _button_row(button: LinkButton, text: str, width: float) -> Table:
+    """A button with a muted explanation beside it."""
+    table = Table([[button, _p(text, size=8, color=MUTED)]], colWidths=[button.width + 10, width - button.width - 10])
+    table.setStyle(TableStyle([("VALIGN", (0, 0), (-1, -1), "MIDDLE"), ("LEFTPADDING", (0, 0), (-1, -1), 0),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 0), ("TOPPADDING", (0, 0), (-1, -1), 0), ("BOTTOMPADDING", (0, 0), (-1, -1), 0)]))
+    return table
 
 
 def _panel(items: list[Any], width: float, fill=colors.white, padding: float = 16) -> Table:
@@ -247,13 +271,36 @@ def _chart_groups(rows: list[Mapping[str, Any]]) -> list[list[Mapping[str, Any]]
     return [rows[i:i + size] for i in range(0, len(rows), size)]
 
 
+SOURCE_LABELS = {"public_edu_center": "공개교육", "studio_elearning": "이러닝", "b2b_inquiry": "단체교육 문의", "studio_original": "stud.io"}
+BUTTON_LABELS = {"public_edu_center": "최신 일정 보기", "studio_elearning": "수강 페이지 보기", "b2b_inquiry": "과정 안내 보기"}
+
+
+def _course_entry(index: int, course: Mapping[str, Any], width: float) -> Table:
+    """One course: numbered title and source/schedule on the left, the link button on the right."""
+    source = str(course.get("source", ""))
+    meta = "  ·  ".join(str(part) for part in (SOURCE_LABELS.get(source) or course.get("delivery_label"), course.get("schedule")) if part)
+    left: list[Any] = [_p(f"{index}. {course['title']}", size=10.5, bold=True)]
+    if meta:
+        left.extend([Spacer(1, 2), _p(meta, size=8.4, color=MUTED)])
+    url = str(course.get("url") or "")
+    button_width = 118
+    right: Any = LinkButton(BUTTON_LABELS.get(source, "KMA에서 과정 찾기"), url, width=button_width) if url.startswith(("https://", "http://")) else ""
+    table = Table([[left, right]], colWidths=[width - button_width - 10, button_width + 10])
+    table.setStyle(TableStyle([("VALIGN", (0, 0), (-1, -1), "MIDDLE"), ("LEFTPADDING", (0, 0), (-1, -1), 0),
+        ("LEFTPADDING", (1, 0), (1, 0), 10), ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+        ("TOPPADDING", (0, 0), (-1, -1), 0), ("BOTTOMPADDING", (0, 0), (-1, -1), 0)]))
+    return table
+
+
 def _followup_story(transfer: Mapping[str, Any] | None, courses: list[Mapping[str, Any]] | None, width: float) -> list[Any]:
     """Transfer climate (organization only) and follow-up courses, continuing after the competency details."""
     from tap.account_insights import COURSE_INQUIRY_URL, course_context_note, transfer_notes
     is_org = transfer is not None
-    inquiry = [Spacer(1, 6), _link("맞춤형 교육 문의  ·  www.kma.or.kr", COURSE_INQUIRY_URL)] if is_org else []
-    heading: list[Any] = [Spacer(1, 10), _p("현업 적용과 후속 과정" if is_org else "보완 학습 제안", size=20, bold=True), Spacer(1, 6),
-                        _p("현업 적용 여건과 다음 교육 검토 후보입니다." if is_org else "본인 응답(자기보고)에 근거한 제안입니다.",
+    inner = width - 32  # panel padding
+    inquiry = [Spacer(1, 10), _button_row(LinkButton("맞춤형 교육 문의", COURSE_INQUIRY_URL, width=108),
+                                          "회사 상황에 맞춘 과정은 KMA 교육 문의 페이지(www.kma.or.kr)로 문의하세요.", inner)] if is_org else []
+    heading: list[Any] = [Spacer(1, 10), _p("현업전이 환경과 후속 과정" if is_org else "보완 학습 제안", size=20, bold=True), Spacer(1, 6),
+                        _p("현업 적용 여건과 다음 교육에서 검토할 KMA 과정입니다." if is_org else "본인 응답(자기보고)에 근거한 제안입니다.",
                            size=9, color=MUTED), Spacer(1, 15)]
     panels: list[Any] = []
     if transfer is not None:
@@ -275,9 +322,10 @@ def _followup_story(transfer: Mapping[str, Any] | None, courses: list[Mapping[st
         panels.extend([_panel(body, width), Spacer(1, 12)])
     if courses:
         note = course_context_note(transfer)
+        sources = "공개교육, 이러닝, 단체교육 문의" if is_org else "공개교육과 이러닝"
         items: list[Any] = [_p("교육과정 검토 우선순위" if is_org else "제안 과정", size=12, bold=True), Spacer(1, 4),
-                            _p(f"교육 후 {'평균이' if is_org else '점수가'} 목표보다 0.2점 이상 낮은 역량을 차이가 큰 순서로 골랐습니다. 역량마다 내용이 잘 맞는 과정이 먼저 나옵니다.",
-                               size=8, color=MUTED),
+                            _p(f"교육 후 {'평균이' if is_org else '점수가'} 목표보다 0.2점 이상 낮은 역량을 차이가 큰 순서로 골라, "
+                               f"역량마다 {sources} 과정을 제안합니다. 버튼을 누르면 KMA 과정 페이지가 열립니다.", size=8, color=MUTED),
                             *([Spacer(1, 8), _p(note, size=8.8, bold=True, color=TEAL)] if note else [])]
         explained: set[str] = set()
         for index, course in enumerate(courses, 1):
@@ -285,16 +333,14 @@ def _followup_story(transfer: Mapping[str, Any] | None, courses: list[Mapping[st
                 # A panel is one table cell and cannot break across pages; long lists continue in a new panel.
                 panels.extend([_panel(items, width), Spacer(1, 12)])
                 items = []
-            # The score reason is the same for every course of one competency, so it is printed once.
+            # The score reason and the advice are the same for every course of one competency, so they head its group.
             competency = str(course["factor_name_ko"])
-            reason = "" if competency in explained else f"  ·  {course['reason']}"
-            explained.add(competency)
-            items.extend([Spacer(1, 10), _p(f"{index}. {course['title']}  ({course['delivery_label']})", size=10.5, bold=True),
-                          _p(f"관련 역량 {competency}{reason}", size=8.4, color=MUTED),
-                          *([_p("  ·  ".join(str(course[key]) for key in ("schedule", "url") if course.get(key)), size=7.6, color=MUTED)]
-                            if course.get("schedule") or course.get("url") else []),
-                          *([_p(course["advice"], size=8.4)] if course.get("advice") else [])])
-        items.extend([Spacer(1, 9), _p("개설 여부와 일정은 KMA 교육 페이지(www.kma.or.kr)에서 확인해 주세요.", size=7.8, color=MUTED), *inquiry])
+            if competency not in explained:
+                explained.add(competency)
+                items.extend([Spacer(1, 12), _p(f"{competency}  ·  {course['reason']}", size=9, bold=True, color=TEAL),
+                              *([Spacer(1, 2), _p(course["advice"], size=8.4)] if course.get("advice") else [])])
+            items.extend([Spacer(1, 8), _course_entry(index, course, inner)])
+        items.extend([Spacer(1, 12), _p("개설 여부와 교육비는 KMA 교육 페이지(www.kma.or.kr)에서 확인해 주세요.", size=7.8, color=MUTED), *inquiry])
         panels.append(_panel(items, width))
     elif courses is not None:
         panels.append(_panel([_p("교육과정 검토 우선순위" if is_org else "제안 과정", size=12, bold=True), Spacer(1, 7),
