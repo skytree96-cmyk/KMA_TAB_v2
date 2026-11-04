@@ -243,7 +243,7 @@ def _accessible_table(factors: list[dict[str, Any]], chart_id: str) -> str:
       <div class="tap-radar-table-wrap" tabindex="0" aria-label="교육 전후 역량 비교 상세표">
         <table class="tap-radar-table">
           <caption id="{chart_id}-table-caption">차트에 표시된 역량의 교육 전후 상세 수치</caption>
-          <thead><tr><th scope="col">역량</th><th scope="col">교육 전</th><th scope="col">교육 후</th><th scope="col">변화</th><th scope="col">전·후 유효응답 N</th></tr></thead>
+          <thead><tr><th scope="col">역량</th><th scope="col">교육 전</th><th scope="col">교육 후</th><th scope="col">변화</th><th scope="col">전후 유효응답 N</th></tr></thead>
           <tbody>{rows}</tbody>
         </table>
       </div>
@@ -284,12 +284,12 @@ def build_pre_post_radar_html(
     safe_title = escape(str(title))
 
     selection_note = (
-        f"최대 {max_axes}개 역량 표시 · 대표 역량 선정: 프로젝트 고정 우선순서 → 나머지 역량명 가나다순."
+        f"역량은 최대 {max_axes}개까지 표시합니다. 프로젝트 우선순서대로 고르고, 나머지는 역량명 가나다순으로 채웠습니다."
         if omitted_count
         else (
-            f"최대 {max_axes}개 역량 표시 · 공개 가능한 {len(factors)}개 역량을 실제 축으로 표시했습니다. 가상 축은 추가하지 않았습니다."
+            f"공개 가능한 역량 {len(factors)}개를 모두 표시했습니다."
             if len(factors) < max_axes
-            else f"최대 {max_axes}개 역량 표시 · 프로젝트 고정 우선순서와 역량명 순서로 표시했습니다."
+            else f"역량 {len(factors)}개를 프로젝트 우선순서, 역량명 순으로 표시했습니다."
         )
     )
 
@@ -306,8 +306,8 @@ def build_pre_post_radar_html(
     table = _accessible_table(factors, chart_id) if factors else ""
     if len(factors) < MIN_RADAR_AXES:
         message = (
-            f"레이더 그래프에는 공개 가능한 역량이 최소 {MIN_RADAR_AXES}개 필요합니다. "
-            f"현재 공개 가능한 역량은 {len(factors)}개이며, 가짜 축은 추가하지 않았습니다."
+            f"레이더 그래프는 공개 가능한 역량이 {MIN_RADAR_AXES}개 이상일 때 그립니다. "
+            f"지금은 {len(factors)}개입니다."
         )
         return f"""
         <section class="tap-radar" id="{chart_id}" aria-labelledby="{chart_id}-heading" data-axis-count="{len(factors)}" data-selected-count="{prepared['selected_count']}" data-omitted-count="{prepared['omitted_count']}">
@@ -359,7 +359,7 @@ def build_pre_post_radar_html(
     )
     desc = (
         f"1점에서 5점 범위의 {count}축 레이더 그래프입니다. "
-        "파란색은 교육 전, 청록색은 교육 후 평균이며 상세 수치는 아래 표에 있습니다."
+        "교육 전과 교육 후 평균을 겹쳐 그렸으며 상세 수치는 아래 표에 있습니다."
     )
     svg = f"""
       <div class="tap-radar-chart-scroll">

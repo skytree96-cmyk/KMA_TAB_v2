@@ -321,7 +321,7 @@ class ReportingTests(unittest.TestCase):
             allow_schedule_override=True,
         )
 
-        self.assertTrue(any("사전검사일" in error for error in strict_errors))
+        self.assertTrue(any("교육 전 검사일" in error for error in strict_errors))
         self.assertEqual([], demo_errors)
         self.assertTrue(any("날짜 경고" in warning for warning in demo_warnings))
 
@@ -366,6 +366,12 @@ class ReportingTests(unittest.TestCase):
         self.assertIn("예시 데이터", html)
         self.assertIn("@page", html)
         self.assertIn("업무 소통", html)
+        # A single public factor must not be reported as both the highest
+        # and the lowest competency.
+        self.assertIn("공개 역량은 <b>업무 소통</b> 1개", html)
+        self.assertNotIn("가장 낮은 역량", html)
+        for hr_use in ("채용", "승진", "성과평가", "인사평가"):
+            self.assertNotIn(hr_use, html)
         fragment = organization_report_fragment(model)
         self.assertEqual(fragment.count('<section class="tap-report-sheet'), 4)
         self.assertNotIn("\n", fragment)
@@ -402,10 +408,10 @@ class ReportingTests(unittest.TestCase):
             pre_post_summary=summary,
         )
         html = printable_organization_report_html(model)
-        self.assertIn("조직 교육 전·후 변화 리포트", html)
-        self.assertIn("전·후 유효응답 N=7", html)
+        self.assertIn("조직 교육 전후 변화 리포트", html)
+        self.assertIn("전후 유효응답 N=7", html)
         self.assertIn("인과효과로 확정", html)
-        self.assertIn("사후 이탈률", html)
+        self.assertIn("교육 후 이탈률", html)
         fragment = organization_report_fragment(model)
         self.assertEqual(fragment.count('<section class="tap-report-sheet'), 4)
         self.assertNotIn("\n", fragment)
@@ -492,10 +498,10 @@ class ReportingTests(unittest.TestCase):
         app.run()
         self.assertEqual([], [str(item.value) for item in app.exception])
         self.assertTrue(
-            any("교육 전·후 비교" in str(item.value) for item in app.markdown)
+            any("교육 전후 비교" in str(item.value) for item in app.markdown)
         )
         self.assertTrue(any(item.label == "관찰 변화 평균" for item in app.metric))
-        self.assertTrue(any("실제 교육 전·후 완료 응답" in str(item.value) for item in app.success))
+        self.assertTrue(any("교육 전후 완료 응답" in str(item.value) for item in app.success))
 
     def test_completed_pre_report_offers_private_baseline_download(self) -> None:
         questions = questions_for_factors(["CORE-CO"])
@@ -515,13 +521,13 @@ class ReportingTests(unittest.TestCase):
         self.assertEqual([], [str(item.value) for item in app.exception])
         button = next(
             item for item in app.get("download_button")
-            if item.label == "1. 교육 전 검사 기준파일 저장"
+            if item.label == "교육 전 검사 기준파일 저장"
         )
-        self.assertEqual("1. 교육 전 검사 기준파일 저장", button.label)
+        self.assertEqual("교육 전 검사 기준파일 저장", button.label)
         source = (ROOT / "pages" / "3_individual_report.py").read_text(encoding="utf-8")
         self.assertIn('f"tap_pre_baseline_{project_token}_{completed_at}.json"', source)
-        self.assertTrue(any("일반 결과 JSON과 다른" in str(item.value) for item in app.caption))
-        self.assertTrue(any("본인만 안전하게 보관" in str(item.value) for item in app.caption))
+        self.assertTrue(any("일반 결과 JSON과는 다른" in str(item.value) for item in app.caption))
+        self.assertTrue(any("본인만 보관" in str(item.value) for item in app.caption))
         self.assertTrue(
             any("교육 전 완료 결과" in str(item.value) for item in app.markdown)
         )
@@ -553,7 +559,7 @@ class ReportingTests(unittest.TestCase):
                 saved = next(item for item in app.metric if item.label == "저장된 응답")
                 self.assertEqual(f"{len(responses)}/{len(questions)}문항", saved.value)
                 self.assertTrue(
-                    any("임시 점수·교육 추천·결과 파일" in str(item.value) for item in app.warning)
+                    any("최종 제출" in str(item.value) for item in app.warning)
                 )
                 self.assertTrue(
                     any(item.label == "교육 전 검사로 돌아가기" for item in app.button)
@@ -562,7 +568,7 @@ class ReportingTests(unittest.TestCase):
                 download_labels = {item.label for item in app.get("download_button")}
                 self.assertNotIn("결과 JSON", download_labels)
                 self.assertNotIn("결과 CSV", download_labels)
-                self.assertNotIn("1. 교육 전 검사 기준파일 저장", download_labels)
+                self.assertNotIn("교육 전 검사 기준파일 저장", download_labels)
                 self.assertFalse(app.checkbox)
 
     def test_organization_report_uses_completed_session_before_sample(self) -> None:
@@ -610,16 +616,16 @@ class ReportingTests(unittest.TestCase):
                 for item in app.expander
             )
         )
-        self.assertTrue(any("실제 교육 전·후 결과" in str(item.value) for item in app.success))
-        self.assertTrue(any("실제 완료 결과 1명" in str(item.value) for item in app.warning))
-        self.assertTrue(any(item.label == "내 실제 교육 전·후 비교 보기" for item in app.button))
+        self.assertTrue(any("교육 전후 결과" in str(item.value) for item in app.success))
+        self.assertTrue(any("완료 결과 1명분" in str(item.value) for item in app.warning))
+        self.assertTrue(any(item.label == "내 교육 전후 비교 보기" for item in app.button))
         self.assertFalse(any("합성 예시" in str(item.value) for item in app.warning))
         self.assertFalse(
             any(item.label == "리포트 미리보기 코드" for item in app.text_input),
             "현재 브라우저 결과에는 관리자용 소표본 미리보기를 열어서는 안 됩니다.",
         )
         self.assertEqual(
-            {"교육 전 완료", "교육 후 완료", "전·후 모두 완료"},
+            {"교육 전 완료", "교육 후 완료", "전후 모두 완료"},
             {item.label for item in app.metric},
             "N<5에서는 완료 건수만 보여주고 평균·변화량 조직 지표는 숨겨야 합니다.",
         )
@@ -692,7 +698,7 @@ class ReportingTests(unittest.TestCase):
 
             self.assertEqual([], [str(item.value) for item in app.exception])
             self.assertTrue(any(item.label == "교육 전 참여" for item in app.metric))
-            self.assertTrue(any(item.label == "전·후 비교 참여자" for item in app.metric))
+            self.assertTrue(any(item.label == "전후 비교 참여자" for item in app.metric))
             self.assertTrue(
                 any("외부 공유·캡처·인쇄 금지" in str(item.value) for item in app.warning)
             )
@@ -703,7 +709,7 @@ class ReportingTests(unittest.TestCase):
             preview_downloads = {item.label for item in app.get("download_button")}
             self.assertNotIn("인쇄용 리포트 HTML", preview_downloads)
             self.assertNotIn("상세 결과 CSV", preview_downloads)
-            self.assertNotIn("사전·사후 CSV 양식", preview_downloads)
+            self.assertNotIn("교육 전후 CSV 양식", preview_downloads)
             self.assertFalse(
                 any(
                     item.label == "CSV 파일로 직접 비교하기 · 보조 기능"
@@ -1014,7 +1020,7 @@ class ReportingTests(unittest.TestCase):
             any("교육 전후 비교 포인트" in str(item.value) for item in app.markdown)
         )
         self.assertEqual(
-            {"교육 전 참여", "교육 후 참여", "전·후 비교 참여자", "사후 이탈률"},
+            {"교육 전 참여", "교육 후 참여", "전후 비교 참여자", "교육 후 이탈률"},
             {item.label for item in app.metric},
         )
         self.assertTrue(
@@ -1034,8 +1040,8 @@ class ReportingTests(unittest.TestCase):
         app.session_state["assessment_completed_by_phase"] = {"pre": True, "post": False}
         app.run()
         self.assertEqual([], [str(item.value) for item in app.exception])
-        self.assertTrue(any("모두 완료" in str(item.value) for item in app.warning))
-        self.assertFalse(any("교육 전·후 비교" in str(item.value) for item in app.markdown))
+        self.assertTrue(any("모두 마쳐야" in str(item.value) for item in app.warning))
+        self.assertFalse(any("교육 전후 비교" in str(item.value) for item in app.markdown))
         self.assertTrue(any("교육 전 완료 결과" in str(item.value) for item in app.markdown))
         saved = next(item for item in app.metric if item.label == "저장된 응답")
         self.assertEqual(f"3/{len(questions)}문항", saved.value)

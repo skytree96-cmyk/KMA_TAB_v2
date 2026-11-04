@@ -227,8 +227,8 @@ def main() -> int:
 
     prepost_contract = {
         ROOT / "pages" / "1_project_setup.py": ("교육평가 프로젝트 만들기", "56 <= post_delay_days <= 70"),
-        ROOT / "pages" / "2_assessment.py": ("사전·사후 모두 동일하게 최근 8주", "교육 참여자 ID"),
-        ROOT / "pages" / "3_individual_report.py": ("교육 전·후 비교", "assessment_completed_by_phase"),
+        ROOT / "pages" / "2_assessment.py": ("교육 전후 모두 최근 8주", "교육 참여자 ID"),
+        ROOT / "pages" / "3_individual_report.py": ("교육 전후 비교", "assessment_completed_by_phase"),
         ROOT / "pages" / "4_organization_report.py": (
             "교육 전후 리포트",
             "session_type",
@@ -263,8 +263,9 @@ def main() -> int:
         ),
         ROOT / "docs" / "TAP_오픈페이지_와이어프레임_v1.html": (
             "현업 행동의 변화",
-            "교육 전/후",
-            "사전·사후 비교",
+            "교육 전후,",
+            "교육 전후 비교",
+            'id="recommend"',
             "표본 보호",
             "header-guide-button",
             "data-guide-download",
@@ -319,10 +320,12 @@ def main() -> int:
             "현재 저장 방식",
             "짝지은",
             "소표본 보호",
-            "교육개발 전용 · 채용·승진·보상·성과평가에는 사용하지 않습니다.",
+            "채용·승진·보상·성과평가",
+            "인사평가",
             "교육 전과 후",
-            "교육 전후",
+            "교육 전/후",
             "교육 전·후",
+            "사전·사후",
         ):
             if forbidden in source:
                 errors.append(f"removed open-page content remains: {forbidden}")
@@ -349,7 +352,7 @@ def main() -> int:
             "회사 확인과 KMA 승인",
             "회사명과 사업자등록번호 두 항목만 입력",
             "참여 기업 및 관리자 범위",
-            "프로젝트 코드를 선택한 검사 화면에 입력",
+            "프로젝트 코드를 검사 화면에 입력",
             "교육 참여자 ID 원문은 저장하지 않고 프로젝트별 가명키",
             "기획검증 접속코드",
         ),

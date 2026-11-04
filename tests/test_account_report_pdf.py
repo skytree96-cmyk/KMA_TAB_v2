@@ -101,6 +101,30 @@ class AccountReportPDFTests(unittest.TestCase):
         uris = [annot.get_object()["/A"]["/URI"] for page in PdfReader(BytesIO(pdf)).pages for annot in page.get("/Annots", [])]
         self.assertEqual(uris, [COURSE_INQUIRY_URL])
 
+    def test_long_course_list_continues_across_pages(self):
+        url = "https://www.kma.or.kr/usrs/eduRegMgnt/eduRegInfoDetailForm.do?" + "p_crscd=110083&CRSSEQ_ID=&" * 6
+        courses = [{"title": f"리더십 과정 {i} " * 4, "delivery_label": "집합", "factor_name_ko": "문제해결력",
+                    "reason": "교육 후 3.00점, 목표 3.50점보다 0.50점 낮음 · 교육 전보다 0.10점 높음",
+                    "schedule": "다음 개강 2026-12-01 · 여의도 · 2일 · 14시간", "url": url,
+                    "advice": "교육 전과 큰 차이가 없습니다. 지난 교육 내용이 업무에 맞았는지 함께 점검하세요." if i == 1 else ""}
+                   for i in range(1, 10)]
+        transfer = {"n": 3, "disclosed": False, "factors": [], "barriers": []}
+        pdf = build_report_pdf(PROJECT, [row()], kind="organization", subject="조직 전체", participant_count=5,
+                               transfer=transfer, courses=courses)
+        self.assertTrue(pdf.startswith(b"%PDF-"))
+
+    def test_zero_change_and_single_competency_read_as_sentences(self):
+        try:
+            from pypdf import PdfReader
+        except ImportError:
+            self.skipTest("pypdf is not installed")
+        pdf = build_report_pdf(PROJECT, [row(pre=3.0, post=3.0)], kind="individual", subject="참여자")
+        text = "\n".join(page.extract_text() for page in PdfReader(BytesIO(pdf)).pages)
+        self.assertIn("교육 전후 모두 3.00점입니다", text)
+        self.assertNotIn("+0.00", text)
+        # One comparable competency is not shown as both the one to spread and the one to check first.
+        self.assertNotIn("우선 점검할 역량", text)
+
     def test_invalid_kind_rejected(self):
         with self.assertRaises(ValueError):
             build_report_pdf(PROJECT, [], kind="other", subject="test")

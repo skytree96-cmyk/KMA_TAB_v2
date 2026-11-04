@@ -64,13 +64,13 @@ def _project_questions(config: Mapping[str, Any]) -> list[dict[str, Any]]:
     questions = config.get("question_snapshot", base)
     expected = {str(q["question_code"]): q for q in base}
     if not isinstance(questions, list) or not questions or len(questions) != len(expected):
-        raise ValueError("배정된 검사 문항 스냅샷을 확인해 주세요.")
+        raise ValueError("배정된 검사 문항 구성이 올바르지 않습니다. 교육담당자에게 문의해 주세요.")
     for question in questions:
         reference = expected.get(str(question.get("question_code"))) if isinstance(question, Mapping) else None
         if (reference is None or question.get("factor_code") != reference["factor_code"]
                 or question.get("scoring_direction", "direct") != reference.get("scoring_direction", "direct")
                 or not isinstance(question.get("revised_text"), str) or not question["revised_text"].strip()):
-            raise ValueError("배정된 검사 문항 스냅샷을 확인해 주세요.")
+            raise ValueError("배정된 검사 문항 구성이 올바르지 않습니다. 교육담당자에게 문의해 주세요.")
     if {q["factor_code"] for q in questions} != set(selected):
         raise ValueError("현재 문항은행에서 배정된 역량을 찾을 수 없습니다.")
     question_by_code = {str(q["question_code"]): q for q in questions}
@@ -121,7 +121,7 @@ def _save(store: Any, token: str, assignment_id: str, phase: str, payload: dict[
         if "current_question" in payload and receipt["payload"].get("current_question") != payload["current_question"]:
             raise ValueError("저장된 진행 위치를 확인하지 못해 현재 문항을 유지했습니다.")
         if phase == "post" and dict(receipt["payload"].get("post_transfer_responses", {})) != dict(payload.get("post_transfer_responses", {})):
-            raise ValueError("현업전이 응답의 저장을 확인하지 못했습니다.")
+            raise ValueError("현업전이 응답이 저장됐는지 확인하지 못했습니다.")
     except Exception as exc:
         if callback:
             st.session_state.pop(PREFIX + "saved_record", None)
@@ -205,14 +205,14 @@ def _render_results(questions: list[dict[str, Any]], config: Mapping[str, Any], 
     targets = config.get("target_means", {})
     pre_responses = pre["payload"]["responses"]
     if post is not None and post.get("completed"):
-        st.subheader("나의 교육 전·후 리포트")
+        st.subheader("나의 교육 전후 리포트")
         results = score_pre_post_responses(questions, pre_responses, post["payload"]["responses"], targets)
         st.dataframe([
             {"역량": r["factor_name_ko"], "교육 전(1~5)": r["pre_score"], "교육 후(1~5)": r["post_score"],
              "관찰 변화": r["self_reported_change"], "공통 유효문항": r["paired_valid_items"], "문항 수": r["total_items"], "산출 상태": r["status"]}
             for r in results
         ], hide_index=True, width="stretch")
-        st.caption("두 시점 모두 1~5로 답한 동일 문항만 비교합니다. 0(수행 기회 없음)은 제외하며, 공통 유효문항이 부족한 역량은 산출하지 않습니다. 관찰된 자기보고 변화이며 교육의 인과효과를 뜻하지 않습니다.")
+        st.caption("교육 전후 모두 1~5로 답한 문항만 비교합니다. 0(수행 기회 없음)은 빼고, 공통 유효문항이 부족한 역량은 산출하지 않습니다. 자기보고로 관찰된 변화이며 교육의 인과효과를 뜻하지 않습니다.")
         scored = [r for r in results if r["pre_score"] is not None or r["post_score"] is not None]
         if scored:
             import pandas as pd
@@ -226,7 +226,7 @@ def _render_results(questions: list[dict[str, Any]], config: Mapping[str, Any], 
         if transfer:
             with st.expander("내 현업전이 환경 응답", key=PREFIX + "transfer_panel"):
                 for code, label in TRANSFER_ITEMS:
-                    st.write(f"{label} — {TRANSFER_LABELS.get(transfer.get(code), '미응답')}")
+                    st.write(f"{label} ({TRANSFER_LABELS.get(transfer.get(code), '미응답')})")
                 if transfer.get("barriers"):
                     st.write("적용 방해요인: " + ", ".join(transfer["barriers"]))
                 if transfer.get("applied_content"):
@@ -250,15 +250,15 @@ def _render_followup_courses(config: Mapping[str, Any], results: list[dict[str, 
 
     # Three competencies, each with one public course and one e-learning course.
     courses = recommend_courses(config, results, limit=6, score_key="post_score" if phase == "post" else "score_1_to_5")
-    st.subheader("보완 학습 제안" if phase == "post" else "지금 보완하면 좋은 역량과 KMA 추천 과정")
+    st.subheader("보완 학습 제안" if phase == "post" else "보완할 역량과 KMA 추천 과정")
     if not courses:
-        st.success("모든 역량이 목표 수준에 도달했거나 차이가 0.2점 미만입니다. 지금의 실천을 유지하며 적용 사례를 기록해 보세요.")
+        st.success("목표보다 0.2점 이상 낮은 역량이 없습니다. 지금처럼 실천하면서 적용 사례를 기록해 두세요.")
         return
     render_course_cards(courses)
     phase_label = "교육 후" if phase == "post" else "교육 전"
-    st.caption(f"{phase_label} 점수가 목표보다 0.2점 이상 낮은 역량을 부족한 정도가 큰 순서로 골라 역량마다 공개교육 1개와 이러닝 1개를 제안합니다. "
-               "공개교육은 다음 기수가 열린 과정만 보여 주며 버튼은 최신 일정 페이지로 연결됩니다. "
-               "본인 응답(자기보고)에 근거한 제안이므로 수강 여부는 교육담당자와 상의해 주세요.")
+    st.caption(f"{phase_label} 점수가 목표보다 0.2점 이상 낮은 역량을 차이가 큰 순서로 골라, 역량마다 공개교육과 이러닝 과정을 제안합니다. "
+               "공개교육은 다음 기수가 열린 과정만 보여 주고, 버튼을 누르면 최신 일정 페이지가 열립니다. "
+               "본인 응답에 근거한 제안이니 수강 여부는 교육담당자와 상의해 주세요.")
 
 
 def _render_report_download(assignment: Mapping[str, Any], config: Mapping[str, Any], questions: list[dict[str, Any]],
@@ -268,14 +268,14 @@ def _render_report_download(assignment: Mapping[str, Any], config: Mapping[str, 
 
     project = {"name": assignment.get("project_name"), "config": config,
                "company_name": assignment.get("company_name") or principal.get("company_name")}
-    subject = f"{principal.get('display_name') or '참여자'} · {principal.get('login_id') or ''}"
+    subject = " · ".join(str(part) for part in (principal.get("display_name") or "참여자", principal.get("login_id")) if part)
     st.download_button(
         "내 리포트 PDF 다운로드", icon=":material/download:", type="primary",
         data=lambda: individual_report_pdf(project, questions, pre["payload"]["responses"], post["payload"]["responses"], subject),
         file_name="KMA_TAP_나의_전후_리포트.pdf", mime="application/pdf", on_click="ignore",
         key=PREFIX + f"own_report_pdf_{assignment.get('id')}",
     )
-    st.caption("PDF에는 본인의 교육 전·후 결과만 담깁니다. 개인 결과이므로 보관과 공유에 유의해 주세요.")
+    st.caption("PDF에는 본인의 교육 전후 결과만 담깁니다. 개인 결과이니 보관과 공유에 유의해 주세요.")
 
 
 def _render_review(store: Any, token: str, assignment_id: str, phase: str, questions: list[dict[str, Any]], payload: dict[str, Any]) -> None:
@@ -295,7 +295,7 @@ def _render_review(store: Any, token: str, assignment_id: str, phase: str, quest
         return
 
     st.subheader("현업전이 환경 확인")
-    st.caption("교육 내용을 실제 업무에 적용할 수 있었는지 확인합니다. 아래 응답은 역량점수에 합산하지 않고, 변화의 맥락과 후속조치에만 사용합니다.")
+    st.caption("교육 내용을 업무에 적용할 수 있었는지 묻습니다. 이 응답은 역량점수에 합산하지 않고, 점수 변화를 해석하거나 후속조치를 정할 때만 씁니다.")
     stored = payload.get("post_transfer_responses", {})
     with st.form(PREFIX + "transfer_form"):
         values = {}
@@ -424,7 +424,7 @@ def render_participant(store: Any, token: str, principal: Mapping[str, Any]) -> 
                               for label, done in (("교육 전", pre_complete), ("교육 후", post_complete)))
                     + "</div>")
             if pre_complete and post_complete:
-                st.button("나의 전·후 리포트 보기", key=PREFIX + "open_report", on_click=_choose_phase,
+                st.button("나의 교육 전후 리포트 보기", key=PREFIX + "open_report", on_click=_choose_phase,
                           args=("post",), type="primary", width="stretch")
             before, after = st.columns(2)
             before.button("교육 전 검사", key=PREFIX + "enter_pre", on_click=_choose_phase, args=("pre",),

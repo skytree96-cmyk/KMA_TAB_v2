@@ -66,7 +66,7 @@ def _login(store: AccountStore | None) -> None:
         with st.container(key="tap_login_shell"):
             # Single centered card with the wordmark on top, as in the PAI sign-in screen.
             with st.container(border=True, key="tap_login_card"):
-                st.html('<div class="tap-login-brand">' + brand_html(compact=True) + '<span>교육 전·후<br>변화 평가 플랫폼</span></div>')
+                st.html('<div class="tap-login-brand">' + brand_html(compact=True) + '<span>교육 전후<br>변화 평가 플랫폼</span></div>')
                 st.title("로그인")
                 st.caption("발급받은 ID로 로그인하면 내 교육과 관리 화면이 열립니다.")
                 with st.form("_tap_login_form", clear_on_submit=True, border=False):
@@ -74,7 +74,7 @@ def _login(store: AccountStore | None) -> None:
                     password = st.text_input("비밀번호", type="password", max_chars=128, disabled=store is None)
                     submitted = st.form_submit_button("로그인", type="primary", use_container_width=True, disabled=store is None)
                 if store is None:
-                    st.info("계정 서비스 연결을 준비하고 있습니다. 설정이 완료되면 로그인할 수 있습니다.")
+                    st.info("계정 서비스가 아직 연결되지 않아 로그인할 수 없습니다.")
                 if submitted and store is not None:
                     try:
                         token = store.login(login_id, password)
@@ -87,7 +87,7 @@ def _login(store: AccountStore | None) -> None:
                         st.session_state[TOKEN_KEY] = token
                         login_slot.empty()
                         st.rerun()
-                st.html('<div class="tap-login-foot">참여자 계정·비밀번호 문의는 교육담당자에게, 교육담당자 계정 문의는 KMA 관리자에게 요청해 주세요.'
+                st.html('<div class="tap-login-foot">참여자 계정과 비밀번호는 교육담당자에게, 교육담당자 계정은 KMA 관리자에게 문의해 주세요.'
                         '<a href="/open" target="_self">서비스 소개</a></div>')
 
 
@@ -114,7 +114,7 @@ def _password_change(store: AccountStore, token: str, required: bool) -> None:
         else:
             clear_identity()
             st.session_state[TOKEN_KEY] = next_token
-            st.session_state["_tap_account_notice"] = "비밀번호를 변경했습니다. 다른 로그인 세션은 종료되었습니다."
+            st.session_state["_tap_account_notice"] = "비밀번호를 변경했습니다. 다른 기기와 브라우저의 로그인은 종료되었습니다."
             # Mark /password as already entered so the rerun leaves it for work.
             st.session_state[ROUTE_KEY] = PASSWORD_ROUTE
             st.rerun()

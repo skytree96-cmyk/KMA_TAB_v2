@@ -49,16 +49,16 @@ def project_status(project: Mapping[str, Any], today: date) -> str:
     if not all((pre_start, pre_end, training, post_start, post_end)):
         return "일정 확인 필요"
     if pre_start <= today <= pre_end and post_start <= today <= post_end:
-        return "사전·사후검사 진행"
+        return "교육 전후 검사 진행"
     if today < pre_start:
-        return "사전검사 예정"
+        return "교육 전 검사 예정"
     if today <= pre_end:
-        return "사전검사 진행"
+        return "교육 전 검사 진행"
     if today < post_start:
-        return "교육 예정" if today < training else "사후검사 대기"
+        return "교육 예정" if today < training else "교육 후 검사 대기"
     if today <= post_end:
-        return "사후검사 진행"
-    return "사후검사 종료"
+        return "교육 후 검사 진행"
+    return "교육 후 검사 종료"
 
 
 def schedule_checks(projects: list[dict[str, Any]], today: date) -> list[dict[str, Any]]:
@@ -71,7 +71,7 @@ def schedule_checks(projects: list[dict[str, Any]], today: date) -> list[dict[st
             checks.append({**base, "확인할 내용": "참여자 배정 필요", "일정": "—"})
             continue
         config = project.get("config") or {}
-        for phase, label in (("pre", "사전검사"), ("post", "사후검사")):
+        for phase, label in (("pre", "교육 전 검사"), ("post", "교육 후 검사")):
             remaining = max(0, assigned - _count(project, phase + "_completed"))
             if not remaining:
                 continue
@@ -147,23 +147,22 @@ def _render_projects(store: Any, token: str, projects: list[dict[str, Any]], rol
             row = {
                 "회사": project.get("company_name") or "—", "프로젝트": project["name"],
                 "교육과정": config.get("course_name") or "—", "상태": project_status(project, today),
-                "배정": _count(project, "assigned"), "사전 완료": _count(project, "pre_completed"),
-                "사후 완료": _count(project, "post_completed"), "교육일": config.get("training_date") or "미설정",
-                "사전검사": f"{config.get('pre_start_date') or '미설정'} ~ {config.get('pre_end_date') or '미설정'}",
-                "사후검사": f"{config.get('post_start_date') or '미설정'} ~ {config.get('post_end_date') or '미설정'}",
+                "배정": _count(project, "assigned"), "교육 전 완료": _count(project, "pre_completed"),
+                "교육 후 완료": _count(project, "post_completed"), "교육일": config.get("training_date") or "미설정",
+                "교육 전 검사": f"{config.get('pre_start_date') or '미설정'} ~ {config.get('pre_end_date') or '미설정'}",
+                "교육 후 검사": f"{config.get('post_start_date') or '미설정'} ~ {config.get('post_end_date') or '미설정'}",
             }
             if role == "company":
                 row.pop("회사")
             rows.append(row)
         st.dataframe(pd.DataFrame(rows), hide_index=True, width="stretch")
-        selected = st.selectbox("교육 전·후 리포트", list(by_id), index=None, key=select_key,
+        selected = st.selectbox("교육 전후 리포트", list(by_id), index=None, key=select_key,
                                 placeholder="리포트를 볼 프로젝트를 선택하세요",
                                 format_func=lambda value: " · ".join(str(item) for item in (
                                     by_id[value].get("company_name") if role == "kma" else None,
                                     by_id[value]["name"], (by_id[value].get("config") or {}).get("course_name")
                                 ) if item))
         if selected in by_id:
-            st.caption("완료한 참여자의 개인별 리포트와 조직 리포트를 확인합니다. 조직 평균은 역량별 유효응답 5명 이상일 때 표시됩니다.")
             try:
                 render_project_report(store, token, by_id[selected])
             except Exception as exc:
@@ -217,18 +216,18 @@ def _ranking(rows: list[tuple[str, int, int]], *, unit: str = "명") -> None:
 def _render_trend(summary: dict[str, Any], role: str) -> None:
     with st.container(key=PREFIX + "trend", border=True):
         st.subheader("전체 검사 완료 추세" if role == "kma" else "조직 전체 검사 완료 추세")
-        st.caption("최근 12개월 · 월별 검사 완료 인원 · 사전·사후 각각 동일인 중복 제외")
+        st.caption("최근 12개월 · 월별 검사 완료 인원 · 교육 전후 검사별 동일인 중복 제외")
         months = list(summary.get("completion_trend") or [])
         if not months:
             st.info("검사를 완료하면 월별 추세가 표시됩니다.")
             return
         points = [{"월": row["month"], "검사": label, "완료 인원": _count(row, key)}
-                  for row in months for key, label in (("pre_completed", "사전검사"), ("post_completed", "사후검사"))]
+                  for row in months for key, label in (("pre_completed", "교육 전 검사"), ("post_completed", "교육 후 검사"))]
         frame = pd.DataFrame(points)
         base = alt.Chart(frame).encode(
             x=alt.X("월:O", title=None, sort=[row["month"] for row in months], axis=alt.Axis(labelAngle=-35)),
             y=alt.Y("완료 인원:Q", title="완료 인원 (명)", scale=alt.Scale(domainMin=0), axis=alt.Axis(tickMinStep=1)),
-            color=alt.Color("검사:N", scale=alt.Scale(domain=["사전검사", "사후검사"], range=["#087b76", "#45bdb1"]),
+            color=alt.Color("검사:N", scale=alt.Scale(domain=["교육 전 검사", "교육 후 검사"], range=["#087b76", "#45bdb1"]),
                             legend=alt.Legend(title=None, orient="top")),
             tooltip=["월:O", "검사:N", alt.Tooltip("완료 인원:Q", format=",")])
         chart = (base.mark_area(opacity=0.07, line=False).encode(y=alt.Y("완료 인원:Q", stack=None))
@@ -240,8 +239,8 @@ def _render_trend(summary: dict[str, Any], role: str) -> None:
         current = months[-1]
         pre, post = _count(current, "pre_completed"), _count(current, "post_completed")
         st.html(f'<div class="tap-dash-insight"><b>{escape(current["month"])} 검사 완료</b>'
-                f'<span>사전검사 <strong>{pre:,}명</strong> · 사후검사 <strong>{post:,}명</strong></span></div>')
-        st.caption("완료한 시점의 한국시간 월 기준입니다. 같은 사람이 두 검사를 완료하면 각 검사에 집계됩니다. 과거 참여율을 추정하지 않습니다.")
+                f'<span>교육 전 검사 <strong>{pre:,}명</strong> · 교육 후 검사 <strong>{post:,}명</strong></span></div>')
+        st.caption("완료 시점의 한국시간 월로 집계합니다. 같은 사람이 교육 전후 검사를 모두 마치면 두 검사에 각각 집계됩니다. 과거 참여율은 추정하지 않습니다.")
 
 
 def render_dashboard(store: Any, token: str, principal: Mapping[str, Any]) -> None:
@@ -250,7 +249,7 @@ def render_dashboard(store: Any, token: str, principal: Mapping[str, Any]) -> No
         st.error("KMA 관리자 또는 교육담당자 계정으로 로그인해 주세요.")
         return
     st.title("대시보드")
-    st.caption("회원사 전체의 역량검사 운영 현황을 한눈에 확인하세요." if role == "kma" else
+    st.caption("회원사 전체 역량검사 운영 현황" if role == "kma" else
                f"{principal.get('company_name') or '소속 회사'} · 조직 전체 역량검사 현황")
     try:
         summary = store.dashboard_summary(token)
@@ -267,8 +266,8 @@ def render_dashboard(store: Any, token: str, principal: Mapping[str, Any]) -> No
     if role == "company":
         metrics = [
             ("검사 참여 인원", participating, "명", "brand", "group", f"참여율 {_rate(participating, total)}", f"전체 등록 {total:,}명 중 응답을 시작한 인원"),
-            ("사전검사 완료", pre, "명", "indigo", "task_alt", f"완료율 {_rate(pre, total)}", "교육 전 검사를 최종 제출한 인원"),
-            ("사후검사 완료", post, "명", "violet", "verified", f"완료율 {_rate(post, total)}", "교육 후 검사까지 최종 제출한 인원"),
+            ("교육 전 검사 완료", pre, "명", "indigo", "task_alt", f"완료율 {_rate(pre, total)}", "교육 전 검사를 최종 제출한 인원"),
+            ("교육 후 검사 완료", post, "명", "violet", "verified", f"완료율 {_rate(post, total)}", "교육 후 검사까지 최종 제출한 인원"),
             ("운영 프로젝트", len(projects), "개", "amber", "folder_open", "프로젝트", "등록된 교육평가 프로젝트"),
         ]
     else:
@@ -287,8 +286,8 @@ def render_dashboard(store: Any, token: str, principal: Mapping[str, Any]) -> No
         with left, st.container(key=PREFIX + "participation", border=True):
             st.subheader("전체 역량검사 참여 현황" if role == "kma" else "조직 전체 역량검사 참여 현황")
             st.caption("전체 등록 참여자 대비 · 프로젝트 간 동일인 중복 제외")
-            _rings(total, [("검사 참여율", participating, "#087b76"), ("사전검사 완료율", pre, "#16998c"),
-                           ("사후검사 완료율", post, "#52bfb2")])
+            _rings(total, [("검사 참여율", participating, "#087b76"), ("교육 전 검사 완료율", pre, "#16998c"),
+                           ("교육 후 검사 완료율", post, "#52bfb2")])
             st.html(f'<div class="tap-dash-insight"><b>아직 참여하지 않은 인원</b><strong>{max(0,total-participating):,}명</strong></div>')
             st.caption("참여: 한 문항 이상 저장한 사람. 모수: 전체 등록 참여자(미배정·사용 중지 포함). 참여 기업: 참여자가 있는 기업.")
         with right, st.container(key=PREFIX + "ranking", border=True):
@@ -303,7 +302,7 @@ def render_dashboard(store: Any, token: str, principal: Mapping[str, Any]) -> No
                 _ranking([(row.get("company_name") or "회사명 미등록", _count(row,"participating"), _count(row,"total")) for row in matches])
             else:
                 st.subheader("프로젝트별 검사 완료 현황")
-                st.caption("모수: 프로젝트별 배정 인원 × 사전·사후 2회")
+                st.caption("모수: 프로젝트별 배정 인원 × 교육 전후 2회")
                 _ranking([(project["name"], _count(project,"pre_completed") + _count(project,"post_completed"),
                            _count(project,"assigned") * 2) for project in projects], unit="건")
     _render_trend(summary, str(role))

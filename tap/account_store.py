@@ -87,7 +87,7 @@ _SCRYPT_WAIT_SECONDS = float(os.environ.get("TAP_PASSWORD_HASH_WAIT_SECONDS", "9
 
 def _scrypt(raw: bytes, salt: bytes) -> bytes:
     if not _SCRYPT_SLOTS.acquire(timeout=_SCRYPT_WAIT_SECONDS):
-        raise RateLimitError("접속이 많아 처리가 늦어지고 있습니다. 잠시 후 다시 시도해 주세요.")
+        raise RateLimitError("접속이 많아 처리하지 못했습니다. 잠시 후 다시 시도해 주세요.")
     try:
         return hashlib.scrypt(raw, salt=salt, n=_SCRYPT_N, r=_SCRYPT_R, p=_SCRYPT_P,
                               maxmem=64 * 1024 * 1024, dklen=32)
@@ -151,7 +151,7 @@ def _text(value: Any, label: str, maximum: int = 120) -> str:
 def _login_id(value: Any) -> str:
     value = _text(value, "로그인 ID", 64).lower()
     if not _LOGIN_RE.fullmatch(value):
-        raise ValidationError("ID는 영문 소문자·숫자·점·밑줄·하이픈으로 3~64자여야 합니다.")
+        raise ValidationError("ID는 영문 소문자, 숫자, 점, 밑줄과 하이픈으로 3~64자여야 합니다.")
     return value
 
 
@@ -331,7 +331,7 @@ class AccountStore:
         if user["must_change_password"] and not allow_password_change:
             raise AuthorizationError("임시 비밀번호를 먼저 변경해 주세요.")
         if roles and user["role"] not in roles:
-            raise AuthorizationError("이 작업에 대한 권한이 없습니다.")
+            raise AuthorizationError("이 작업을 할 권한이 없습니다.")
         updated = self._execute(conn, "UPDATE tap_sessions SET last_seen_at=? WHERE token_hash=?", (now, token_hash))
         if updated.rowcount != 1:
             raise AuthenticationError("다시 로그인해 주세요.")
@@ -649,7 +649,7 @@ class AccountStore:
                 except (ValueError, TypeError) as exc:
                     raise ValidationError("검사 일정은 YYYY-MM-DD 형식이어야 합니다.") from exc
         if len(dates) != 5 or not (dates["pre_start_date"] <= dates["pre_end_date"] <= dates["training_date"] <= dates["post_start_date"] <= dates["post_end_date"]):
-            raise ValidationError("일정은 사전 시작≤사전 종료≤교육일≤사후 시작≤사후 종료 순서여야 합니다.")
+            raise ValidationError("검사 일정은 교육 전 검사, 교육일, 교육 후 검사 순서여야 하며 마감일은 시작일보다 빠를 수 없습니다.")
         _json(config)
         return config
 
@@ -816,7 +816,7 @@ class AccountStore:
         if not isinstance(transfer, dict) or set(transfer) - (_TRANSFER_KEYS | {"barriers", "applied_content"}):
             raise ValidationError("현업 적용 응답을 확인하세요.")
         if phase == "pre" and transfer:
-            raise ValidationError("사전검사에는 현업 적용 응답을 저장할 수 없습니다.")
+            raise ValidationError("교육 전 검사에는 현업 적용 응답을 저장할 수 없습니다.")
         if phase == "post":
             if any(type(transfer[k]) is not int or not 1 <= transfer[k] <= 5 for k in _TRANSFER_KEYS & transfer.keys()) or (completed and not _TRANSFER_KEYS <= transfer.keys()):
                 raise ValidationError("현업 적용 환경 네 문항에 응답해 주세요.")
@@ -853,7 +853,7 @@ class AccountStore:
             if phase == "post":
                 pre = self._one(conn, "SELECT completed FROM tap_assessments WHERE assignment_id=? AND phase='pre'", (assignment_id,))
                 if not pre or not pre["completed"]:
-                    raise AuthorizationError("사전검사를 먼저 완료해 주세요.")
+                    raise AuthorizationError("교육 전 검사를 먼저 완료해 주세요.")
             now = self._clock()
             self._execute(conn, "INSERT INTO tap_assessments(assignment_id,phase,payload_json,completed,completed_at,updated_at) VALUES (?,?,?,?,?,?) ON CONFLICT (assignment_id,phase) DO UPDATE SET payload_json=excluded.payload_json,completed=excluded.completed,completed_at=excluded.completed_at,updated_at=excluded.updated_at", (assignment_id, phase, encoded, int(completed), now if completed else None, now))
             if completed:

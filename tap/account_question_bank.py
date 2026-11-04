@@ -116,7 +116,7 @@ def render_question_bank(store: Any, token: str, principal: Mapping[str, Any]) -
     if int(row.get("revision") or 0) != draft["base_revision"]:
         draft["conflict"] = True
     if draft["conflict"]:
-        st.warning("이 문항이 다른 관리자에 의해 수정되었습니다. 작성 중인 문구는 보존되어 있습니다. 최신 문구를 불러온 뒤 다시 편집해 주세요.")
+        st.warning("다른 관리자가 이 문항을 먼저 수정했습니다. 작성 중인 문구는 보존되어 있습니다. 최신 문구를 불러온 뒤 다시 편집해 주세요.")
     st.caption(f"{selected} · 최종 수정 {_updated_time(row.get('updated_at'))} · 수정자 {row.get('updated_by') or '—'}")
     with st.form(PREFIX + "edit_form"):
         text = st.text_area("운영 문구", key=PREFIX + "text", max_chars=2000, height=160, help="1~2000자로 입력해 주세요.")
@@ -138,5 +138,5 @@ def render_question_bank(store: Any, token: str, principal: Mapping[str, Any]) -
             st.error(_failure(exc))
         return
     st.session_state[PREFIX + "reload_after_save"] = True
-    st.session_state[PREFIX + "notice"] = "운영 문구를 저장했습니다. 새 프로젝트부터 적용됩니다."
+    st.session_state[PREFIX + "notice"] = "운영 문구를 저장했습니다."
     st.rerun()

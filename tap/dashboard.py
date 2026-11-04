@@ -114,7 +114,7 @@ def build_persistent_dashboard(
         if not participants:
             status = "검사 대기"
         elif paired == participants:
-            status = "전·후 완료"
+            status = "교육 전후 완료"
         elif row["post"]:
             status = "교육 후 진행"
         else:
@@ -151,7 +151,7 @@ def build_persistent_dashboard(
         {
             "value": f"{participant_count}명",
             "label": "완료 검사 참여자",
-            "note": "완료 snapshot · 프로젝트별 가명키",
+            "note": "완료 결과 · 프로젝트별 가명키",
         },
         {
             "value": f"{pre_completed_count}건",
@@ -161,7 +161,7 @@ def build_persistent_dashboard(
         {
             "value": f"{post_completed_count}건",
             "label": "교육 후 완료",
-            "note": f"전·후 모두 완료 {paired_count}명",
+            "note": f"교육 전후 모두 완료 {paired_count}명",
         },
     ]
     return {
@@ -201,7 +201,7 @@ def build_kma_persistent_dashboard(
         {
             "value": f"{accumulated['participant_count']}명",
             "label": "완료 검사 참여자",
-            "note": "완료 snapshot · 가명키 중복 제거",
+            "note": "완료 결과 · 가명키 중복 제거",
         },
         {
             "value": f"{accumulated['pre_completed_count']}건",
@@ -210,7 +210,7 @@ def build_kma_persistent_dashboard(
         },
         {
             "value": f"{accumulated['paired_count']}명",
-            "label": "전·후 모두 완료",
+            "label": "교육 전후 모두 완료",
             "note": f"교육 후 완료 {accumulated['post_completed_count']}건",
         },
     ]
@@ -259,7 +259,7 @@ def format_kma_organization_rows(
         (
             ("name", "프로젝트"),
             ("invited", "검사 참여자"),
-            ("completion_pct", "사전·사후 모두 완료율(%)"),
+            ("completion_pct", "교육 전후 모두 완료율(%)"),
             ("activity", "최근 집계 갱신"),
         )
         if persistent
@@ -371,7 +371,7 @@ def completed_store_submission_factor_rows(
         )
     if warnings is not None and excluded_snapshot_hash:
         warnings.append(
-            f"현재 프로젝트와 문항 스냅샷 버전이 다른 누적 제출 {excluded_snapshot_hash}건을 집계에서 제외했습니다."
+            f"현재 프로젝트와 문항 구성 버전이 다른 누적 제출 {excluded_snapshot_hash}건을 집계에서 제외했습니다."
         )
     return output
 
@@ -454,30 +454,30 @@ def build_session_dashboard(state: Mapping[str, Any]) -> dict[str, Any]:
     metrics = [
         {
             "value": f"{int(has_project)}개",
-            "label": "현재 세션 프로젝트",
+            "label": "이 브라우저의 프로젝트",
             "note": project_name if has_project else "저장된 프로젝트 없음",
         },
         {
             "value": f"{participant_count}명",
-            "label": "현재 세션 참여자",
+            "label": "이 브라우저의 참여자",
             "note": "가명 ID 연결됨" if participant_id else "교육 참여자 ID 미입력",
         },
         {
             "value": _phase_label(has_project, pre_complete),
             "label": "교육 전 검사",
-            "note": f"현재 세션 응답 {len(pre_responses)}개",
+            "note": f"이 브라우저 응답 {len(pre_responses)}개",
         },
         {
             "value": _phase_label(has_project, post_complete),
             "label": "교육 후 검사",
-            "note": f"현재 세션 응답 {len(post_responses)}개",
+            "note": f"이 브라우저 응답 {len(post_responses)}개",
         },
     ]
 
     projects: list[dict[str, Any]] = []
     if has_project:
         if pre_complete and post_complete:
-            stage = "교육 전·후 검사 완료"
+            stage = "교육 전후 검사 완료"
             status = "완료"
         elif pre_complete:
             stage = "교육 전 완료 · 교육 후 대기/진행"
@@ -492,7 +492,7 @@ def build_session_dashboard(state: Mapping[str, Any]) -> dict[str, Any]:
             {
                 "name": project_name,
                 "scope": (
-                    f"현재 브라우저 세션 · 측정역량 {len(selected_factors)}개 · {stage}"
+                    f"이 브라우저 · 측정역량 {len(selected_factors)}개 · {stage}"
                 ),
                 # The row numerator, denominator and progress bar all describe
                 # complete pre/post participant pairs. Phase progress is kept

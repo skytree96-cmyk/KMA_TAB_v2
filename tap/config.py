@@ -7,7 +7,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 DATA_DIR = PROJECT_ROOT / "data"
 
 APP_TITLE = "TAP | 교육 전후 평가"
-APP_SUBTITLE = "교육 전후의 업무행동 변화를 확인하고, 다음 개선을 연결합니다."
+APP_SUBTITLE = "교육 전후의 업무행동 변화를 확인하고, 다음 교육 개선에 반영합니다."
 
 MIN_VALID_ITEMS = 3
 MIN_GROUP_N = 5

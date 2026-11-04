@@ -34,6 +34,13 @@ class AccountGuideTests(unittest.TestCase):
         for phrase in ("KMA 관리자", "회원사", "문항은행", "사업자등록번호 등록", "교육담당자 계정 발급", "임시 비밀번호는 kma"):
             self.assertNotIn(phrase, text)
 
+    def test_guide_uses_unified_pre_post_wording_without_hr_use_clauses(self):
+        text = " ".join(" ".join(blocks) for blocks in guide_sections().values())
+        self.assertIn("교육 전후", text)
+        for phrase in ("전·후", "전/후", "사전", "사후", "휴리스틱", "스냅샷", "짝지",
+                       "채용", "승진", "성과평가", "인사평가", "인사 판단", "단독 판단"):
+            self.assertNotIn(phrase, text)
+
     def test_every_numbered_pin_has_a_matching_instruction(self):
         for tab, blocks in guide_sections().items():
             steps = [block for block in blocks if block.startswith('<section class="tg-step">')]

@@ -13,7 +13,7 @@ SOURCE_LABELS = {
 }
 BUTTON_LABELS = {
     "public_edu_center": "최신 일정 보기",
-    "studio_elearning": "바로 수강",
+    "studio_elearning": "수강 페이지 보기",
     "b2b_inquiry": "과정 안내 보기",
 }
 

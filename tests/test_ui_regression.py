@@ -93,12 +93,24 @@ class UiRegressionTests(unittest.TestCase):
         self.assertIn("기획검증용 완료 결과 저장", source)
         self.assertNotIn("GitHub", source)
         self.assertIn("교육 참여자 ID 원문은 저장하지 않고 프로젝트별 가명키", source)
-        self.assertIn("교육담당자가 전달한 프로젝트 코드를 선택한 검사 화면에 입력", source)
-        self.assertIn("교육 전·후 완료 결과만 저장", source)
+        self.assertIn("교육담당자에게 받은 프로젝트 코드를 검사 화면에 입력", source)
+        self.assertIn("교육 전후 검사를 완료한 결과만 저장", source)
         self.assertIn("‘교육 전 검사’ 또는 ‘교육 후 검사’를 먼저 선택", source)
-        self.assertIn("저장소를 사용할 수 없으면 동일 브라우저에서 시작하거나 기준파일(JSON)", source)
+        self.assertIn("저장소를 사용할 수 없으면 같은 브라우저에서 시작하거나 기준파일(JSON)", source)
         self.assertIn("소표본 실제값을 화면에서만 미리보기", source)
         self.assertIn("다운로드·인쇄·외부 공유 대상이 아닙니다", source)
+
+    def test_legacy_screens_do_not_carry_hr_use_restrictions(self) -> None:
+        sources = [
+            *sorted((ROOT / "pages").glob("*.py")),
+            ROOT / "tap" / "ui.py",
+            ROOT / "tap" / "reporting.py",
+        ]
+        for path in sources:
+            source = path.read_text(encoding="utf-8")
+            for hr_use in ("채용", "승진", "성과평가", "인사평가"):
+                with self.subTest(path=path.name, phrase=hr_use):
+                    self.assertNotIn(hr_use, source)
 
     def test_company_scope_is_two_fields_with_kma_review_and_company_registry(self) -> None:
         scope_source = (ROOT / "tap" / "company_scope_ui.py").read_text(

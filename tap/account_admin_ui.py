@@ -62,6 +62,13 @@ def _notice(message: str) -> None:
     st.session_state[PREFIX + "notice"] = message
 
 
+def _josa(word: str, with_final: str, without_final: str) -> str:
+    """Attach the particle that matches the word's last syllable (회원사가, 프로젝트가, 직급은)."""
+    last = word[-1:]
+    has_final = "가" <= last <= "힣" and (ord(last) - 0xAC00) % 28 != 0
+    return word + (with_final if has_final else without_final)
+
+
 def _login_id(value: str, company_prefix: str | None = None) -> str:
     value = value.strip().lower()
     if not value:
@@ -73,7 +80,7 @@ def _login_id(value: str, company_prefix: str | None = None) -> str:
         if value == company_prefix + "-":
             raise ValueError("회사 식별정보 뒤에 사용할 아이디를 입력해 주세요.")
     if not re.fullmatch(r"[a-z0-9][a-z0-9._-]{2,63}", value):
-        raise ValueError("아이디는 영문 소문자·숫자로 시작하는 3~64자의 영문·숫자·점·밑줄·하이픈으로 입력해 주세요.")
+        raise ValueError("아이디는 영문 소문자나 숫자로 시작하는 3~64자로 입력해 주세요. 영문 소문자, 숫자, 점, 밑줄과 하이픈만 쓸 수 있습니다.")
     return value
 
 
@@ -101,7 +108,7 @@ def _participant_profile(values: Mapping[str, Any]) -> dict[str, str]:
         raw_value = str(values.get(key) or "")
         value = raw_value.strip()
         if len(value) > limit or any(ord(char) < 32 or 127 <= ord(char) <= 159 for char in raw_value):
-            raise ValueError(f"{label}은 줄바꿈 없이 {limit}자 이내로 입력해 주세요.")
+            raise ValueError(f"{_josa(label, '은', '는')} 줄바꿈 없이 {limit}자 이내로 입력해 주세요.")
         profile[key] = value
     if profile["email"] and not re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", profile["email"]):
         raise ValueError("이메일 형식을 확인해 주세요. 예: name@example.com")
@@ -192,7 +199,7 @@ def _render_credentials(principal: Mapping[str, Any]) -> None:
     rows = data["rows"]
     with st.container(border=True, key=PREFIX + "credentials_panel"):
         st.subheader("발급한 로그인 정보")
-        st.info("임시 비밀번호는 이 발급 화면에서만 확인할 수 있습니다. 필요한 정보를 내려받아 해당 사용자에게 전달한 후 닫아 주세요. 첫 로그인 때 비밀번호를 변경합니다.")
+        st.info("임시 비밀번호는 이 화면에서만 확인할 수 있습니다. 내려받아 사용자에게 전달한 뒤 닫아 주세요. 사용자는 첫 로그인 때 비밀번호를 바꿉니다.")
         st.dataframe([
             {"로그인 아이디": row["login_id"], "이름": row["display_name"], "임시 비밀번호": row["temp_password"]}
             for row in rows
@@ -314,11 +321,11 @@ def _render_create_user(store: Any, token: str, principal: Mapping[str, Any], co
     st.caption("영문 대문자는 소문자로 저장됩니다. 로그인에는 이메일을 사용하지 않습니다.")
     st.info(f"{label}의 임시 비밀번호는 kma로 자동 발급됩니다. 첫 로그인 때 새 비밀번호로 변경해야 합니다.")
     with st.form(PREFIX + f"user_create_{role}_{_identifier(company)}", clear_on_submit=True):
-        login_input = st.text_input("아이디", max_chars=80, placeholder="예: user001", help="영문 소문자·숫자·점·밑줄·하이픈을 사용할 수 있습니다. 완성된 로그인 아이디는 3~64자이며, 영문 소문자 또는 숫자로 시작해야 합니다.")
+        login_input = st.text_input("아이디", max_chars=80, placeholder="예: user001", help="영문 소문자, 숫자, 점, 밑줄과 하이픈을 쓸 수 있습니다. 완성된 로그인 아이디는 3~64자이며, 영문 소문자 또는 숫자로 시작해야 합니다.")
         name = st.text_input("이름", max_chars=80)
         profile_input: dict[str, str] = {}
         if role == "participant":
-            st.caption("부서·직급·이메일·연락처는 선택 입력입니다.")
+            st.caption("부서, 직급, 이메일과 연락처는 선택 입력입니다.")
             left, right = st.columns(2)
             with left:
                 profile_input["department"] = st.text_input("부서", max_chars=100)
@@ -345,7 +352,7 @@ def _render_create_user(store: Any, token: str, principal: Mapping[str, Any], co
 def _render_batch(store: Any, token: str, principal: Mapping[str, Any], company: Mapping[str, Any], users: list[dict[str, Any]],
                   projects: list[dict[str, Any]] | None = None) -> None:
     with st.expander("CSV로 참여자 일괄 등록", key=PREFIX + f"batch_expander_{_identifier(company)}", on_change="rerun"):
-        st.caption(f"CSV 파일 · 한 번에 최대 {MAX_BATCH_ROWS}명 · 아이디·이름은 필수이며 부서·직급·이메일·연락처는 선택입니다. 기존 아이디·이름 2열 양식도 사용할 수 있습니다. user 또는 user001처럼 user 뒤에 숫자만 붙인 기본 예시 아이디에만 회사 식별정보가 자동으로 붙습니다. 직접 정한 아이디와 회사 식별정보가 이미 붙은 아이디는 그대로 사용합니다. 임시 비밀번호는 모두 kma이며, 첫 로그인 때 변경해야 합니다.")
+        st.caption(f"한 번에 최대 {MAX_BATCH_ROWS}명까지 등록합니다. 아이디와 이름은 필수이고 부서, 직급, 이메일과 연락처는 선택입니다. 아이디·이름 2열로 된 기존 양식도 쓸 수 있습니다. 아이디 규칙과 임시 비밀번호(kma)는 한 명씩 발급할 때와 같습니다.")
         st.download_button("CSV 양식 내려받기", CSV_TEMPLATE.encode("utf-8"), "tap_participants_template.csv", "text/csv", key=PREFIX + "batch_template")
         upload = st.file_uploader("참여자 CSV", type=["csv"], key=PREFIX + "batch_upload")
         if upload is None:
@@ -379,7 +386,7 @@ def _render_batch(store: Any, token: str, principal: Mapping[str, Any], company:
             label = f"새 참여자 {len(pending)}명 등록"
         if st.button(label, disabled=not (pending or existing_ids), key=PREFIX + "batch_create", type="primary"):
             password = _temporary_password("participant")
-            with st.spinner("참여자 계정을 처리하고 있습니다."):
+            with st.spinner("참여자 계정을 처리하는 중입니다."):
                 try:
                     # One transaction: either every row is saved or none is.
                     if pending:
@@ -390,13 +397,16 @@ def _render_batch(store: Any, token: str, principal: Mapping[str, Any], company:
                 except Exception as exc:
                     LOGGER.error("Participant batch failed: %s", type(exc).__name__)
                     detail = str(exc) if type(exc).__name__ == "ConflictError" and str(exc).startswith("이미 사용 중인 아이디") else ""
-                    st.error(_safe_error(exc) + (f" {detail} · 아무 계정도 등록하지 않았습니다. 아이디를 바꿔 다시 올려 주세요." if detail else " 아무 계정도 등록하지 않았습니다."))
+                    st.error(f"{detail}. 아무 계정도 등록하지 않았습니다. 아이디를 바꿔 다시 올려 주세요." if detail else _safe_error(exc) + " 아무 계정도 등록하지 않았습니다.")
                     return
             _remember_credentials([{"login_id": row["login_id"], "display_name": row["display_name"], "temp_password": password} for row in pending], principal)
-            parts = [f"참여자 {len(pending)}명 계정을 발급했습니다"] if pending else []
-            if project_id:
-                parts.append(f"{len(pending) + len(existing_ids)}명을 프로젝트에 배정했습니다")
-            _notice(" · ".join(parts) + ".")
+            assigned_count = len(pending) + len(existing_ids)
+            if pending and project_id:
+                _notice(f"참여자 {len(pending)}명 계정을 발급하고 {assigned_count}명을 프로젝트에 배정했습니다.")
+            elif project_id:
+                _notice(f"{assigned_count}명을 프로젝트에 배정했습니다.")
+            else:
+                _notice(f"참여자 {len(pending)}명 계정을 발급했습니다.")
             st.rerun()
 
 
@@ -413,7 +423,7 @@ def _render_manage_users(store: Any, token: str, principal: Mapping[str, Any], u
     query = st.text_input(
         "계정 검색", key=PREFIX + "manage_user_search",
         placeholder="이름, 아이디, 회사명으로 검색",
-        help="이름·아이디·회사명의 일부로 검색할 수 있습니다. 영문 대소문자는 구분하지 않습니다.",
+        help="일부 글자로 검색할 수 있습니다. 영문 대소문자는 구분하지 않습니다.",
     ).strip().casefold()
     matched = [row for row in allowed if not query or any(
         query in str(row.get(field) or "").casefold()
@@ -495,7 +505,7 @@ def _factor_checkboxes(rows: list[Mapping[str, Any]], key_prefix: str, limit: in
 def _render_project_create(store: Any, token: str, *, show_heading: bool = True) -> None:
     if show_heading:
         st.subheader("교육평가 프로젝트 만들기")
-    st.caption("교육 전·후 비교에 사용할 일정과 측정역량을 등록합니다. 등록한 검사 구성은 고정됩니다.")
+    st.caption("교육 전후 비교에 사용할 일정과 측정역량을 등록합니다. 등록한 검사 구성은 고정됩니다.")
     rows = load_competencies()
     picker = st.container(key=PREFIX + "factor_picker")
     with picker:
@@ -558,7 +568,7 @@ def _render_project_create(store: Any, token: str, *, show_heading: bool = True)
             return
         ok, _ = _attempt(lambda: store.create_project(token, name.strip(), config))
         if ok:
-            _notice("프로젝트를 등록했습니다. 참여자를 배정하면 각 계정에서 검사를 진행할 수 있습니다.")
+            _notice("프로젝트를 등록했습니다. 참여자를 배정하면 각자 계정에서 검사에 응답할 수 있습니다.")
             st.rerun()
 
 
@@ -720,7 +730,7 @@ def _render_progress_board(project: Mapping[str, Any], everyone: list[Mapping[st
     shown = [row for row in matched if chosen == "전체" or statuses[str(row["id"])] == chosen]
     label, content, pending = incomplete_csv(project, everyone)
     st.download_button(label, content, f"tap_incomplete_{project_id}.csv", "text/csv", disabled=not pending,
-                       key=PREFIX + f"board_csv_{project_id}", help="이름·아이디·부서·직급·상태만 담습니다. 사내 메신저로 독려할 때 사용하세요.")
+                       key=PREFIX + f"board_csv_{project_id}", help="이름, 아이디, 부서, 직급과 검사 상태만 담습니다. 사내 메신저로 응답을 독려할 때 쓰세요.")
     if not shown:
         st.info("이 상태에 해당하는 참여자가 없습니다.")
         return
@@ -790,7 +800,7 @@ def _render_assignments(store: Any, token: str, project: Mapping[str, Any], user
         query = st.text_input(
             "배정된 참여자 검색", key=PREFIX + f"assignment_search_{project_id}",
             placeholder="이름, 아이디, 부서, 직급으로 검색",
-            help="이름·아이디·부서·직급의 일부로 검색할 수 있습니다. 영문 대소문자는 구분하지 않습니다.",
+            help="일부 글자로 검색할 수 있습니다. 영문 대소문자는 구분하지 않습니다.",
         ).strip().casefold()
         matched = [row for row in assignments if _participant_matches(row, query)]
         by_assignment = {str(row["id"]): row for row in matched}
@@ -842,7 +852,7 @@ def _render_projects(store: Any, token: str, principal: Mapping[str, Any], proje
     query = st.text_input(
         "프로젝트 검색", key=PREFIX + "project_search",
         placeholder="회사명, 프로젝트명, 교육명으로 검색",
-        help="회사명·프로젝트명·교육명의 일부로 검색할 수 있습니다. 영문 대소문자는 구분하지 않습니다.",
+        help="일부 글자로 검색할 수 있습니다. 영문 대소문자는 구분하지 않습니다.",
     ).strip().casefold()
     matched = [row for row in projects if not query or any(
         query in str(value or "").casefold() for value in (
@@ -870,7 +880,7 @@ def _render_projects(store: Any, token: str, principal: Mapping[str, Any], proje
     project = by_id[selected]
     config = project.get("config", {})
     if config:
-        st.caption(f"교육일 {config.get('training_date', '미설정')} · 사전 {config.get('pre_start_date', '')} ~ {config.get('pre_end_date', '')} · 사후 {config.get('post_start_date', '')} ~ {config.get('post_end_date', '')}")
+        st.caption(f"교육일 {config.get('training_date', '미설정')} · 교육 전 검사 {config.get('pre_start_date', '')} ~ {config.get('pre_end_date', '')} · 교육 후 검사 {config.get('post_start_date', '')} ~ {config.get('post_end_date', '')}")
     if principal.get("role") == "company":
         _render_assignments(store, token, project, users)
     from tap.account_reports import render_project_report
@@ -919,7 +929,7 @@ def _workspace_pick(
     st.session_state[page_key] = page
     st.caption(f"검색 결과 {len(matched)}{unit} · 전체 {len(rows)}{unit}")
     if not matched:
-        st.info("검색 결과가 없습니다. 검색어를 다시 입력해 주세요." if rows else f"등록된 {label}이 없습니다.")
+        st.info("검색 결과가 없습니다. 검색어를 다시 입력해 주세요." if rows else f"등록된 {_josa(label, '이', '가')} 없습니다.")
         return None
     visible = list(by_id)[page * WORKSPACE_PAGE_SIZE:(page + 1) * WORKSPACE_PAGE_SIZE]
     if st.session_state.get(selection_key) not in visible:
@@ -1064,8 +1074,8 @@ def _render_workspace_projects(store: Any, token: str, principal: Mapping[str, A
                 _workspace_fields([
                     ("회사", project.get("company_name")), ("교육명", config.get("course_name")),
                     ("교육일", config.get("training_date") or "미설정"),
-                    ("사전검사", f"{config.get('pre_start_date', '미설정')} ~ {config.get('pre_end_date', '미설정')}"),
-                    ("사후검사", f"{config.get('post_start_date', '미설정')} ~ {config.get('post_end_date', '미설정')}"),
+                    ("교육 전 검사", f"{config.get('pre_start_date', '미설정')} ~ {config.get('pre_end_date', '미설정')}"),
+                    ("교육 후 검사", f"{config.get('post_start_date', '미설정')} ~ {config.get('post_end_date', '미설정')}"),
                 ])
     if project is not None and principal.get("role") == "company":
         # Assigning participants is the next step after picking a project, so it

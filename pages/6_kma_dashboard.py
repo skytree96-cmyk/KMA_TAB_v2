@@ -214,7 +214,7 @@ if dashboard_source == "store":
     with source_col:
         callout(
             "기획검증 누적 실데이터",
-            "프로젝트·참여자·교육 전후 완료 수치는 기획검증용 저장소의 실제 완료 제출을 집계했습니다. 원문 참여자 ID와 개인점수는 표시하지 않습니다.",
+            "프로젝트, 참여자, 교육 전후 완료 수치는 기획검증용 저장소의 실제 완료 제출을 집계한 값입니다.",
             icon="ⓘ",
         )
 else:
@@ -355,7 +355,7 @@ with right:
         )
         c1, c2 = st.columns(2)
         c1.metric("활성 과정", f"{sum(row['active'] for row in load_courses())}개")
-        c2.metric("역량–과정 매핑", f"{len(load_course_map())}건")
+        c2.metric("역량별 과정 매핑", f"{len(load_course_map())}건")
         callout(
             "매핑 완료 · 46개 과정",
             "주역량, 행동지표, 학습목표, 대상, 난이도, 방식, 감수 버전을 등록한 예시입니다.",
@@ -370,9 +370,9 @@ with right:
 
 st.markdown("### 기획검증 프로젝트 누적 현황" if dashboard_source == "store" else "### 회원사 운영 현황")
 st.caption(
-    "완료 제출의 프로젝트별 참여·전후 완료 상태만 표시하며 가명키·문항응답·개인점수는 열람하지 않습니다."
+    "완료 제출 기준으로 프로젝트별 참여 인원과 교육 전후 완료 상태만 표시합니다."
     if dashboard_source == "store"
-    else "KMA 관리자는 프로젝트 진행 상태만 확인하며 회원사의 조직점수·격차·개인결과는 열람하지 않습니다."
+    else "KMA 관리자는 프로젝트 진행 상태만 확인합니다."
 )
 organizations = pd.DataFrame(
     format_kma_organization_rows(
@@ -413,7 +413,7 @@ with boundary_col:
     with st.container(border=True):
         st.markdown('<h3 class="tap-card-title">운영 권한 경계</h3>', unsafe_allow_html=True)
         st.markdown(
-            '<p class="tap-card-sub">KMA 운영 화면은 데이터 최소권한을 기본값으로 둡니다.</p>',
+            '<p class="tap-card-sub">KMA 운영 화면에서는 업무에 필요한 최소한의 데이터만 봅니다.</p>',
             unsafe_allow_html=True,
         )
         callout(
@@ -426,7 +426,7 @@ with boundary_col:
         )
         callout(
             "기본 미열람",
-            "회원사 조직점수, 개인점수, 문항별 응답, 참여자 실명·연락처",
+            "회원사 조직점수·격차, 개인점수, 문항별 응답, 원문 참여자 ID·가명키, 참여자 실명·연락처",
             icon="×",
             tone="danger",
         )

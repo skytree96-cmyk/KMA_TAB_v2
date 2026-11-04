@@ -24,11 +24,13 @@ class CloudflareOpenPageTests(unittest.TestCase):
         ).read_text(encoding="utf-8")
 
         for phrase in (
-            "교육 전/후,",
+            "교육 전후,",
             "최근 8주 업무행동",
             "실제 업무에서 한 행동을 기준으로 응답",
             "조직 결과 공개 기준",
-            "각 역량의 전·후 응답자가 5명 이상일 때 공개",
+            "역량별 교육 전후 응답자가 5명 이상일 때 공개",
+            '<section class="section section-soft" id="recommend">',
+            '<li><a href="#recommend">교육 추천</a></li>',
             '<div class="step-icon">중</div>',
             "교육 이수 후 8~10주간 실제 업무에 적용",
             "사용설명서 보기",
@@ -48,10 +50,13 @@ class CloudflareOpenPageTests(unittest.TestCase):
             self.assertIn(phrase, source)
 
         for removed in (
-            "교육개발 전용 · 채용·승진·보상·성과평가에는 사용하지 않습니다.",
+            "채용·승진·보상·성과평가",
+            "인사평가",
             "교육 전과 후",
-            "교육 전후",
+            "교육 전/후",
             "교육 전·후",
+            "사전·사후",
+            "KMA BI",
         ):
             self.assertNotIn(removed, source)
         self.assertEqual(

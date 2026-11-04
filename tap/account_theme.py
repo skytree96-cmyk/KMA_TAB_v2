@@ -13,7 +13,7 @@ PANEL_TONES = {
     "account_admin_workspace_issue_": ("brand", "person_add", "아이디와 이름을 입력해 계정을 한 명씩 만들고 임시 비밀번호를 발급합니다."),
     "account_admin_batch_expander_": ("indigo", "upload_file", "CSV 양식으로 여러 명의 계정을 한 번에 등록합니다."),
     "account_admin_assignment_panel_": ("amber", "swap_horiz", "잘못 배정한 참여자의 배정을 해제하거나 다시 배정합니다."),
-    "_tap_participant_review_panel": ("brand", "fact_check", "최종 제출 전에 내가 고른 응답을 한눈에 확인합니다."),
+    "_tap_participant_review_panel": ("brand", "fact_check", "최종 제출 전에 내가 고른 응답을 다시 확인합니다."),
     "_tap_participant_transfer_panel": ("violet", "insights", "교육 후 검사에서 답한 현업 적용 환경을 다시 봅니다."),
 }
 

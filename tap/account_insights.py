@@ -64,15 +64,19 @@ def transfer_notes(summary: Mapping[str, Any]) -> list[str]:
     """Plain follow-up sentences for the weakest transfer conditions and the most common barrier."""
     if not summary.get("disclosed"):
         return []
-    notes = [f"{row['label']} 평균이 {row['mean']:.2f}점으로 낮아, 교육 내용이 현업에서 쓰이도록 이 조건을 먼저 보완해 보세요."
-             for row in sorted(summary["factors"], key=lambda row: row["mean"])
-             if row["mean"] < TRANSFER_ATTENTION_MEAN]
+    weak = [row for row in sorted(summary["factors"], key=lambda row: row["mean"])
+            if row["mean"] < TRANSFER_ATTENTION_MEAN]
+    # One sentence for all weak conditions, so the advice is not repeated under each one. The particle
+    # follows the fixed word "조건은", never a label.
+    notes = [f"평균이 {TRANSFER_ATTENTION_MEAN:.1f}점 미만이라 먼저 보완할 현업 적용 조건은 "
+             + ", ".join(f"{row['label']}({row['mean']:.2f}점)" for row in weak) + "입니다."] if weak else []
     top = max((row for row in summary["barriers"] if row["label"] != "특별한 방해요인 없음" and row["count"]),
               key=lambda row: row["count"], default=None)
     if top:
         notes.append(f"가장 많이 꼽힌 적용 장애요인은 '{top['label']}'({top['rate']}%)입니다.")
     if not notes:
-        notes.append("네 가지 현업 적용 조건이 모두 보통 이상으로 응답되었습니다. 적용 사례를 공유해 확산해 보세요.")
+        notes.append(f"현업 적용 조건 {len(summary['factors'])}가지의 평균이 모두 {TRANSFER_ATTENTION_MEAN:.1f}점 이상입니다. "
+                     "잘된 적용 사례를 모아 조직 안에 공유하세요.")
     return notes
 
 
@@ -187,7 +191,7 @@ def course_schedule_text(course: Mapping[str, Any]) -> str:
     if source == "studio_elearning":
         return "온라인 · 상시 수강"
     if source == "b2b_inquiry":
-        return "사내교육 · 인원을 모아 KMA에 문의"
+        return "사내교육 · KMA에 단체교육 문의"
     return DELIVERY_LABELS.get(str(course.get("delivery")), "")
 
 
@@ -198,13 +202,15 @@ def _course_reason(need: Mapping[str, Any]) -> dict[str, Any]:
     change = need["change"]
     if change is None:
         return {"reason": reason, "advice": ""}
-    reason += f" · 교육 전보다 {change:+.2f}점"
+    # Words instead of a signed number, so a zero change never reads "교육 전보다 +0.00점".
+    reason += (" · 교육 전과 같음" if change == 0
+               else f" · 교육 전보다 {abs(change):.2f}점 {'높음' if change > 0 else '낮음'}")
     if change >= MEANINGFUL_DIFFERENCE:
-        advice = "교육 후 점수가 오르고 있습니다. 같은 주제의 심화 학습이나 현업 적용 과제로 이어가 보세요."
+        advice = "교육 전보다 점수가 올랐습니다. 같은 주제의 심화 과정이나 현업 적용 과제로 이어가세요."
     elif change <= -MEANINGFUL_DIFFERENCE:
-        advice = "교육 전보다 낮아졌습니다. 업무 변화나 적용 기회 감소가 있었는지 먼저 확인해 보세요."
+        advice = "교육 전보다 점수가 낮아졌습니다. 새 과정을 듣기 전에 업무가 바뀌었거나 적용 기회가 줄었는지 살펴보세요."
     else:
-        advice = "교육 전과 큰 차이가 없습니다. 과정 내용이 맞았는지와 현업 적용 여건을 함께 점검해 보세요."
+        advice = "교육 전과 큰 차이가 없습니다. 지난 교육 내용이 업무에 맞았는지, 적용할 여건이 있었는지 함께 점검하세요."
     return {"reason": reason, "advice": advice}
 
 
@@ -215,8 +221,8 @@ def course_context_note(transfer: Mapping[str, Any] | None) -> str | None:
     weak = [row["label"] for row in transfer["factors"] if row["mean"] < TRANSFER_ATTENTION_MEAN]
     if not weak:
         return None
-    return (f"현업 적용 조건({', '.join(weak)}) 평균이 {TRANSFER_ATTENTION_MEAN:.1f}점 미만입니다. "
-            "과정을 더 듣기 전에 이 조건부터 보완해야 배운 내용이 현업에서 쓰일 수 있습니다.")
+    # The transfer section above already gives the means; this line only ties them to the course list.
+    return f"현업 적용 조건 중 평균이 낮은 {', '.join(weak)}부터 보완해야 과정에서 배운 내용이 현업에서 쓰입니다."
 
 
 def organization_detail_rows(summaries: Iterable[Mapping[str, Any]], config: Mapping[str, Any],
@@ -226,8 +232,8 @@ def organization_detail_rows(summaries: Iterable[Mapping[str, Any]], config: Map
     Scores of undisclosed competencies are already None in the summaries; only counts remain.
     """
     targets = config.get("target_means") or {}
-    rows = [{"구분": "역량", "항목": row["factor_name_ko"], "사전 응답": row["pre_n"], "사후 응답": row["post_n"],
-             "전·후 유효 인원": row["paired_n"], "사후 미응답": row["attrition_n"],
+    rows = [{"구분": "역량", "항목": row["factor_name_ko"], "교육 전 응답": row["pre_n"], "교육 후 응답": row["post_n"],
+             "교육 전후 유효 인원": row["paired_n"], "교육 후 미응답": row["attrition_n"],
              "교육 전": row["pre_mean"], "교육 후": row["post_mean"], "변화": row["observed_change"],
              "목표 수준": targets.get(row["factor_code"]),
              "목표 대비": round(row["post_mean"] - float(targets[row["factor_code"]]), 2)
