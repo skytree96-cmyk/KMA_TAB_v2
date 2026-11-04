@@ -64,6 +64,25 @@ class IndividualAccountReportTests(unittest.TestCase):
         self.assertFalse(app.dataframe)
 
 
+class IndividualReportCourseTests(unittest.TestCase):
+    def test_individual_pdf_lists_two_courses_for_each_of_three_competencies(self):
+        from unittest.mock import patch
+        from tap.account_reports import individual_report_pdf
+        factors = ["CORE-CL", "JOB-PS", "LEAD-PD", "CORE-CO"]
+        questions = questions_for_factors(factors)
+        config = {"selected_factors": factors, "target_means": {code: 3.5 for code in factors}, "target_level": "manager",
+                  "delivery_preference": "all", "question_snapshot": questions}
+        pre = {q["question_code"]: 2 for q in questions}
+        post = {q["question_code"]: 4 if q["factor_code"] == "CORE-CO" else 2 for q in questions}
+        with patch("tap.account_report_pdf.build_report_pdf", return_value=b"%PDF") as build:
+            individual_report_pdf({"name": "리더십", "config": config}, questions, pre, post, "참여자")
+        courses = build.call_args.kwargs["courses"]
+        # Same picks as the participant screen: three weak competencies, a public course and an e-learning course each.
+        self.assertEqual(len(courses), 6)
+        self.assertEqual({row["factor_code"] for row in courses}, {"CORE-CL", "JOB-PS", "LEAD-PD"})
+        self.assertEqual([row["source"] for row in courses].count("studio_elearning"), 3)
+
+
 class ReportDownloadTests(unittest.TestCase):
     records = AccountReportTests.records
 

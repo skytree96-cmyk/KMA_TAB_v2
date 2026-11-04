@@ -1,10 +1,26 @@
 from __future__ import annotations
 
+from datetime import date
 import unittest
+from unittest.mock import patch
 
-from tap.account_insights import (course_context_note, organization_detail_rows, recommend_courses, summarize_transfer,
-                                  transfer_notes)
+from tap.account_insights import (course_context_note, course_topic_words, organization_detail_rows, recommend_courses,
+                                  summarize_transfer, transfer_notes)
 from tap.data import load_courses
+
+
+def _course(course_id: str, title: str, source: str = "public_edu_center", starts: str = "", **extra: object) -> dict:
+    row = {"course_id": course_id, "title": title, "source": source, "target_level": "all", "active": True,
+           "delivery": {"public_edu_center": "offline", "studio_elearning": "online"}.get(source, "inhouse")}
+    if starts:
+        row.update(next_start=starts.split("|")[0], upcoming_starts=starts)
+    return {**row, **extra}
+
+
+def _catalog(courses: list[dict], mapping: list[tuple[str, str, float]]):
+    """Swap the KMA catalog for a few hand-made rows while the block runs."""
+    rows = [{"factor_code": code, "course_id": course_id, "content_fit": fit} for code, course_id, fit in mapping]
+    return patch.multiple("tap.account_insights", load_courses=lambda: courses, load_course_map=lambda: rows)
 
 
 def _result(opportunity: int, barriers: list[str], *, post_completed: bool = True, applied: str = "") -> dict:
@@ -162,6 +178,57 @@ class CourseRecommendationTests(unittest.TestCase):
         self.assertNotIn("적용 기회", note)
         self.assertIsNone(course_context_note(summarize_transfer([_result(4, [])])))
         self.assertIsNone(course_context_note(None))
+
+    def test_parts_of_one_series_count_as_the_same_course(self):
+        from tap.recommendation import normalize_course_title
+        self.assertEqual(normalize_course_title("[HD]직장인을 위한 AI 활용 실무 Part.1 ChatGPT 엑셀, 파워포인트, VBA"),
+                         normalize_course_title("[HD]직장인을 위한 AI 활용 실무 Part.2 ChatGPT Google Docs, 업무용 글쓰기 등"))
+        self.assertEqual(normalize_course_title("빅데이터 분석 - Pandas 실전 강의 Part.1-1 개발환경설치 및 소개"),
+                         normalize_course_title("빅데이터 분석 - Pandas 실전 강의 Part.1-2 DataFrame"))
+        self.assertEqual(normalize_course_title("멘토링 바이블 1편"), normalize_course_title("멘토링 바이블 2편"))
+        self.assertNotEqual(normalize_course_title("코칭 대화법 1편"), normalize_course_title("코칭 리더십 1편"))
+        # A title that starts with a number is not a series tail.
+        self.assertEqual(normalize_course_title("4차 산업혁명 시대의 리더십"), "4차산업혁명시대의리더십")
+
+    def test_sessions_starting_within_a_week_are_skipped(self):
+        courses = [_course("SOON", "[여의도] 고객 경험 설계", starts="20261104|20261201"),
+                   _course("ONLY-SOON", "[여의도] 고객 불만 응대", starts="20261106"),
+                   _course("LATER", "[여의도] 고객 여정 분석", starts="20261120")]
+        rows = [{"factor_code": "CORE-CO", "factor_name_ko": "고객지향", "post_score": 2.0}]
+        with _catalog(courses, [("CORE-CO", c["course_id"], 0.9) for c in courses]):
+            picked = recommend_courses(self.config, rows, limit=5, today=date(2026, 11, 4))
+        # LATER's only session (11-20) is sooner than SOON's first joinable one (12-01); ONLY-SOON cannot be joined.
+        self.assertEqual([row["course_id"] for row in picked], ["LATER", "SOON"])
+        self.assertEqual(picked[1]["schedule"], "다음 개강 2026-12-01")
+
+    def test_equal_fit_prefers_a_new_subject_within_a_competency(self):
+        courses = [_course("PUB", "[비대면] 일잘러라면 꼭 알아야 하는 노션 활용법", starts="20261211", delivery="online_live"),
+                   _course("EL-A", "[HD]일과 생활을 편하게 관리하는 Notion(노션) 활용 Part.1 기본 1", "studio_elearning"),
+                   _course("EL-B", "[리더십 아카이브] 변화 리더십(조직개발과 퍼실리테이션)", "studio_elearning"),
+                   _course("EL-C", "Claude를 활용한 업무자동화", "studio_elearning")]
+        mapping = [("DX_APPLY", "PUB", 0.8), ("DX_APPLY", "EL-A", 0.8), ("DX_APPLY", "EL-B", 0.7), ("DX_APPLY", "EL-C", 0.8)]
+        rows = [{"factor_code": "DX_APPLY", "factor_name_ko": "디지털 혁신 적용", "post_score": 2.0}]
+        with _catalog(courses, mapping):
+            picked = recommend_courses(self.config, rows, limit=3, today=date(2026, 11, 4))
+        # EL-A fits as well as EL-C but repeats the Notion subject; the lower-fitting EL-B never jumps ahead.
+        self.assertEqual([row["course_id"] for row in picked], ["PUB", "EL-C", "EL-A"])
+        self.assertEqual(course_topic_words("Claude를 활용한 업무자동화"), {"claude", "업무자동화"})
+        self.assertIn("노션", course_topic_words("[HD]일과 생활을 편하게 관리하는 Notion(노션) 활용 Part.1 기본 1"))
+
+    def test_competency_without_the_preferred_source_keeps_its_place(self):
+        courses = [_course("SALES-PUB", "[여의도] 세일즈 협상 스킬", starts="20261127"),
+                   _course("SALES-PUB2", "[여의도] 영업사원을 위한 손익관리", starts="20261130"),
+                   _course("PRES-EL", "OK를 부르는 프레젠테이션 스킬", "studio_elearning"),
+                   _course("PRES-PUB", "[여의도] 보이스 트레이닝", starts="20261112")]
+        mapping = [("SALES_CORE", "SALES-PUB", 0.95), ("SALES_CORE", "SALES-PUB2", 0.85),
+                   ("COMM_PRES", "PRES-EL", 0.9), ("COMM_PRES", "PRES-PUB", 0.9)]
+        rows = [{"factor_code": "SALES_CORE", "factor_name_ko": "영업 핵심역량", "post_score": 2.0},
+                {"factor_code": "COMM_PRES", "factor_name_ko": "설득·프레젠테이션", "post_score": 2.5}]
+        config = {**self.config, "target_level": "staff", "delivery_preference": "online", "organization_priorities": []}
+        with _catalog(courses, mapping):
+            picked = recommend_courses(config, rows, limit=4, today=date(2026, 11, 4))
+        # Sales has no e-learning, so it takes its public course in the first round instead of dropping to third.
+        self.assertEqual([row["course_id"] for row in picked], ["SALES-PUB", "PRES-EL", "SALES-PUB2", "PRES-PUB"])
 
     def test_course_links_use_current_kma_paths(self):
         urls = {row["url"] for row in load_courses()}

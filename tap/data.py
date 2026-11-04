@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import csv
+import html
 import json
 from functools import lru_cache
 from pathlib import Path
@@ -48,6 +49,7 @@ def load_pilot_item_candidates() -> list[dict[str, Any]]:
 def load_courses() -> list[dict[str, Any]]:
     rows = _read_csv(DATA_DIR / "courses.csv")
     for row in rows:
+        row["title"] = html.unescape(row.get("title", ""))  # KMA list pages deliver titles with &#39; and &amp;
         row["active"] = row["active"].lower() == "true"
         row["has_upcoming"] = str(row.get("has_upcoming", "true")).lower() == "true"
     return rows

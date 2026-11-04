@@ -4,8 +4,11 @@ Pure functions only, so the Streamlit screens and the PDF share one calculation.
 """
 from __future__ import annotations
 
+from datetime import date, datetime, timedelta
+import re
 from statistics import mean
 from typing import Any, Iterable, Mapping
+from zoneinfo import ZoneInfo
 
 from tap.config import MIN_GROUP_N
 from tap.data import load_course_map, load_courses
@@ -32,6 +35,18 @@ TRANSFER_ATTENTION_MEAN = 3.0
 # The report calls a pre/post difference under 0.2 "유지". A gap to target that small is within
 # self-report noise, so it does not call for a course; a rise of 0.2 or more means change is under way.
 MEANINGFUL_DIFFERENCE = 0.2
+# A session that starts sooner than this cannot be acted on from a report: approval and registration take
+# time. A public course is offered with its first session on or after the cutoff, or not at all.
+MIN_DAYS_BEFORE_START = 7
+# Words that say nothing about a course's subject. Two titles that share only these are different topics.
+_GENERIC_TITLE_WORDS = frozenset("""
+활용 활용법 활용한 활용의 실무 과정 스킬 위한 위해 기본 기초 입문 심화 완벽 하루 하루만에 끝내는 통하는 통한 직장인 직장인을
+일잘러 일잘러의 일잘러라면 비즈니스 업무 방법 기법 노하우 실전 강의 마스터 클래스 아카이브 교육 이해 핵심 성공 성장 함께 함께하는
+하는 만드는 기반 바로 써먹는 알아야 필요한 모든 여의도 비대면 상시개강 테크닉 역량 개발 향상 전문가 양성 워크숍 실습 사례 트레이닝
+hd part biz with the and for of ok tool
+""".split())
+_TITLE_TOKEN = re.compile(r"[a-z0-9]+|[가-힣]+")
+_TRAILING_PARTICLE = re.compile(r"(으로|에서|부터|까지|을|를|의|과|와|로|에|은|는|이|가|도|만)$")
 
 
 def _complete_transfer(transfer: Any) -> bool:
@@ -80,21 +95,51 @@ def transfer_notes(summary: Mapping[str, Any]) -> list[str]:
     return notes
 
 
+def course_topic_words(title: Any) -> set[str]:
+    """Subject words of a title: "노션 활용법" and "Notion(노션) 활용 Part.1" share 노션, so they are one topic."""
+    words = set()
+    for token in _TITLE_TOKEN.findall(str(title or "").lower()):
+        if len(token) >= 3 and "가" <= token[0] <= "힣":
+            token = _TRAILING_PARTICLE.sub("", token)
+        if len(token) >= 2 and token not in _GENERIC_TITLE_WORDS:
+            words.add(token)
+    return words
+
+
+def _session_starts(course: Mapping[str, Any]) -> list[str]:
+    """Known session start dates (YYYYMMDD) of a public course; the catalog's next_start when no list is given."""
+    starts = [start for start in str(course.get("upcoming_starts") or "").split("|") if len(start) == 8]
+    if not starts and len(str(course.get("next_start") or "")) == 8:
+        starts = [str(course["next_start"])]
+    return sorted(set(starts))
+
+
+def next_feasible_start(course: Mapping[str, Any], today: date) -> str | None:
+    """First session a reader can still register for, or None when every known session starts too soon."""
+    cutoff = (today + timedelta(days=MIN_DAYS_BEFORE_START)).strftime("%Y%m%d")
+    return next((start for start in _session_starts(course) if start >= cutoff), None)
+
+
 def recommend_courses(config: Mapping[str, Any], factor_rows: Iterable[Mapping[str, Any]], limit: int = 4, *,
                       audience: str = "individual", score_key: str = "post_score",
-                      max_competencies: int = 3) -> list[dict[str, Any]]:
+                      max_competencies: int = 3, today: date | None = None) -> list[dict[str, Any]]:
     """Pick courses for competencies at least 0.2 below the project target.
 
     factor_rows need factor_code, factor_name_ko and the score under ``score_key`` (post_score after
     training, score_1_to_5 for the pre-training report) and may carry pre_score; rows without a score
     are skipped. Larger gaps come first (gaps in the same 0.1 band tie, and the organization's priority
     competencies break the tie). Courses are filled source by source: every competency gets its best
-    public course (only courses with an upcoming session), then its best e-learning course, and
-    organizations also get an in-house inquiry course. The same course — a second location or next
-    year's run of the same title — is never shown twice.
+    public course (only sessions starting at least MIN_DAYS_BEFORE_START days from today), then its best
+    e-learning course, and organizations also get an in-house inquiry course. A competency without a
+    course from the preferred source takes one from the next source in the first round, so the largest
+    gap never drops below smaller ones. Within one competency, equally fitting courses are ordered by
+    the next session, and a course on a subject the competency already has yields to a new subject.
+    The same course — a second location, next year's run or another part of the same series — is never
+    shown twice.
     """
     if TRAINING_GATE.get(str(config.get("training_cause") or "mixed_or_unknown"), 0.0) == 0.0:
         return []
+    today = today or datetime.now(ZoneInfo("Asia/Seoul")).date()
     targets = config.get("target_means") or {}
     priorities = {str(code) for code in config.get("organization_priorities") or []}
     needs = []
@@ -117,18 +162,29 @@ def recommend_courses(config: Mapping[str, Any], factor_rows: Iterable[Mapping[s
 
     level = str(config.get("target_level") or "all")
     preference = str(config.get("delivery_preference") or "all")
-    # A course written for one level (e.g. team leaders) is never offered to another level, and a public
-    # course without an upcoming session is not offered at all (active == has_upcoming in the catalog).
-    catalog = {str(row["course_id"]): row for row in load_courses()
-               if row.get("active", True) and row.get("target_level", "all") in {"all", level}}
-    queues: dict[str, list[dict[str, Any]]] = {}
+    # A course written for one level (e.g. team leaders) is never offered to another level. A public course
+    # is offered with its first session the reader can still join; one whose sessions all start within the
+    # next week (or are over, when the monthly catalog has aged) is not offered at all.
+    catalog: dict[str, dict[str, Any]] = {}
+    for row in load_courses():
+        if not row.get("active", True) or row.get("target_level", "all") not in {"all", level}:
+            continue
+        course = dict(row)
+        if str(course.get("source", "")) == "public_edu_center" and _session_starts(course):
+            start = next_feasible_start(course, today)
+            if start is None:
+                continue
+            course["next_start"] = start
+        catalog[str(course["course_id"])] = course
+    queues: dict[str, list[tuple[float, dict[str, Any]]]] = {}
     for need in needs:
         mappings = [mapping for mapping in load_course_map()
                     if mapping["factor_code"] == need["factor_code"] and str(mapping["course_id"]) in catalog]
         mappings.sort(key=lambda mapping: (-float(mapping["content_fit"]),
                                            str(catalog[str(mapping["course_id"])].get("next_start") or "99999999"),
                                            str(mapping["course_id"])))
-        queues[need["factor_code"]] = [catalog[str(mapping["course_id"])] for mapping in mappings]
+        queues[need["factor_code"]] = [(float(mapping["content_fit"]), catalog[str(mapping["course_id"])])
+                                       for mapping in mappings]
 
     slots = list(SOURCE_SLOTS.get(audience, SOURCE_SLOTS["individual"]))
     if preference == "online":
@@ -142,32 +198,42 @@ def recommend_courses(config: Mapping[str, Any], factor_rows: Iterable[Mapping[s
     seen_titles: set[str] = set()
 
     def take(need: Mapping[str, Any], source: str | None) -> bool:
-        for course in queues[need["factor_code"]]:
-            course_id = str(course["course_id"])
+        candidates = []
+        for fit, course in queues[need["factor_code"]]:
             course_source = str(course.get("source", ""))
-            if course_id in seen_ids or course_source not in allowed:
+            if str(course["course_id"]) in seen_ids or course_source not in allowed:
                 continue
             if source is not None and course_source != source:
                 continue
-            title_key = normalize_course_title(course.get("title", ""))
-            if title_key in seen_titles:
+            if normalize_course_title(course.get("title", "")) in seen_titles:
                 continue
-            seen_ids.add(course_id)
-            seen_titles.add(title_key)
-            reason = _course_reason(need)
-            if any(row["factor_code"] == need["factor_code"] for row in picked):
-                reason["advice"] = ""  # say what the change suggests once per competency, not under every course
-            picked.append({**course, "factor_code": need["factor_code"], "factor_name_ko": need["factor_name_ko"],
-                           "delivery_label": DELIVERY_LABELS.get(str(course.get("delivery")), "온라인·집합"),
-                           "schedule": course_schedule_text(course), **reason})
-            return True
-        return False
+            candidates.append((fit, course))
+        if not candidates:
+            return False
+        # Among the best-fitting courses, a new subject beats a repeat of one this competency already has:
+        # three Notion courses say less than one Notion course and one automation course.
+        covered = [course_topic_words(row["title"]) for row in picked if row["factor_code"] == need["factor_code"]]
+        best_fit = candidates[0][0]
+        course = next((course for fit, course in candidates
+                       if fit == best_fit and not any(course_topic_words(course.get("title", "")) & words for words in covered)),
+                      candidates[0][1])
+        seen_ids.add(str(course["course_id"]))
+        seen_titles.add(normalize_course_title(course.get("title", "")))
+        reason = _course_reason(need)
+        if covered:
+            reason["advice"] = ""  # say what the change suggests once per competency, not under every course
+        picked.append({**course, "factor_code": need["factor_code"], "factor_name_ko": need["factor_name_ko"],
+                       "delivery_label": DELIVERY_LABELS.get(str(course.get("delivery")), "온라인·집합"),
+                       "schedule": course_schedule_text(course), **reason})
+        return True
 
-    # Source by source so every competency gets its public course before any gets an e-learning one.
-    for source, count in slots:
+    # Source by source so every competency gets its public course before any gets an e-learning one. In the
+    # first round a competency without a course from that source (sales has no e-learning) takes one from
+    # another source, so it keeps its place in the gap order.
+    for round_index, (source, count) in enumerate(slots):
         for need in needs:
             for _ in range(count):
-                if len(picked) >= limit or not take(need, source):
+                if len(picked) >= limit or not (take(need, source) or (round_index == 0 and take(need, None))):
                     break
     # Fill any remaining room round-robin from whatever is left, as the earlier version did.
     progressed = True
