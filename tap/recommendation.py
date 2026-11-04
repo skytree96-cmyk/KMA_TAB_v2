@@ -107,14 +107,17 @@ def rank_courses(
 
 _TITLE_PREFIX = re.compile(r"^(\[[^\]]+\]\s*)+")
 _YEAR_TAIL = re.compile(r"\(\s*20\d\d\s*\)")
+# "… Part.1 엑셀" / "… Part.2 Docs" / "… 3편"처럼 회차만 다른 이러닝 시리즈는 한 과정으로 본다.
+_SERIES_TAIL = re.compile(r"\s*(part\s*\.?\s*\d.*|제?\s*\d+\s*(편|부|강))$", re.I)
 _NON_WORD = re.compile(r"[^0-9a-z가-힣]")
 
 
 def normalize_course_title(title: str) -> str:
-    """지점([여의도]/[강남]/[비대면])·연도 꼬리가 다른 같은 과정을 하나로 묶기 위한 키."""
+    """지점([여의도]/[강남]/[비대면])·연도 꼬리·시리즈 회차가 다른 같은 과정을 하나로 묶기 위한 키."""
     text = _TITLE_PREFIX.sub("", str(title or ""))
-    text = _YEAR_TAIL.sub("", text).lower()
-    return _NON_WORD.sub("", text)
+    text = _YEAR_TAIL.sub("", text)
+    text = _SERIES_TAIL.sub("", text) or text  # 회차 표기만으로 된 제목은 그대로 둔다
+    return _NON_WORD.sub("", text.lower())
 
 
 def select_gap_factors(

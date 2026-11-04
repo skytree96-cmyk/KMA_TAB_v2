@@ -36,7 +36,8 @@ def individual_report_pdf(project: Mapping[str, Any], questions: list[dict[str, 
     scores = score_pre_post_responses(questions, pre_responses, post_responses, (project.get("config") or {}).get("target_means"))
     rows = [{**row, "change": row["self_reported_change"], "valid_n": row["paired_valid_items"]} for row in scores]
     # Personal transfer answers stay out of the PDF: managers can also download it.
-    courses = recommend_courses(project.get("config") or {}, scores)
+    # Same picks as the participant screen: three competencies, each with a public course and an e-learning course.
+    courses = recommend_courses(project.get("config") or {}, scores, limit=6)
     return build_report_pdf(project, rows, kind="individual", subject=subject, participant_count=1, courses=courses)
 
 
@@ -103,7 +104,7 @@ def _render_courses(courses: list[dict[str, Any]], transfer: Mapping[str, Any]) 
         from tap.account_course_ui import render_course_cards
         render_course_cards(courses)
         st.caption("교육 후 평균이 목표보다 0.2점 이상 낮은 역량을 차이가 큰 순서로 골라, 역량마다 공개교육, 이러닝, 단체교육 문의 과정을 제안합니다. "
-                   "공개교육은 다음 기수가 열린 과정만 보여 주고, 버튼을 누르면 최신 일정 페이지가 열립니다.")
+                   "공개교육은 개강이 일주일 넘게 남은 기수가 있는 과정만 보여 주고, 버튼을 누르면 최신 일정 페이지가 열립니다.")
     st.markdown("회사 상황에 맞춘 과정이 필요하면 KMA에 문의하세요.")
     st.link_button("맞춤형 교육 문의", COURSE_INQUIRY_URL)
 

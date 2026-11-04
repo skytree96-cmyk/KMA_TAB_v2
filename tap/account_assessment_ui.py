@@ -257,7 +257,7 @@ def _render_followup_courses(config: Mapping[str, Any], results: list[dict[str, 
     render_course_cards(courses)
     phase_label = "교육 후" if phase == "post" else "교육 전"
     st.caption(f"{phase_label} 점수가 목표보다 0.2점 이상 낮은 역량을 차이가 큰 순서로 골라, 역량마다 공개교육과 이러닝 과정을 제안합니다. "
-               "공개교육은 다음 기수가 열린 과정만 보여 주고, 버튼을 누르면 최신 일정 페이지가 열립니다. "
+               "공개교육은 개강이 일주일 넘게 남은 기수가 있는 과정만 보여 주고, 버튼을 누르면 최신 일정 페이지가 열립니다. "
                "본인 응답에 근거한 제안이니 수강 여부는 교육담당자와 상의해 주세요.")
 
 

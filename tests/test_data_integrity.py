@@ -34,6 +34,18 @@ class DataIntegrityTests(unittest.TestCase):
         mapped = {m["factor_code"] for m in load_course_map()}
         self.assertEqual(active - mapped, set())
 
+    def test_course_titles_are_plain_text(self):
+        from tap.data import load_courses
+        titles = [row["title"] for row in load_courses()]
+        self.assertFalse([title for title in titles if "&#" in title or "&amp;" in title or "&quot;" in title])
+
+    def test_active_public_courses_carry_their_session_dates(self):
+        from tap.data import load_courses
+        public = [row for row in load_courses() if row["source"] == "public_edu_center" and row["active"]]
+        self.assertTrue(public)
+        self.assertTrue(all(len(start) == 8 for row in public for start in row["upcoming_starts"].split("|")),
+                        [row["course_id"] for row in public if not row.get("upcoming_starts")][:5])
+
     def test_pilot_candidates_are_separate_and_inactive(self):
         rows = load_pilot_item_candidates()
         self.assertEqual(len(rows), 16)
