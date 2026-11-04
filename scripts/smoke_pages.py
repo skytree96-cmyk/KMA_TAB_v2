@@ -51,10 +51,12 @@ def main() -> int:
         "현재 저장 방식",
         "짝지은",
         "소표본 보호",
-        "교육개발 전용 · 채용·승진·보상·성과평가에는 사용하지 않습니다.",
+        "채용·승진·보상·성과평가",
+        "인사평가",
         "교육 전과 후",
-        "교육 전후",
+        "교육 전/후",
         "교육 전·후",
+        "사전·사후",
     ):
         if forbidden in source:
             raise AssertionError(f"removed open-page content remains: {forbidden}")

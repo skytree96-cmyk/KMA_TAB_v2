@@ -79,13 +79,13 @@ def _render_demo_store_access_gate(config: DemoStoreConfig) -> None:
         help="합성 테스트 프로젝트 게시, 완료 결과 저장, 교육 전 결과 연결에만 사용합니다.",
     )
     if not config.write_enabled:
-        st.caption("완료 결과 저장 기능 또는 서버 접속코드가 미설정되어 현 세션·JSON 방식으로만 진행됩니다.")
+        st.caption("기획검증 저장 설정이 완료되지 않아 이 브라우저와 JSON 파일로만 진행합니다.")
     elif config.access_granted(_demo_access_code()):
         st.caption("접속코드 확인 완료 · 기획검증용 완료 결과 저장 기능을 사용할 수 있습니다.")
     elif _demo_access_code():
-        st.warning("기획검증 접속코드가 일치하지 않습니다. 현 세션·JSON 데이터는 그대로 유지됩니다.")
+        st.warning("기획검증 접속코드가 일치하지 않습니다.")
     else:
-        st.caption("기획검증용 저장·연결 기능을 사용하려면 전달받은 접속코드를 입력하세요.")
+        st.caption("기획검증용 저장·연결 기능을 쓰려면 받은 접속코드를 입력하세요.")
 
 
 def _set_demo_store_notice(level: str, message: str) -> None:
@@ -108,7 +108,7 @@ def _configured_demo_store() -> tuple[DemoStoreConfig | None, GitHubDemoStore | 
     except Exception as exc:  # configuration errors must not break the session flow
         _set_demo_store_notice(
             "error",
-            f"기획검증 저장 설정을 확인하지 못했습니다({type(exc).__name__}). 현 세션과 JSON 파일은 계속 사용할 수 있습니다.",
+            f"기획검증 저장 설정을 확인하지 못했습니다({type(exc).__name__}). 이 브라우저와 JSON 파일로는 계속 진행할 수 있습니다.",
         )
         return None, None
     return (
@@ -156,7 +156,7 @@ def _restore_demo_project(payload: Mapping[str, object], requested_code: str) ->
     stored_hash = str(payload.get("question_snapshot_hash", ""))
     raw_codes = payload.get("question_snapshot_codes")
     if not isinstance(raw_codes, list):
-        raise ValueError("문항 스냅샷 코드가 없습니다")
+        raise ValueError("문항 구성 코드가 없습니다")
     stored_codes = [str(value) for value in raw_codes]
     if (
         stored_hash != snapshot_hash
@@ -164,7 +164,7 @@ def _restore_demo_project(payload: Mapping[str, object], requested_code: str) ->
         or set(stored_codes) != set(expected_codes)
         or str(payload.get("assessment_version", "")) != f"TAP-1.0+{snapshot_hash[:12]}"
     ):
-        raise ValueError("현재 검사 버전·문항 스냅샷과 일치하지 않습니다")
+        raise ValueError("현재 검사 버전·문항 구성과 일치하지 않습니다")
 
     target_level = str(payload.get("target_level", ""))
     if target_level not in {"staff", "manager", "executive"}:
@@ -196,7 +196,7 @@ def _restore_demo_project(payload: Mapping[str, object], requested_code: str) ->
             <= parsed_dates["post_end_date"]
         )
     ):
-        raise ValueError("교육 전·후 검사 일정의 순서가 올바르지 않습니다")
+        raise ValueError("교육 전후 검사 일정의 순서가 올바르지 않습니다")
 
     raw_target_means = payload.get("target_means")
     if not isinstance(raw_target_means, Mapping):
@@ -328,7 +328,7 @@ def _load_demo_project(project_code: str) -> None:
 def _render_demo_project_entry() -> None:
     config, store = _configured_demo_store()
     if config is None or not config.enabled or store is None:
-        st.info("기획검증용 저장소가 미설정되어 현재 세션 또는 교육 전 기준파일(JSON)로 검사를 이어갑니다.")
+        st.info("기획검증용 저장소가 설정되지 않아 이 브라우저나 교육 전 기준파일(JSON)로 검사를 이어갑니다.")
         return
     try:
         query_value = st.query_params.get("project", "")
@@ -337,7 +337,7 @@ def _render_demo_project_entry() -> None:
         query_code = ""
     with st.container(border=True):
         st.markdown("### 테스트 프로젝트 코드로 시작")
-        st.caption("교육담당자가 전달한 프로젝트 코드를 입력하면 일정·역량·동일 문항 스냅샷을 안전하게 불러옵니다.")
+        st.caption("교육담당자에게 받은 프로젝트 코드를 입력하면 일정·역량·문항 구성을 그대로 불러옵니다.")
         _render_demo_store_access_gate(config)
         code = st.text_input(
             "프로젝트 코드",
@@ -390,7 +390,7 @@ def _restore_stored_pre_submission(
         or response_scale.get("minimum") != 0
         or response_scale.get("maximum") != 5
     ):
-        raise ValueError("현재 프로젝트의 검사 버전·문항 스냅샷과 일치하지 않습니다")
+        raise ValueError("현재 프로젝트의 검사 버전·문항 구성과 일치하지 않습니다")
 
     phases = payload.get("phases")
     pre = phases.get("pre") if isinstance(phases, Mapping) else None
@@ -443,8 +443,8 @@ def _render_stored_pre_submission_entry() -> None:
     with st.container(border=True):
         st.markdown("### 프로젝트 코드로 저장된 교육 전 결과 연결")
         st.caption(
-            "교육 전 검사에서 사용한 추측하기 어려운 가명 교육 참여자 ID를 입력하면 원문 ID를 전송하지 않고 "
-            "가명 연결키로 저장 결과를 조회합니다."
+            "교육 전 검사에서 쓴 교육 참여자 ID를 입력하세요. "
+            "ID 원문은 전송하지 않고 가명 연결키로만 저장된 결과를 찾습니다."
         )
         _render_demo_store_access_gate(config)
         load_participant_id_widget(st.session_state)
@@ -453,16 +453,16 @@ def _render_stored_pre_submission_entry() -> None:
             key=PARTICIPANT_ID_WIDGET_KEY,
             on_change=save_participant_id_widget,
             args=(st.session_state,),
-            help="교육담당자가 무작위로 배정한 동일한 가명 ID를 입력하세요. 이름·사번은 사용하지 마세요. 기획검증용 저장소에는 원문 ID가 저장되지 않습니다.",
+            help="교육담당자가 무작위로 배정한 같은 가명 ID를 입력하세요. 이름·사번은 사용하지 마세요. 기획검증용 저장소에는 원문 ID가 저장되지 않습니다.",
         )
         clicked = st.button("저장된 교육 전 결과 불러오기", type="primary", width="stretch")
     if not clicked:
         return
     if not config.write_enabled:
-        st.error("완료 결과 저장 기능 또는 서버 접속코드가 미설정되어 저장 결과를 조회할 수 없습니다. 기준파일(JSON)을 사용해 주세요.")
+        st.error("기획검증 저장 설정이 완료되지 않아 저장된 결과를 불러올 수 없습니다. 기준파일(JSON)을 사용해 주세요.")
         return
     if not config.access_granted(_demo_access_code()):
-        st.error("기획검증 접속코드를 입력하거나 다시 확인해 주세요. 기준파일(JSON) 방식은 계속 사용할 수 있습니다.")
+        st.error("기획검증 접속코드를 입력하거나 다시 확인해 주세요. 기준파일(JSON)로도 진행할 수 있습니다.")
         return
     participant_id = str(st.session_state.get("participant_id", "")).strip()
     if not participant_id:
@@ -491,7 +491,7 @@ def _render_stored_pre_submission_entry() -> None:
         return
     _set_demo_store_notice(
         "success",
-        "저장된 교육 전 검사결과를 안전하게 연결했습니다. 이제 교육 후 검사에 응답해 주세요.",
+        "저장된 교육 전 검사결과를 연결했습니다. 이제 교육 후 검사에 응답해 주세요.",
     )
     st.rerun()
 
@@ -499,10 +499,10 @@ def _render_stored_pre_submission_entry() -> None:
 def _retry_current_project_save() -> None:
     config, store = _configured_demo_store()
     if config is None or store is None or not config.write_enabled:
-        _set_demo_store_notice("warning", "완료 결과 저장 기능 또는 서버 접속코드가 미설정되어 아직 저장할 수 없습니다. 현 세션·JSON 방식은 유지됩니다.")
+        _set_demo_store_notice("warning", "기획검증 저장 설정이 완료되지 않아 아직 저장할 수 없습니다.")
         return
     if not config.access_granted(_demo_access_code()):
-        _set_demo_store_notice("warning", "기획검증 접속코드를 입력하거나 다시 확인해 주세요. 현 세션·JSON 방식은 유지됩니다.")
+        _set_demo_store_notice("warning", "기획검증 접속코드를 입력하거나 다시 확인해 주세요.")
         return
     try:
         store.save_project(project_payload_from_state(st.session_state))
@@ -517,15 +517,15 @@ def _save_completed_submission(phase: str) -> None:
     config, store = _configured_demo_store()
     if config is None or not config.enabled or store is None:
         st.session_state["demo_store_submission_pending_phase"] = None
-        _set_demo_store_notice("info", "검사는 완료되었습니다. 누적 저장소가 미설정되어 현 세션과 결과 파일 방식으로 보관합니다.")
+        _set_demo_store_notice("info", "검사를 완료했습니다. 누적 저장소가 설정되지 않아 결과는 이 브라우저와 결과 파일로만 보관합니다.")
         return
     if not config.write_enabled:
         st.session_state["demo_store_submission_pending_phase"] = phase
-        _set_demo_store_notice("warning", "검사는 완료되었지만 완료 결과 저장 기능 또는 서버 접속코드가 미설정되어 결과를 저장하지 못했습니다. 현 세션·JSON 결과는 유지됩니다.")
+        _set_demo_store_notice("warning", "검사를 완료했지만 기획검증 저장 설정이 완료되지 않아 결과를 저장하지 못했습니다. 이 브라우저의 결과와 JSON 파일은 그대로 있습니다.")
         return
     if not config.access_granted(_demo_access_code()):
         st.session_state["demo_store_submission_pending_phase"] = phase
-        _set_demo_store_notice("warning", "검사는 완료되었습니다. 기획검증 접속코드를 입력하거나 다시 확인하면 누적 저장을 재시도할 수 있으며, 현 세션·JSON 결과는 유지됩니다.")
+        _set_demo_store_notice("warning", "검사를 완료했습니다. 누적 저장하려면 기획검증 접속코드를 확인한 뒤 아래 '검사결과 저장 다시 시도'를 눌러 주세요.")
         return
     try:
         store.save_submission(
@@ -533,7 +533,7 @@ def _save_completed_submission(phase: str) -> None:
         )
     except Exception as exc:
         st.session_state["demo_store_submission_pending_phase"] = phase
-        _set_demo_store_notice("error", f"검사는 완료되었지만 결과 저장에 실패했습니다({type(exc).__name__}). 아래에서 다시 시도할 수 있습니다.")
+        _set_demo_store_notice("error", f"검사를 완료했지만 결과 저장에 실패했습니다({type(exc).__name__}). 아래에서 다시 시도할 수 있습니다.")
         return
     st.session_state["demo_store_submission_pending_phase"] = None
     _set_demo_store_notice("success", f"{phase_labels[phase]} 완료 결과를 기획검증용 저장소에 누적했습니다.")
@@ -544,8 +544,8 @@ def _render_post_baseline_entry(*, key: str) -> None:
     with st.container(border=True):
         st.markdown("### 교육 후 검사 이어하기")
         st.markdown(
-            "**1. 기준파일 선택 → 2. 교육 전 결과·참여자 ID 자동 복원 → "
-            "3. 교육 후 검사 시작**"
+            "기준파일을 선택하면 교육 전 결과와 참여자 ID가 자동으로 복원되고, "
+            "바로 교육 후 검사를 시작할 수 있습니다."
         )
         st.caption(
             "교육 전 검사 완료 직후 개인 리포트에서 저장한 "
@@ -556,8 +556,8 @@ def _render_post_baseline_entry(*, key: str) -> None:
             "교육 전 검사 기준파일(JSON)",
             type=["json"],
             help=(
-                "파일 안의 프로젝트·교육일·선택 역량·검사 버전·문항 스냅샷을 "
-                "현재 문항은행과 확인한 뒤 교육 후 검사 상태를 자동으로 구성합니다."
+                "파일에 담긴 프로젝트, 교육일, 선택 역량, 검사 버전, 문항 구성이 "
+                "현재 문항은행과 맞는지 확인한 뒤 교육 후 검사를 준비합니다."
             ),
             key=key,
         )
@@ -585,13 +585,13 @@ if not st.session_state.selected_factors:
         # Backward-compatible landing for existing /assessment bookmarks.
         page_header(
             "검사 참여",
-            "교육 전·후 검사 시작",
-            "새 메뉴에서는 교육 전 검사와 교육 후 검사가 분리되어 있습니다. 기존 링크에서는 두 이어가기 방법을 모두 제공합니다.",
+            "교육 전후 검사 시작",
+            "이전 링크로 연 화면입니다. 아래에서 프로젝트 코드나 기준파일로 시작하거나, 왼쪽 메뉴의 ‘교육 전 검사’·‘교육 후 검사’를 이용하세요.",
             badge="참여자",
         )
         _render_demo_project_entry()
         _render_post_baseline_entry(key="pre_baseline_bootstrap_uploader")
-        st.markdown("#### 교육 전 검사를 시작하시나요?")
+        st.markdown("#### 프로젝트 코드가 없는 경우")
         st.caption("교육담당자가 먼저 교육과정·일정·측정역량을 설정해야 합니다.")
         if st.button("교육평가 프로젝트 설정으로 이동", type="primary"):
             st.switch_page("pages/1_project_setup.py")
@@ -612,7 +612,7 @@ if not st.session_state.selected_factors:
             badge="교육 전",
         )
         _render_demo_project_entry()
-        st.markdown("#### 교육 전 검사를 시작하시나요?")
+        st.markdown("#### 프로젝트 코드가 없는 경우")
         st.caption("교육담당자가 먼저 교육과정·일정·측정역량을 설정해야 합니다.")
         if st.button("교육평가 프로젝트 설정으로 이동", type="primary"):
             st.switch_page("pages/1_project_setup.py")
@@ -658,7 +658,7 @@ snapshot_hash = hashlib.sha256(
 ).hexdigest()
 stored_snapshot = str(st.session_state.get("question_snapshot_hash", ""))
 if stored_snapshot and stored_snapshot != snapshot_hash:
-    st.error("프로젝트 저장 후 문항 버전이 변경되어 비교를 중단했습니다. 교육담당자가 새 프로젝트로 다시 설정해 주세요.")
+    st.error("프로젝트 저장 후 문항 버전이 바뀌어 비교를 중단했습니다. 교육담당자에게 문의해 주세요.")
     st.stop()
 if not stored_snapshot:
     st.session_state.question_snapshot_hash = snapshot_hash
@@ -678,20 +678,14 @@ if phase == "post" and not pre_complete:
     page_header(
         "검사 참여",
         f"교육 후 검사 이어하기 · {st.session_state.get('course_name', '교육과정')}",
-        "교육 전 검사 기준파일을 먼저 복원해야 동일 참여자·동일 문항의 변화를 비교할 수 있습니다.",
+        "교육 전 결과를 먼저 불러와야 같은 참여자·같은 문항으로 변화를 비교할 수 있습니다.",
         badge="교육 후",
-    )
-    callout(
-        "교육 전 검사 기준파일 필요",
-        "교육 전 검사 완료 직후 저장한 기준파일을 선택하면 프로젝트와 참여자 ID가 자동으로 복원됩니다.",
-        icon="!",
-        tone="warn",
     )
     _render_stored_pre_submission_entry()
     st.caption("저장 결과를 사용할 수 없다면 아래 교육 전 검사 기준파일(JSON)로도 이어갈 수 있습니다.")
     _render_post_baseline_entry(key="pre_baseline_post_uploader")
     st.caption(
-        "기준파일을 분실한 경우 현재 공개 데모에서는 교육 전·후 비교를 복원할 수 없습니다. "
+        "기준파일을 분실한 경우 공개 데모에서는 교육 전후 비교를 복원할 수 없습니다. "
         "교육담당자에게 문의해 주세요."
     )
     st.stop()
@@ -708,8 +702,7 @@ if outside_window and not st.session_state.get("allow_schedule_override", True):
     st.stop()
 if outside_window:
     st.caption(
-        "공개 시연 환경 · 검사기간 예외가 허용되어 현재도 실제 검사 제출이 가능합니다. "
-        "운영 전환 시 교육평가 프로젝트에서 예외 허용을 해제하세요."
+        "공개 시연 환경이라 검사기간 밖에서도 실제 검사 제출이 가능합니다."
     )
 
 if st.session_state.assessment_started_at is None:
@@ -719,7 +712,7 @@ if st.session_state.assessment_started_at is None:
 page_header(
     "검사 참여",
     f"{phase_labels[phase]} · {st.session_state.get('course_name', '교육과정')}",
-    "사전·사후 모두 동일하게 최근 8주 동안 실제 업무에서 나타난 행동을 기준으로 응답해 주세요.",
+    "교육 전후 모두 최근 8주 동안 업무에서 나타난 행동을 기준으로 응답해 주세요.",
     badge=phase_short_labels[phase],
 )
 
@@ -752,7 +745,7 @@ st.caption(
 
 callout(
     "교육개발 목적의 자기보고형 변화검사",
-    "양 시점의 동일 참여자·동일 문항 결과를 연결해 '교육 전후 관찰된 변화'를 봅니다. 채용·승진·보상·성과평가의 단독 판단자료로 사용하지 않습니다.",
+    "같은 참여자가 같은 문항에 교육 전과 후에 답한 결과를 비교해 '교육 전후 관찰된 변화'를 봅니다.",
     icon="i",
 )
 
@@ -764,14 +757,14 @@ st.text_input(
     on_change=save_participant_id_widget,
     args=(st.session_state,),
     disabled=pre_complete and not participant_id_missing,
-    help="교육 전·후에 교육담당자가 무작위로 배정한 같은 가명 ID를 사용하세요. 이름·사번처럼 추측 가능한 직접 식별정보는 입력하지 마세요.",
+    help="교육담당자가 무작위로 배정한 가명 ID를 교육 전후에 똑같이 사용하세요. 이름·사번처럼 추측 가능한 직접 식별정보는 입력하지 마세요.",
 )
 if pre_complete and not participant_id_missing:
     st.caption("교육 전 검사에 사용한 ID로 자동 연결되어 변경할 수 없습니다.")
 participant_id_missing = not str(st.session_state.get("participant_id", "")).strip()
 if participant_id_missing:
     st.warning(
-        "교육 전·후 결과를 연결할 교육 참여자 ID를 입력해 주세요. "
+        "교육 전후 결과를 연결할 교육 참여자 ID를 입력해 주세요. "
         "문항은 미리 볼 수 있지만 ID 입력 전에는 응답을 저장할 수 없습니다."
     )
 
@@ -792,8 +785,8 @@ def _render_transfer_environment() -> None:
     st.progress(1.0, text=f"{len(questions)}/{len(questions)} 역량문항 응답 완료")
     st.markdown("### 현업전이 환경 확인")
     st.caption(
-        "교육 내용을 실제 업무에 쓸 수 있었는지를 확인합니다. "
-        "아래 응답은 역량점수에 합산하지 않고, 변화의 맥락과 후속조치를 정하는 데만 사용합니다."
+        "교육 내용을 업무에 쓸 수 있었는지 묻습니다. "
+        "아래 응답은 역량점수에 합산하지 않고, 변화의 맥락과 후속조치를 정하는 데만 씁니다."
     )
     transfer_options = [1, 2, 3, 4, 5]
     transfer_labels = {
@@ -867,7 +860,7 @@ if st.session_state.assessment_completed:
         with post_col:
             if st.button("교육 후 검사로 이동", type="primary", width="stretch"):
                 safe_switch_page("pages/8_post_assessment.py")
-    elif st.button("교육 전·후 비교 리포트 보기", type="primary", width="stretch"):
+    elif st.button("교육 전후 비교 리포트 보기", type="primary", width="stretch"):
         safe_switch_page("pages/3_individual_report.py")
     st.stop()
 
@@ -904,7 +897,7 @@ with st.container(border=True):
             """
             <div class="tap-response-head tap-response-anchor">
               <b>얼마나 자주 했습니까?</b>
-              <span>해당 행동을 할 상황이 없었다면 0을 선택하세요.</span>
+              <span>해당 행동을 할 상황이 없었다면 ‘수행 기회 없음’을 선택하세요.</span>
             </div>
             """,
             unsafe_allow_html=True,

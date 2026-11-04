@@ -149,7 +149,7 @@ def render_company_scope_gate(
             "사업자등록번호",
             key=business_key,
             placeholder="숫자 10자리",
-            help="기업 가명키와 확인값 생성에만 사용하며 원문은 저장하지 않습니다.",
+            help="기업 가명키와 확인값을 만드는 데만 씁니다.",
         )
         st.caption(
             "사업자등록번호 원문은 기획검증용 저장소·프로젝트·리포트에 저장하지 않습니다. "
@@ -191,7 +191,7 @@ def render_company_scope_gate(
         if registry is None:
             if not config.project_write_enabled:
                 raise TenantError(
-                    "기업 참여 요청을 저장할 수 없습니다. KMA 관리자에게 저장소 설정을 확인해 주세요."
+                    "기업 참여 요청을 저장할 수 없습니다. KMA 관리자에게 저장소 설정 확인을 요청해 주세요."
                 )
             registry = GitHubDemoStore(
                 config,

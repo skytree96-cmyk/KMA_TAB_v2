@@ -59,17 +59,17 @@ def _render_pre_baseline_download(*, key: str) -> None:
         return
 
     with st.container(border=True):
-        st.markdown("#### 교육 후 검사 연결용 백업 파일")
+        st.markdown("#### 교육 후 검사 연결용 기준파일")
         st.markdown(
-            "**누적 저장 결과를 불러오지 못할 때만 사용하는 보조 수단입니다.** "
-            "다른 브라우저에서 이어할 가능성에 대비해 저장해 두세요."
+            "**누적 저장 결과를 불러오지 못할 때만 쓰는 보조 수단입니다.** "
+            "교육 후 검사를 다른 브라우저에서 할 수도 있으니 미리 저장해 두세요."
         )
         st.caption(
-            "교육 후에는 왼쪽 `교육 후 검사`로 이동해 같은 프로젝트 코드·교육 참여자 ID로 연결하세요. "
-            "저장 결과 조회가 어려울 때 이 기준파일을 불러오면 동일 문항의 사전 응답과 ID가 복원됩니다. "
-            "일반 결과 JSON과 다른 파일입니다. "
-            "파일에는 가명 ID와 문항별 응답이 있으므로 타인에게 전달하지 말고 본인만 안전하게 보관하세요. "
-            "SHA-256 검사는 우발적 파일 변경을 확인할 뿐, 전자서명이나 보안 인증은 아닙니다."
+            "교육 후에는 왼쪽 `교육 후 검사`에서 같은 프로젝트 코드와 교육 참여자 ID로 접속하세요. "
+            "이 파일을 불러오면 같은 문항의 교육 전 응답과 ID가 복원됩니다. "
+            "일반 결과 JSON과는 다른 파일입니다. "
+            "가명 ID와 문항별 응답이 들어 있으니 다른 사람에게 보내지 말고 본인만 보관하세요. "
+            "SHA-256 검사는 파일이 실수로 바뀌었는지만 확인하며, 전자서명이나 보안 인증은 아닙니다."
         )
         project_token = "".join(
             character
@@ -81,7 +81,7 @@ def _render_pre_baseline_download(*, key: str) -> None:
             or st.session_state.get("pre_end_date", "")
         ).replace("-", "")
         st.download_button(
-            "1. 교육 전 검사 기준파일 저장",
+            "교육 전 검사 기준파일 저장",
             baseline_bytes,
             f"tap_pre_baseline_{project_token}_{completed_at}.json",
             "application/json",
@@ -106,10 +106,7 @@ def _render_incomplete_progress(phase: str, responses: dict[str, object]) -> Non
         c_answered.metric("저장된 응답", f"{answered}/{total}문항")
         c_missing.metric("미응답", f"{missing}문항")
         st.progress(answered / total if total else 0.0)
-        st.warning(
-            "검사가 최종 제출되기 전에는 임시 점수·교육 추천·결과 파일을 제공하지 않습니다. "
-            "검사 화면에서 남은 문항을 완료해 주세요."
-        )
+        st.warning("검사 화면에서 남은 문항을 마치고 최종 제출해 주세요.")
         if st.button(
             f"{phase_label} 검사로 돌아가기",
             type="primary",
@@ -167,7 +164,7 @@ elif not has_pre_post:
     st.stop()
 else:
     current_responses = post_responses
-    current_phase_label = "교육 전·후 완료 결과"
+    current_phase_label = "교육 전후 완료 결과"
     report_phase = "post"
 
 results = score_responses(questions, current_responses, st.session_state.target_means)
@@ -175,7 +172,7 @@ valid_results = [row for row in results if row["status"] == "산출"]
 
 page_header(
     "개인 리포트",
-    "나의 교육 전·후 역량평가" if has_pre_post else current_phase_label,
+    "나의 교육 전후 역량평가" if has_pre_post else current_phase_label,
     (
         "같은 문항에서 교육 전과 교육 후의 자기보고 행동빈도 변화를 확인합니다."
         if has_pre_post
@@ -186,7 +183,7 @@ page_header(
 
 if not has_pre_post and pending_phase:
     st.warning(
-        "사전·사후 검사가 모두 완료되어야 변화 리포트를 확정할 수 있습니다. "
+        "교육 전후 검사를 모두 마쳐야 변화 리포트가 나옵니다. "
         f"아래에는 {current_phase_label}만 표시하며, 진행 중 응답은 점수에 포함하지 않습니다."
     )
     _render_incomplete_progress(pending_phase, pending_responses)
@@ -195,7 +192,7 @@ _render_post_assessment_cta()
 _render_pre_baseline_download(key="pre_baseline_download")
 
 if has_pre_post:
-    st.success("현재 브라우저에 저장된 실제 교육 전·후 완료 응답을 비교하고 있습니다.")
+    st.success("이 브라우저에 저장된 교육 전후 완료 응답을 비교했습니다.")
     pre_results = score_responses(questions, pre_responses, st.session_state.target_means)
     post_results = score_responses(questions, post_responses, st.session_state.target_means)
     scored_changes = score_pre_post_responses(
@@ -216,22 +213,20 @@ if has_pre_post:
     post_na_count = sum(int(row["post_na_items"]) for row in change_rows)
     average_change = mean(float(row["change"]) for row in comparable) if comparable else None
     largest = max(comparable, key=lambda row: abs(float(row["change"]))) if comparable else None
-    change_direction = (
-        "증가" if largest and float(largest["change"]) > 0
-        else "감소" if largest and float(largest["change"]) < 0
-        else "변화 없음"
-    )
-    headline = (
-        f"{escape(str(largest['factor_name_ko']))}에서 가장 큰 관찰 변화가 "
-        f"{change_direction} {float(largest['change']):+.2f}점으로 나타났습니다."
-        if largest
-        else "공통 유효문항이 부족해 교육 전·후 변화를 산출하지 못했습니다."
-    )
+    if largest is None:
+        headline = "공통 유효문항이 부족해 교육 전후 변화를 산출하지 못했습니다."
+    elif round(float(largest["change"]), 2) == 0:
+        headline = "비교한 역량 모두 관찰 변화가 없습니다."
+    else:
+        headline = (
+            f"관찰 변화가 가장 큰 역량은 {escape(str(largest['factor_name_ko']))}"
+            f"({float(largest['change']):+.2f}점)입니다."
+        )
     st.markdown(
         f"""
         <section class="tap-report-hero">
           <div>
-            <span class="tap-chip teal">교육 전·후 비교</span>
+            <span class="tap-chip teal">교육 전후 비교</span>
             <h2>{headline}</h2>
             <p>같은 문항에 두 시점 모두 1~5점으로 응답한 결과만 비교했습니다. 변화는 관찰값이며 교육의 인과효과를 뜻하지 않습니다.</p>
           </div>
@@ -263,7 +258,7 @@ if has_pre_post:
             "status": "비교상태",
         }
     )
-    st.subheader("역량별 교육 전·후 비교")
+    st.subheader("역량별 교육 전후 비교")
     st.dataframe(
         comparison_frame[
             [
@@ -293,7 +288,7 @@ if has_pre_post:
             messages.append("교육 전: " + ", ".join(pre_flags))
         if post_flags:
             messages.append("교육 후: " + ", ".join(post_flags))
-        st.warning("응답 품질 확인 신호 · " + " / ".join(messages) + ". 자동 무효처리하지 않습니다.")
+        st.warning("응답 품질 참고 · " + " / ".join(messages) + ". 이 표시만으로 결과를 무효 처리하지 않습니다.")
 
     callout(
         "해석 범위",
@@ -319,13 +314,13 @@ if has_pre_post:
         with column:
             with st.container(border=True):
                 st.markdown(f"**{label}**")
-                st.metric("사후 확인", "미수집" if value is None else f"{float(value):.1f}/5")
-                st.caption("점수 변화의 맥락을 해석하기 위해 확인합니다.")
+                st.metric("교육 후 응답", "미수집" if value is None else f"{float(value):.1f}/5")
+    st.caption("네 항목은 점수 변화를 해석할 때 참고합니다.")
     st.markdown(
         """
-        1. 변화가 작거나 감소한 행동은 실제 적용기회와 업무환경을 먼저 확인합니다.
+        1. 변화가 작거나 줄어든 행동은 적용기회와 업무환경부터 점검합니다.
         2. 변화가 나타난 행동은 현업 과제와 피드백으로 반복합니다.
-        3. 같은 기준의 추적검사에서 변화가 유지되는지 확인합니다.
+        3. 변화가 유지되는지는 다음 교육평가 프로젝트에서 같은 기준으로 다시 측정해 봅니다.
         """
     )
 else:
@@ -333,14 +328,23 @@ else:
         valid_results,
         key=lambda row: float(row["score_1_to_5"]) if row["score_1_to_5"] is not None else -1,
     )
-    development_name = valid_sorted[0]["factor_name_ko"] if valid_sorted else "유효응답 확인"
+    if len(valid_sorted) >= 2:
+        development_headline = (
+            f"평균이 가장 낮은 {escape(str(valid_sorted[0]['factor_name_ko']))}부터 살펴보세요."
+        )
+    elif valid_sorted:
+        development_headline = (
+            f"산출된 역량은 {escape(str(valid_sorted[0]['factor_name_ko']))} 1개입니다."
+        )
+    else:
+        development_headline = "산출된 역량이 없습니다. 유효응답 수를 확인해 주세요."
     st.markdown(
         f"""
         <section class="tap-report-hero">
           <div>
             <span class="tap-chip teal">{current_phase_label} · 최근 8주 자기보고</span>
-            <h2>{escape(str(development_name))}은 개발 맥락을 먼저 살펴볼 후보입니다.</h2>
-            <p>외부 규준·백분위가 아닌 1~5점 행동빈도 평균입니다. 작은 점수 차이는 측정오차일 수 있으므로 역량 순위로 확정하지 않습니다.</p>
+            <h2>{development_headline}</h2>
+            <p>외부 규준·백분위가 아닌 1~5점 행동빈도 평균입니다. 작은 점수 차이는 측정오차일 수 있으니 역량 순위로 보지 마세요.</p>
           </div>
           <div class="tap-score-callout">
             <small>측정한 역량</small>
@@ -389,27 +393,27 @@ else:
 
     flags = response_quality_flags(current_responses, st.session_state.get("duration_seconds"))
     if flags:
-        st.warning("응답 품질 확인 신호: " + ", ".join(flags) + ". 자동 무효처리하지 않습니다.")
+        st.warning("응답 품질 참고 · " + ", ".join(flags) + ". 이 표시만으로 결과를 무효 처리하지 않습니다.")
 
     callout(
         "해석 범위",
-        "이 결과는 교육개발을 위한 자기보고 행동빈도이며 규준 비교·개인 순위·채용·승진 판단에 사용할 수 없습니다.",
+        "이 결과는 교육·개발용 자기보고 행동빈도이며, 개인 순위를 매기는 데 쓰지 않습니다.",
         icon="i",
     )
 
 if has_pre_post or report_phase == "post":
     st.subheader("교육 후 후속지원")
-    st.caption("사후점수가 낮다는 이유만으로 재교육을 자동 추천하지 않습니다.")
+    st.caption("교육 후 점수가 낮다는 이유만으로 재교육을 자동 추천하지 않습니다.")
     callout(
-        "현업 전이를 먼저 확인하세요",
-        "적용기회, 상사 피드백, 도구와 권한, 업무 프로세스를 확인한 뒤 보충학습이나 코칭을 결정합니다.",
+        "현업 적용 여건부터 점검하세요",
+        "적용기회, 상사 피드백, 도구와 권한, 업무 프로세스를 살펴본 뒤 보충학습이나 코칭을 정합니다.",
         icon="i",
     )
 else:
     st.subheader("교육과정 검토 우선순위")
-    st.caption("검토점수는 대화를 돕는 운영 휴리스틱이며 정밀한 측정점수나 교육효과 예측치가 아닙니다.")
+    st.caption("검토점수는 과정 검토 순서를 정하는 참고값이며, 측정점수나 교육효과 예측치가 아닙니다.")
     if st.session_state.training_cause == "system_only":
-        st.info("주된 원인이 권한·도구·프로세스 등 시스템 요인으로 판정되어 교육 추천을 중단했습니다.")
+        st.info("주원인이 권한·도구·프로세스 같은 시스템 요인으로 설정되어 교육 과정을 추천하지 않습니다.")
     else:
         ranked = rank_courses(
             results,

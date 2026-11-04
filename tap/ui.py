@@ -858,15 +858,15 @@ def _render_sidebar() -> str:
         notes = {
             "company": (
                 "회원사 교육담당자 화면",
-                "교육 일정과 사전·사후 참여율을 운영하고 전·후 유효응답 N≥5 조직 변화를 확인합니다.",
+                "교육 일정과 검사 참여율을 관리하고, 교육 전후 유효응답이 N≥5인 조직 변화를 확인합니다.",
             ),
             "participant": (
                 "참여자 교육평가 화면",
-                "본인의 사전·사후 검사와 변화 리포트만 확인합니다. 결과 공유 동의는 선택입니다.",
+                "본인의 교육 전후 검사와 변화 리포트만 확인합니다. 결과 공유 동의는 선택입니다.",
             ),
             "kma": (
                 "KMA 관리자 화면",
-                "회원사 운영상태·문항 버전·과정 매핑·감사로그만 관리합니다.",
+                "회원사 운영상태, 문항 버전, 과정 매핑과 감사로그만 관리합니다.",
             ),
         }
         title, body = notes[selected_role]
@@ -920,14 +920,14 @@ def dashboard_hero() -> None:
           <div class="tap-hero-copy">
             <span class="tap-chip teal">교육 전후 역량평가 · 회원사 제공</span>
             <h2>교육 전후의 변화를<br>같은 기준으로 확인합니다.</h2>
-            <p>교육 전 출발점을 기록하고, 교육 후 현업 적용 시점에 같은 행동문항으로 다시 측정해 개인·조직의 관찰된 변화와 현업 적용환경을 확인합니다.</p>
+            <p>교육 전 행동을 기록하고, 교육 후 현업 적용 시점에 같은 행동문항으로 다시 측정합니다. 개인·조직의 관찰된 변화와 현업 적용환경을 함께 봅니다.</p>
           </div>
           <div class="tap-loop-card">
-            <div class="tap-loop-step"><span>1</span>사전검사</div>
+            <div class="tap-loop-step"><span>1</span>교육 전 검사</div>
             <div class="tap-loop-arrow"></div>
             <div class="tap-loop-step"><span>2</span>교육·현업 적용</div>
             <div class="tap-loop-arrow"></div>
-            <div class="tap-loop-step"><span>3</span>사후검사</div>
+            <div class="tap-loop-step"><span>3</span>교육 후 검사</div>
             <div class="tap-loop-arrow"></div>
             <div class="tap-loop-step"><span>4</span>변화·전이 리포트</div>
           </div>

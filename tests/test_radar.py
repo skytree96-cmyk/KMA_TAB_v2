@@ -88,15 +88,14 @@ class RadarTests(unittest.TestCase):
         self.assertIn("교육 전", html)
         self.assertIn("교육 후", html)
         self.assertIn("척도 1~5", html)
-        self.assertIn("전·후 유효응답 N", html)
+        self.assertIn("전후 유효응답 N", html)
         self.assertEqual(8, html.count('<th scope="row">'))
 
     def test_fewer_than_eight_uses_actual_axis_count_without_fake_data(self) -> None:
         html = build_pre_post_radar_html([_row(index) for index in range(1, 6)])
 
         self.assertIn('data-axis-count="5"', html)
-        self.assertIn("공개 가능한 5개 역량을 실제 축으로 표시했습니다", html)
-        self.assertIn("가상 축은 추가하지 않았습니다", html)
+        self.assertIn("공개 가능한 역량 5개를 모두 표시했습니다", html)
         self.assertNotIn("역량 6", html)
 
     def test_one_or_two_public_factors_show_message_instead_of_svg(self) -> None:
@@ -104,8 +103,8 @@ class RadarTests(unittest.TestCase):
 
         self.assertIn('data-axis-count="2"', html)
         self.assertNotIn("<svg", html)
-        self.assertIn("최소 3개 필요", html)
-        self.assertIn("가짜 축은 추가하지 않았습니다", html)
+        self.assertIn("3개 이상일 때 그립니다", html)
+        self.assertIn("지금은 2개입니다", html)
         # Public values remain available in the accessible fallback table.
         self.assertEqual(2, html.count('<th scope="row">'))
 

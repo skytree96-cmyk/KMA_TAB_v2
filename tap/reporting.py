@@ -278,7 +278,7 @@ def prepare_group_results(
         if GROUP_SESSION_COLUMN in work.columns:
             missing_quality = [column for column in GROUP_QUALITY_COLUMNS if column not in work.columns]
             if missing_quality:
-                errors.append("사전·사후 품질 확인을 위해 다음 열이 필요합니다: " + ", ".join(missing_quality))
+                errors.append("교육 전후 품질 확인을 위해 다음 열이 필요합니다: " + ", ".join(missing_quality))
             elif not work.empty:
                 quality_total = work[list(GROUP_QUALITY_COLUMNS)].sum(axis=1)
                 inconsistent_total = quality_total.ne(4)
@@ -302,7 +302,7 @@ def prepare_group_results(
                     pre_dates = group.loc[group[GROUP_SESSION_COLUMN].eq("pre"), "_assessment_date"].dropna()
                     post_dates = group.loc[group[GROUP_SESSION_COLUMN].eq("post"), "_assessment_date"].dropna()
                     if not pre_dates.empty and not post_dates.empty and pre_dates.max() >= post_dates.min():
-                        message = "동일 참여자·역량의 사전검사일은 사후검사일보다 빨라야 합니다."
+                        message = "같은 참여자·역량의 교육 전 검사일은 교육 후 검사일보다 빨라야 합니다."
                         if allow_schedule_override:
                             warnings.append(
                                 message
@@ -523,7 +523,7 @@ def _score_text(value: float | None) -> str:
 
 
 _PRE_POST_CSS = """
-.tap-change-list{display:grid;gap:12px}.tap-change-row{display:grid;grid-template-columns:42mm 1fr 16mm;gap:10px;align-items:center;padding:10px 0;border-bottom:1px solid #edf2f1;break-inside:avoid;page-break-inside:avoid}.tap-change-row b,.tap-change-row small{display:block}.tap-change-row b{font-size:12px}.tap-change-row small{font-size:9px;color:#53696b;margin-top:2px}.tap-change-track{position:relative;height:18px}.tap-change-track:before{content:"";position:absolute;left:0;right:0;top:8px;height:2px;background:#dfe9e7}.tap-change-link{position:absolute;top:7px;height:4px;border-radius:9px;background:#7dcfc7}.tap-change-dot{position:absolute;top:3px;width:11px;height:11px;border-radius:50%;transform:translateX(-50%);border:2px solid #fff;box-shadow:0 0 0 1px #a8b8b6}.tap-change-dot.pre{background:#8a9998}.tap-change-dot.post{background:#087b76;box-shadow:0 0 0 1px #087b76}.tap-change-value{text-align:right;font-size:12px}.tap-change-value.positive{color:#087b76}.tap-change-value.negative{color:#963728}.tap-legend{display:flex;gap:14px;margin:8px 0 18px;color:#53696b;font-size:10px}.tap-legend i{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:4px}.tap-legend .pre{background:#8a9998}.tap-legend .post{background:#087b76}.tap-transfer-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}.tap-transfer-card{border:1px solid #d8e4e2;border-radius:13px;padding:16px}.tap-transfer-card b,.tap-transfer-card span{display:block}.tap-transfer-card b{font-size:11px}.tap-transfer-card strong{display:block;font-size:23px;margin:8px 0 3px}.tap-transfer-card span{font-size:9px;color:#53696b;line-height:1.45}.tap-action-list{display:grid;gap:9px;margin-top:18px}.tap-action{display:grid;grid-template-columns:24px 1fr;gap:10px;padding:12px;border-radius:11px;background:#f7faf9}.tap-action>span{width:24px;height:24px;border-radius:50%;display:grid;place-items:center;background:#087b76;color:#fff;font-size:10px;font-weight:900}.tap-action b,.tap-action small{display:block}.tap-action small{color:#53696b;margin-top:3px;font-size:9px}.tap-quality-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:9px;margin:16px 0}.tap-quality-grid div{padding:12px;border:1px solid #d8e4e2;border-radius:11px}.tap-quality-grid b,.tap-quality-grid span{display:block}.tap-quality-grid b{font-size:18px}.tap-quality-grid span{font-size:9px;color:#53696b;margin-top:3px}
+.tap-change-list{display:grid;gap:12px}.tap-change-row{display:grid;grid-template-columns:42mm 1fr 16mm;gap:10px;align-items:center;padding:10px 0;border-bottom:1px solid #edf2f1;break-inside:avoid;page-break-inside:avoid}.tap-change-row b,.tap-change-row small{display:block}.tap-change-row b{font-size:12px}.tap-change-row small{font-size:9px;color:#53696b;margin-top:2px}.tap-change-track{position:relative;height:18px}.tap-change-track:before{content:"";position:absolute;left:0;right:0;top:8px;height:2px;background:#dfe9e7}.tap-change-link{position:absolute;top:7px;height:4px;border-radius:9px;background:#7dcfc7}.tap-change-dot{position:absolute;top:3px;width:11px;height:11px;border-radius:50%;transform:translateX(-50%);border:2px solid #fff;box-shadow:0 0 0 1px #a8b8b6}.tap-change-dot.pre{background:#8a9998}.tap-change-dot.post{background:#087b76;box-shadow:0 0 0 1px #087b76}.tap-change-value{text-align:right;font-size:12px}.tap-change-value.positive{color:#087b76}.tap-change-value.negative{color:#963728}.tap-legend{display:flex;gap:14px;margin:8px 0 18px;color:#53696b;font-size:10px}.tap-legend i{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:4px}.tap-legend .pre{background:#8a9998}.tap-legend .post{background:#087b76}.tap-transfer-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}.tap-transfer-card{border:1px solid #d8e4e2;border-radius:13px;padding:16px}.tap-transfer-card b,.tap-transfer-card span{display:block}.tap-transfer-card b{font-size:11px}.tap-transfer-card strong{display:block;font-size:23px;margin:8px 0 3px}.tap-transfer-card span{font-size:9px;color:#53696b;line-height:1.45}.tap-action-list{display:grid;gap:9px;margin-top:18px}.tap-action{display:grid;grid-template-columns:24px 1fr;gap:10px;padding:12px;border-radius:11px;background:#f7faf9}.tap-action>span{width:24px;height:24px;border-radius:50%;display:grid;place-items:center;background:#087b76;color:#fff;font-size:10px;font-weight:900}.tap-action b,.tap-action small{display:block}.tap-action small{color:#53696b;margin-top:3px;font-size:9px}.tap-quality-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:9px;margin:16px 0}.tap-quality-grid div{padding:12px;border:1px solid #d8e4e2;border-radius:11px}.tap-quality-grid b,.tap-quality-grid span{display:block}.tap-quality-grid b{font-size:18px}.tap-quality-grid span{font-size:9px;color:#53696b;margin-top:3px}
 """
 
 _PRE_POST_CHANGE_ROWS_PER_PAGE = 10
@@ -547,11 +547,11 @@ def _pre_post_report_body(model: Mapping[str, Any]) -> str:
 
     if largest:
         summary = (
-            f"전·후 비교 참여자 기준 가장 큰 관찰 변화는 <b>{escape(str(largest['factor_name_ko']))}</b> "
-            f"{float(largest['change']):+.2f}점입니다. 비교집단이 없는 자기보고 변화는 교육의 인과효과로 확정하지 않습니다."
+            f"전후 비교 참여자 기준으로 관찰 변화가 가장 큰 역량은 <b>{escape(str(largest['factor_name_ko']))}</b>"
+            f"({float(largest['change']):+.2f}점)입니다. 비교집단이 없어 교육의 인과효과로 단정할 수는 없습니다."
         )
     else:
-        summary = "공개 가능한 사전·사후 비교 결과가 없습니다. 사전·사후 완료자 수와 표본 보호 기준을 확인하세요."
+        summary = "공개할 수 있는 교육 전후 비교 결과가 없습니다. 교육 전후 완료자 수와 표본 보호 기준을 확인하세요."
 
     change_rows: list[str] = []
     detail_rows: list[str] = []
@@ -568,7 +568,7 @@ def _pre_post_report_body(model: Mapping[str, Any]) -> str:
             change_rows.append(
                 f"""
                 <div class="tap-change-row">
-                  <div><b>{escape(str(row['factor_name_ko']))}</b><small>교육 전 {float(pre_score):.2f} · 교육 후 {float(post_score):.2f} · 전·후 유효응답 N={row['paired_n']}</small></div>
+                  <div><b>{escape(str(row['factor_name_ko']))}</b><small>교육 전 {float(pre_score):.2f} · 교육 후 {float(post_score):.2f} · 전후 유효응답 N={row['paired_n']}</small></div>
                   <div class="tap-change-track"><span class="tap-change-link" style="left:{link_left:.1f}%;width:{link_width:.1f}%"></span><i class="tap-change-dot pre" style="left:{pre_pos:.1f}%"></i><i class="tap-change-dot post" style="left:{post_pos:.1f}%"></i></div>
                   <strong class="tap-change-value {tone}">{float(change):+.2f}</strong>
                 </div>
@@ -591,11 +591,11 @@ def _pre_post_report_body(model: Mapping[str, Any]) -> str:
             value = detail.get("mean")
             n = int(detail.get("n", 0))
             display = "비공개" if value is None else f"{float(value):.2f}"
-            note = f"전·후 유효응답 N={n} · {detail.get('status', '')}"
+            note = f"전후 유효응답 N={n} · {detail.get('status', '')}"
         else:
             value = detail
             display = "미수집" if value is None else f"{float(value):.2f}"
-            note = "사후 1~5점 평균" if value is not None else "후속 설문에서 확인 필요"
+            note = "교육 후 1~5점 평균" if value is not None else "후속 설문에서 확인 필요"
         transfer_cards.append(
             f'<div class="tap-transfer-card"><b>{label}</b><strong>{display}</strong><span>{note}</span></div>'
         )
@@ -603,9 +603,9 @@ def _pre_post_report_body(model: Mapping[str, Any]) -> str:
     public_changes = [float(row["change"]) for row in comparison_rows if row.get("change") is not None]
     average_change = mean(public_changes) if public_changes else None
     action_rows = [
-        ("1", "변화가 작거나 감소한 역량", "교육내용보다 적용기회·상사지원·도구·권한을 먼저 확인합니다."),
-        ("2", "변화가 확인된 행동", "현업 과제와 피드백으로 반복해 유지 여부를 다음 추적검사에서 확인합니다."),
-        ("3", "다음 측정", "같은 문항·척도·회상기간과 도구버전을 유지하고 전·후 모두 완료한 참여자를 추적합니다."),
+        ("1", "변화가 작거나 감소한 역량", "교육 내용을 바꾸기 전에 적용기회, 상사 지원, 도구와 권한부터 점검합니다."),
+        ("2", "변화가 확인된 행동", "현업 과제와 피드백으로 반복하고, 유지 여부는 다음 교육평가 프로젝트에서 다시 측정합니다."),
+        ("3", "다음 측정", "같은 문항, 척도, 회상기간과 도구버전을 유지하고 교육 전후 검사를 모두 완료한 참여자를 추적합니다."),
     ]
     actions = "".join(
         f'<div class="tap-action"><span>{number}</span><div><b>{title}</b><small>{detail}</small></div></div>'
@@ -621,7 +621,7 @@ def _pre_post_report_body(model: Mapping[str, Any]) -> str:
         page_label = f" ({page_number}/{len(change_chunks)})" if len(change_chunks) > 1 else ""
         average_block = (
             f'<div class="tap-report-method"><b>관찰 변화 평균</b><span>{average_change_text}점 · '
-            "역량별 차이와 적용 맥락을 함께 확인하세요.</span></div>"
+            f"공개 역량 {len(public_changes)}개 기준</span></div>"
             if page_number == len(change_chunks)
             else ""
         )
@@ -630,9 +630,9 @@ def _pre_post_report_body(model: Mapping[str, Any]) -> str:
             <section class="tap-report-sheet tap-report-change-page">
               {sample_badge}
               <div class="tap-report-kicker">01 · 교육 전후 비교{page_label}</div>
-              <h2>교육 전과 교육 후를 같은 1~5점 축에서 봅니다</h2>
-              <p class="tap-report-desc">회색은 교육 전, 청록은 교육 후입니다. 변화량은 같은 참여자의 사후−사전 평균이며 작은 차이를 효과로 단정하지 않습니다.</p>
-              <div class="tap-legend"><span><i class="pre"></i>교육 전</span><span><i class="post"></i>교육 후</span><span>공개 기준 전·후 유효응답 N≥{pre_post.get('min_group_n', 5)}</span></div>
+              <h2>역량별 교육 전후 평균(1~5점)</h2>
+              <p class="tap-report-desc">변화량은 같은 참여자의 교육 후−교육 전 평균이며 작은 차이를 효과로 단정하지 않습니다.</p>
+              <div class="tap-legend"><span><i class="pre"></i>교육 전</span><span><i class="post"></i>교육 후</span><span>공개 기준 전후 유효응답 N≥{pre_post.get('min_group_n', 5)}</span></div>
               <div class="tap-change-list">{''.join(page_rows) or '<p>공개 가능한 비교 결과 없음</p>'}</div>
               {average_block}
               <footer>서로 다른 참여자 집단의 평균을 단순 차감하지 않았습니다.</footer>
@@ -647,8 +647,8 @@ def _pre_post_report_body(model: Mapping[str, Any]) -> str:
         quality_block = (
             f"""
             <div class="tap-quality-grid">
-              <div><b>{pre_post['paired_participant_count']}명</b><span>전·후 비교 참여자</span></div>
-              <div><b>{pre_post['attrition_count']}명</b><span>사후 미완료</span></div>
+              <div><b>{pre_post['paired_participant_count']}명</b><span>전후 비교 참여자</span></div>
+              <div><b>{pre_post['attrition_count']}명</b><span>교육 후 미완료</span></div>
               <div><b>{pre_na}</b><span>교육 전 수행기회 없음</span></div>
               <div><b>{post_na}</b><span>교육 후 수행기회 없음</span></div>
             </div>
@@ -659,8 +659,8 @@ def _pre_post_report_body(model: Mapping[str, Any]) -> str:
         method_block = (
             f"""
             <div class="tap-report-method-grid">
-              <div><b>비교 규칙</b><span>동일 교육 참여자 ID·동일 역량·교육 전/후가 모두 있는 참여자만 변화 산출</span></div>
-              <div><b>집계 보호</b><span>전·후 유효응답 N&lt;{pre_post.get('min_group_n', 5)} 비공개. 이 기준은 통계적 안정성을 보장하지 않음</span></div>
+              <div><b>비교 규칙</b><span>동일 교육 참여자 ID, 동일 역량의 교육 전후 결과가 모두 있는 참여자만 변화 산출</span></div>
+              <div><b>집계 보호</b><span>전후 유효응답 N&lt;{pre_post.get('min_group_n', 5)} 비공개. 이 기준은 통계적 안정성을 보장하지 않음</span></div>
               <div><b>허용 표현</b><span>교육 전후 자기보고 행동빈도 변화</span></div>
               <div><b>금지 표현</b><span>비교집단 없는 결과를 교육의 인과효과로 확정</span></div>
             </div>
@@ -673,9 +673,9 @@ def _pre_post_report_body(model: Mapping[str, Any]) -> str:
             <section class="tap-report-sheet tap-report-detail-page">
               {sample_badge}
               <div class="tap-report-kicker">03 · 데이터 품질 및 상세{page_label}</div>
-              <h2>전·후 유효응답 N과 수행기회 정보를 함께 공개합니다</h2>
+              <h2>역량별 응답 수와 수행기회 현황</h2>
               {quality_block}
-              <table class="tap-report-table"><thead><tr><th>역량</th><th>전 N</th><th>후 N</th><th>전·후 유효응답 N</th><th>교육 전</th><th>교육 후</th><th>변화</th><th>상태</th></tr></thead><tbody>{''.join(page_rows)}</tbody></table>
+              <table class="tap-report-table"><thead><tr><th>역량</th><th>전 N</th><th>후 N</th><th>전후 유효응답 N</th><th>교육 전</th><th>교육 후</th><th>변화</th><th>상태</th></tr></thead><tbody>{''.join(page_rows)}</tbody></table>
               {method_block}
               <footer>KMA TAP · 도구버전, 검사 간격, 회상기간을 동일하게 유지하세요.</footer>
             </section>
@@ -685,19 +685,19 @@ def _pre_post_report_body(model: Mapping[str, Any]) -> str:
     return dedent(f"""
     <section class="tap-report-sheet tap-report-cover">
       {sample_badge}
-      <header class="tap-report-brand"><span>TAP</span><div><b>KMA TAP</b><small>교육 전·후 업무행동 변화</small></div></header>
-      <div class="tap-report-kicker">조직 리포트 · 사전·사후 비교</div>
-      <h1>조직 교육 전·후 변화 리포트</h1>
-      <p class="tap-report-lead">같은 참여자의 교육 전·후 응답을 연결해 관찰된 행동빈도 변화를 확인합니다.</p>
+      <header class="tap-report-brand"><span>TAP</span><div><b>KMA TAP</b><small>교육 전후 업무행동 변화</small></div></header>
+      <div class="tap-report-kicker">조직 리포트 · 교육 전후 비교</div>
+      <h1>조직 교육 전후 변화 리포트</h1>
+      <p class="tap-report-lead">같은 참여자의 교육 전후 응답을 비교해 관찰된 행동빈도 변화를 정리했습니다.</p>
       <div class="tap-report-meta"><b>{escape(str(model['project_name']))}</b><span>{escape(str(model['report_period']))}</span><span>생성일 {model['generated_on']}</span></div>
       <div class="tap-report-kpis">
         <div><b>{pre_post['pre_participant_count']}명</b><span>교육 전 참여</span></div>
         <div><b>{pre_post['post_participant_count']}명</b><span>교육 후 참여</span></div>
-        <div><b>{pre_post['paired_participant_count']}명</b><span>전·후 비교 참여자</span></div>
-        <div><b>{attrition_text}</b><span>사후 이탈률</span></div>
+        <div><b>{pre_post['paired_participant_count']}명</b><span>전후 비교 참여자</span></div>
+        <div><b>{attrition_text}</b><span>교육 후 이탈률</span></div>
       </div>
       <div class="tap-report-summary">{summary}</div>
-      <footer>자기보고 행동빈도 · 동일 참여자 사전·사후 비교 · 개인순위 미제공</footer>
+      <footer>자기보고 행동빈도 · 동일 참여자 교육 전후 비교 · 개인순위 미제공</footer>
     </section>
 
     {'\n'.join(change_pages)}
@@ -705,12 +705,12 @@ def _pre_post_report_body(model: Mapping[str, Any]) -> str:
     <section class="tap-report-sheet">
       {sample_badge}
       <div class="tap-report-kicker">02 · 전이요인과 후속조치</div>
-      <h2>점수보다 먼저 실제 적용 여건을 확인합니다</h2>
-      <p class="tap-report-desc">교육 후 행동은 학습뿐 아니라 업무 적용기회, 주변의 지원, 도구와 권한의 영향을 받습니다.</p>
+      <h2>점수보다 적용 여건을 먼저 봅니다</h2>
+      <p class="tap-report-desc">교육 후 행동에는 학습 내용과 함께 업무 적용기회, 상사·동료 지원, 도구·권한, 시간·프로세스 여건이 영향을 줍니다.</p>
       <div class="tap-transfer-grid">{''.join(transfer_cards)}</div>
       <div class="tap-action-list">{actions}</div>
       <div class="tap-report-warning"><b>해석 주의</b><span>비교집단이 없으면 관찰 변화에 업무환경 변화·검사효과·평균회귀가 포함될 수 있습니다.</span></div>
-      <footer>낮은 사후점수만으로 재교육을 결정하지 말고 전이 장애요인을 먼저 확인하세요.</footer>
+      <footer>낮은 교육 후 점수만으로 재교육을 결정하지 마세요.</footer>
     </section>
 
     {'\n'.join(detail_pages)}
@@ -779,15 +779,20 @@ def _report_body(model: Mapping[str, Any]) -> str:
             "</tr>"
         )
 
-    if strength and development:
+    if strength and development and len(factors) >= 2:
         summary = (
-            f"상대적으로 높은 응답 영역 후보는 <b>{escape(strength['factor_name_ko'])}</b> "
-            f"({strength['score']:.2f}), 개발 맥락을 먼저 탐색할 영역은 "
-            f"<b>{escape(development['factor_name_ko'])}</b> ({development['score']:.2f})입니다. "
-            "작은 차이는 측정오차일 수 있으므로 순위로 해석하지 않습니다."
+            f"평균이 가장 높은 역량은 <b>{escape(strength['factor_name_ko'])}</b>"
+            f"({strength['score']:.2f}), 가장 낮은 역량은 "
+            f"<b>{escape(development['factor_name_ko'])}</b>({development['score']:.2f})입니다. "
+            "차이가 작으면 측정오차일 수 있어 순위로 해석하지 않습니다."
+        )
+    elif strength:
+        summary = (
+            f"공개 역량은 <b>{escape(strength['factor_name_ko'])}</b> 1개이며 "
+            f"평균은 {strength['score']:.2f}점입니다."
         )
     else:
-        summary = "공개할 수 있는 역량 결과가 없습니다. 표본수와 데이터 품질을 먼저 확인하세요."
+        summary = "공개할 수 있는 역량 결과가 없습니다. 표본수와 데이터 품질을 점검해 주세요."
 
     return dedent(f"""
     <section class="tap-report-sheet tap-report-cover">
@@ -795,7 +800,7 @@ def _report_body(model: Mapping[str, Any]) -> str:
       <header class="tap-report-brand"><span>TAP</span><div><b>KMA TAP</b><small>교육수요·업무행동 점검</small></div></header>
       <div class="tap-report-kicker">조직 리포트 · 탐색용</div>
       <h1>조직 교육수요 리포트</h1>
-      <p class="tap-report-lead">개인의 순위를 매기지 않고, 조직의 공통 개발영역과 교육 검토 순서를 확인합니다.</p>
+      <p class="tap-report-lead">조직의 공통 개발영역과 교육 검토 순서를 정리했습니다.</p>
       <div class="tap-report-meta"><b>{escape(str(model['project_name']))}</b><span>{escape(str(model['report_period']))}</span><span>생성일 {model['generated_on']}</span></div>
       <div class="tap-report-kpis">
         <div><b>{model['participant_count']}명</b><span>익명 참여자</span></div>
@@ -810,34 +815,33 @@ def _report_body(model: Mapping[str, Any]) -> str:
     <section class="tap-report-sheet">
       {sample_badge}
       <div class="tap-report-kicker">01 · 조직 역량 프로필</div>
-      <h2>조직 평균은 ‘얼마나 자주 했는가’를 보여줍니다</h2>
-      <p class="tap-report-desc">1점은 전혀 없었다, 5점은 거의 항상 있었다입니다. 역량 간 작은 차이를 서열로 확정하지 마세요.</p>
+      <h2>역량별 행동빈도 평균</h2>
+      <p class="tap-report-desc">‘얼마나 자주 했는가’를 1점(전혀 없었다)~5점(거의 항상 있었다)으로 물었습니다. 역량 간 작은 차이를 서열로 보지 마세요.</p>
       <div class="tap-report-score-list">{''.join(bars) or '<p>공개 결과 없음</p>'}</div>
-      <div class="tap-report-method"><b>해석 원칙</b><span>평균과 N을 함께 보고, 수행기회·권한·도구·프로세스 맥락을 확인합니다.</span></div>
-      <footer>조직 평균은 개인점수의 단순 순위표가 아닙니다.</footer>
+      <div class="tap-report-method"><b>해석 원칙</b><span>평균은 N과 함께 보고, 수행기회와 권한, 도구, 프로세스 여건을 살핍니다.</span></div>
+      <footer>KMA TAP · 최근 8주 자기보고 행동빈도</footer>
     </section>
 
     <section class="tap-report-sheet">
       {sample_badge}
       <div class="tap-report-kicker">02 · 다음 행동</div>
       <h2>{'교육 검토 우선순위' if model['has_targets'] else '개발 탐색 후보'}</h2>
-      <p class="tap-report-desc">낮은 평균만으로 교육을 확정하지 않습니다. 목표, 조직 중요도, 학습희망, 교육으로 해결 가능한 원인을 함께 확인합니다.</p>
+      <p class="tap-report-desc">평균이 낮다는 이유만으로 교육을 정하지 않습니다. 목표, 조직 중요도, 학습 희망, 교육으로 풀 수 있는 원인인지를 함께 봅니다.</p>
       <div class="tap-report-priority-list">{''.join(priority_rows) or '<p>우선 검토 후보 없음</p>'}</div>
-      <div class="tap-report-warning"><b>교육 전 확인</b><span>권한·도구·인력·시간·프로세스가 주원인이면 교육보다 조직개선을 먼저 실행합니다.</span></div>
+      <div class="tap-report-warning"><b>교육 결정 전 확인</b><span>권한, 도구, 인력, 시간, 프로세스 문제가 주원인이면 교육보다 조직 개선을 먼저 추진합니다.</span></div>
       <div class="tap-report-method"><b>목표수준 주의</b><span>{escape(target_note)}</span></div>
-      <footer>추천점수는 검토 순서를 돕는 휴리스틱이며 교육효과를 보장하지 않습니다.</footer>
+      <footer>추천점수는 검토 순서를 정하는 참고값이며 교육효과를 보장하지 않습니다.</footer>
     </section>
 
     <section class="tap-report-sheet">
       {sample_badge}
       <div class="tap-report-kicker">03 · 상세 및 방법</div>
-      <h2>공개 가능한 결과만 상세표에 포함했습니다</h2>
+      <h2>공개 역량 상세</h2>
       <table class="tap-report-table"><thead><tr><th>역량</th><th>유효 N</th><th>평균</th><th>목표</th><th>격차</th><th>상태</th></tr></thead><tbody>{''.join(detail_rows)}</tbody></table>
       <div class="tap-report-method-grid">
         <div><b>도구 상태</b><span>전문가 예비검토·인지면접 전 탐색용</span></div>
         <div><b>집계 보호</b><span>N&lt;5 비공개. 개인정보 기준과 통계적 안정성 기준은 별도 검토</span></div>
-        <div><b>허용 목적</b><span>교육수요 탐색과 개발 대화</span></div>
-        <div><b>금지 목적</b><span>채용·승진·보상·성과평가의 단독 판단</span></div>
+        <div><b>사용 목적</b><span>교육수요 탐색과 개발 대화</span></div>
       </div>
       <footer>KMA TAP · 진단 버전과 검증 상태를 확인한 뒤 사용하세요.</footer>
     </section>
@@ -882,7 +886,7 @@ def printable_organization_report_html(model: Mapping[str, Any]) -> str:
     """
     css += _PRE_POST_CSS
     title = (
-        f"{model['project_name']} 조직 교육 전·후 변화 리포트"
+        f"{model['project_name']} 조직 교육 전후 변화 리포트"
         if model.get("pre_post")
         else f"{model['project_name']} 조직 교육수요 리포트"
     )

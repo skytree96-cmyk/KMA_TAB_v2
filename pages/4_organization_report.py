@@ -78,12 +78,12 @@ def _read_store_snapshot(
 page_header(
     "교육 전후 리포트",
     "조직 교육 전후 리포트",
-    "교육 전·후 자료가 있으면 같은 참여자의 변화를, 단일시점 자료이면 교육수요를 보여줍니다.",
-    badge=f"전·후 유효응답 N≥{MIN_GROUP_N}만 공개",
+    "교육 전후 자료가 있으면 같은 참여자의 변화를, 단일시점 자료이면 교육수요를 보여줍니다.",
+    badge=f"유효응답 N≥{MIN_GROUP_N}만 공개",
 )
 callout(
-    "개인 순위와 단정적 교육효과는 제공하지 않습니다",
-    "전후 비교는 동일 교육 참여자 ID의 사전·사후 자기보고 변화이며, 비교집단이 없으면 교육의 인과효과로 확정하지 않습니다.",
+    "개인 순위와 교육효과 판정은 제공하지 않습니다",
+    "전후 비교는 같은 교육 참여자 ID로 연결한 자기보고 변화입니다. 비교집단이 없으면 교육의 인과효과로 단정할 수 없습니다.",
     icon="5+",
 )
 
@@ -246,10 +246,10 @@ if project_keys:
         pre_col, post_col, pair_col = st.columns(3)
         pre_col.metric("교육 전 완료", f"{selected_overview['pre']}명")
         post_col.metric("교육 후 완료", f"{selected_overview['post']}명")
-        pair_col.metric("전·후 모두 완료", f"{selected_overview['paired']}명")
+        pair_col.metric("전후 모두 완료", f"{selected_overview['paired']}명")
 else:
     st.info(
-        "저장된 실시 프로젝트가 없습니다. 현재 브라우저에서 프로젝트를 만들고 검사를 완료하면 여기에 표시됩니다."
+        "저장된 실시 프로젝트가 없습니다. 이 브라우저에서 프로젝트를 만들고 검사를 완료하면 여기에 표시됩니다."
     )
 
 if store_error:
@@ -324,7 +324,7 @@ def _render_csv_tools() -> None:
         download_col, upload_col = st.columns([1, 2])
         with download_col:
             st.download_button(
-                "사전·사후 CSV 양식",
+                "교육 전후 CSV 양식",
                 template_csv.encode("utf-8-sig"),
                 "tap_pre_post_group_result_template.csv",
                 "text/csv",
@@ -376,7 +376,7 @@ if uploaded is not None and use_uploaded:
         st.error(str(exc))
         _render_csv_tools()
         st.stop()
-    st.success("업로드 CSV를 명시적으로 선택해 실제 조직결과를 사용하고 있습니다.")
+    st.success("업로드한 CSV의 조직결과로 리포트를 만들었습니다.")
 elif selected_project_key:
     selected_choice = project_choices[selected_project_key]
     store_project_code = str(selected_choice["project_id"])
@@ -423,14 +423,14 @@ elif selected_project_key:
             source = pd.DataFrame(store_rows)
             stored_participants = int(source["participant_id"].nunique())
             st.success(
-                f"선택한 프로젝트의 누적 완료결과 {stored_participants}명을 사용하고 있습니다. "
-                "참여자 연결에는 원문 ID가 아닌 프로젝트별 가명키를 사용합니다."
+                f"선택한 프로젝트의 누적 완료결과 {stored_participants}명분을 사용합니다. "
+                "참여자는 원문 ID 대신 프로젝트별 가명키로 연결합니다."
             )
         elif current_project_id == store_project_code and session_rows:
             source_kind = "session"
             source = pd.DataFrame(session_rows)
             st.info(
-                "선택 프로젝트의 누적 완료결과가 없어 현재 브라우저에서 완료한 실제 결과로 대체했습니다."
+                "선택 프로젝트에 누적된 완료결과가 없습니다."
             )
     elif session_rows:
         source_kind = "session"
@@ -438,10 +438,10 @@ elif selected_project_key:
 
 if source_kind == "session" and not source.empty:
     completed_phases = sorted(set(source["session_type"]))
-    phase_text = "교육 전·후" if completed_phases == ["post", "pre"] else (
+    phase_text = "교육 전후" if completed_phases == ["post", "pre"] else (
         "교육 전" if completed_phases == ["pre"] else "교육 후"
     )
-    st.success(f"현재 브라우저에서 완료한 실제 {phase_text} 결과를 사용하고 있습니다.")
+    st.success(f"이 브라우저에서 완료한 {phase_text} 결과를 사용합니다.")
 
 for warning in store_validation_warnings:
     st.warning(warning)
@@ -512,16 +512,16 @@ participant_count_for_privacy = (
 if source_kind in {"session", "store"} and participant_count_for_privacy < MIN_GROUP_N:
     result_scope = "현재 브라우저" if source_kind == "session" else "누적 저장소"
     st.warning(
-        f"{result_scope}에서 실제 완료 결과 {int(clean['participant_id'].nunique())}명의 데이터를 읽었습니다. "
+        f"{result_scope}에서 완료 결과 {int(clean['participant_id'].nunique())}명분을 읽었습니다. "
         f"조직 리포트는 개인정보 보호를 위해 N≥{MIN_GROUP_N}일 때만 평균과 변화량을 공개합니다. "
         + (
-            "본인의 실제 교육 전·후 수치는 개인 리포트에서 바로 확인할 수 있습니다."
+            "본인의 교육 전후 수치는 개인 리포트에서 볼 수 있습니다."
             if source_kind == "session"
             else "참여자가 더 누적된 뒤 새로고침해 주세요."
         )
     )
     if source_kind == "session":
-        if st.button("내 실제 교육 전·후 비교 보기", type="primary"):
+        if st.button("내 교육 전후 비교 보기", type="primary"):
             st.switch_page("pages/3_individual_report.py")
 
     small_n_preview_eligible = bool(
@@ -572,7 +572,7 @@ if source_kind in {"session", "store"} and participant_count_for_privacy < MIN_G
             if preview_granted and st.button(
                 "미리보기 잠금",
                 key=_project_widget_key("organization_report_preview_lock_button", selected_project_key),
-                help="이 브라우저 세션에 남은 미리보기 코드를 지우고 소표본 값을 다시 숨깁니다.",
+                help="이 브라우저에 남은 미리보기 코드를 지우고 소표본 값을 다시 숨깁니다.",
             ):
                 st.session_state[DEMO_STORE_REPORT_PREVIEW_CODE_KEY] = ""
                 st.session_state[preview_toggle_key] = False
@@ -599,7 +599,7 @@ if source_kind in {"session", "store"} and participant_count_for_privacy < MIN_G
                 list(stored_project.get("selected_factors") or []),
             )
             if not ordered_preview_rows:
-                st.warning("선택 역량 중 전·후로 짝지을 수 있는 유효 결과가 없습니다.")
+                st.warning("선택 역량 중 동일 참여자의 교육 전후 유효 결과가 있는 역량이 없습니다.")
                 st.stop()
 
             selected_preview_rows = ordered_preview_rows
@@ -624,7 +624,7 @@ if source_kind in {"session", "store"} and participant_count_for_privacy < MIN_G
                     if str(row["factor_code"]) in selected_set
                 ]
                 if len(selected_preview_rows) < 3:
-                    st.warning("N각형 레이더를 표시하려면 역량을 3개 이상 선택해 주세요.")
+                    st.warning("레이더 그래프를 그리려면 역량을 3개 이상 선택해 주세요.")
                     st.stop()
 
             st.warning(
@@ -634,7 +634,7 @@ if source_kind in {"session", "store"} and participant_count_for_privacy < MIN_G
             pre_col, post_col, pair_col = st.columns(3)
             pre_col.metric("교육 전 참여", f"{preview_summary['pre_participant_count']}명")
             post_col.metric("교육 후 참여", f"{preview_summary['post_participant_count']}명")
-            pair_col.metric("전·후 비교 참여자", f"{preview_summary['paired_participant_count']}명")
+            pair_col.metric("전후 비교 참여자", f"{preview_summary['paired_participant_count']}명")
 
             preview_codes = [str(row["factor_code"]) for row in selected_preview_rows]
             preview_radar = build_planning_preview_radar(
@@ -645,7 +645,7 @@ if source_kind in {"session", "store"} and participant_count_for_privacy < MIN_G
             )
             _render_radar_component(preview_radar)
             if preview_radar["axis_count"] == 0:
-                st.info("N각형 레이더를 표시하려면 전·후 결과가 있는 역량이 3개 이상 필요합니다.")
+                st.info("레이더 그래프를 그리려면 교육 전후 결과가 있는 역량이 3개 이상 필요합니다.")
 
             st.caption(
                 "그래프 아래의 역량별 값은 화면에서만 확인할 수 있습니다. "
@@ -714,8 +714,8 @@ elif source_kind == "store":
 elif is_sample:
     configured_targets = {}
     organization_priorities = set()
-    project_name = "TAP 교육 전·후 변화 예시"
-    report_period = "예시 교육 전·후 기간"
+    project_name = "TAP 교육 전후 변화 예시"
+    report_period = "예시 교육 전후 기간"
 else:
     # 업로드 결과는 현재 브라우저 세션의 다른 프로젝트 설정과 절대 섞지 않는다.
     configured_targets = {}
@@ -747,16 +747,16 @@ if is_pre_post and pre_post_summary:
     k1, k2, k3, k4 = st.columns(4)
     k1.metric("교육 전 참여", f"{pre_post_summary['pre_participant_count']}명")
     k2.metric("교육 후 참여", f"{pre_post_summary['post_participant_count']}명")
-    k3.metric("전·후 비교 참여자", f"{pre_post_summary['paired_participant_count']}명")
+    k3.metric("전후 비교 참여자", f"{pre_post_summary['paired_participant_count']}명")
     attrition_rate = pre_post_summary.get("attrition_rate")
-    k4.metric("사후 이탈률", "—" if attrition_rate is None else f"{attrition_rate:.1f}%")
+    k4.metric("교육 후 이탈률", "—" if attrition_rate is None else f"{attrition_rate:.1f}%")
     result = pd.DataFrame(pre_post_summary["comparison_rows"])
     result_download = result.rename(
         columns={
             "factor_name_ko": "역량",
             "pre_n": "교육 전 N",
             "post_n": "교육 후 N",
-            "paired_n": "전·후 유효응답 N",
+            "paired_n": "교육 전후 유효응답 N",
             "pre_mean": "교육 전 평균",
             "post_mean": "교육 후 평균",
             "change": "관찰 변화",
@@ -781,8 +781,8 @@ if is_pre_post and pre_post_summary:
     ] + [code for code in radar_factor_order if code not in priority_codes]
     st.markdown("### 교육 전후 비교 포인트")
     st.caption(
-        "동일 참여자의 교육 전 평균은 파란색, 교육 후 평균은 청록색으로 표시합니다. "
-        "공개 역량이 8개를 넘으면 그래프에 표시할 3~8개를 직접 선택합니다."
+        "같은 참여자의 교육 전후 평균입니다. "
+        "공개 역량이 8개를 넘으면 그래프에 넣을 역량을 3~8개 고르세요."
     )
     ordered_public_rows = _ordered_preview_rows(
         list(pre_post_summary["comparison_rows"]),
@@ -816,20 +816,19 @@ if is_pre_post and pre_post_summary:
         ]
         radar = build_pre_post_radar(
             selected_public_rows,
-            title=f"교육 전·후 역량 변화 · {len(selected_public_rows)}개",
+            title=f"교육 전후 역량 변화 · {len(selected_public_rows)}개",
             min_paired_n=MIN_GROUP_N,
             preferred_codes=selected_public_codes,
             max_axes=min(8, len(selected_public_rows)),
         )
         _render_radar_component(radar)
     else:
-        st.warning("N각형 레이더를 표시하려면 공개 역량을 3개 이상 선택해 주세요.")
+        st.warning("레이더 그래프를 그리려면 공개 역량을 3개 이상 선택해 주세요.")
 
     omitted_public_count = len(ordered_public_rows) - len(selected_public_rows)
     if omitted_public_count:
         st.info(
-            f"공개 가능한 역량 중 선택하지 않은 {omitted_public_count}개는 상세표에서 확인할 수 있습니다. "
-            "레이더 그래프는 가독성을 위해 최대 8개를 표시합니다."
+            f"선택하지 않은 공개 역량 {omitted_public_count}개는 상세표에 있습니다."
         )
 
 html_report = printable_organization_report_html(model)
@@ -855,8 +854,8 @@ st.html(organization_report_fragment(model))
 
 with st.expander("집계 검수표 보기"):
     st.caption(
-        "전후 비교는 동일 participant_id의 전·후 유효 결과만 사용합니다. N≥5는 개인정보 보호를 위한 최소 공개 규칙이며 "
-        "평균의 통계적 안정성이나 교육의 인과효과를 보장하지 않습니다."
+        "전후 비교는 같은 participant_id의 교육 전후 유효 결과만 사용합니다. "
+        "N≥5는 개인정보 보호를 위한 최소 공개 기준이며 평균의 통계적 안정성을 보장하지 않습니다."
     )
     st.dataframe(result_download, hide_index=True, width="stretch")
 

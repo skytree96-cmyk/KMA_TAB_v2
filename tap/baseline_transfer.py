@@ -151,19 +151,20 @@ def _validate_project_schedule(
     if delivery not in _DELIVERY_PREFERENCES:
         raise BaselineValidationError("교육방식 선호는 all, offline, online 중 하나여야 합니다.")
 
-    pre_start = _parse_iso_date(project.get("pre_start_date"), "사전검사 시작일")
-    pre_completed = _parse_iso_date(project.get("pre_completed_at"), "사전검사 완료일")
-    pre_end = _parse_iso_date(project.get("pre_end_date"), "사전검사 종료일")
+    pre_start = _parse_iso_date(project.get("pre_start_date"), "교육 전 검사 시작일")
+    pre_completed = _parse_iso_date(project.get("pre_completed_at"), "교육 전 검사 완료일")
+    pre_end = _parse_iso_date(project.get("pre_end_date"), "교육 전 검사 종료일")
     training = _parse_iso_date(project.get("training_date"), "교육일")
-    post_start = _parse_iso_date(project.get("post_start_date"), "사후검사 시작일")
-    post_end = _parse_iso_date(project.get("post_end_date"), "사후검사 종료일")
+    post_start = _parse_iso_date(project.get("post_start_date"), "교육 후 검사 시작일")
+    post_end = _parse_iso_date(project.get("post_end_date"), "교육 후 검사 종료일")
     if not (pre_start <= pre_end < training < post_start <= post_end):
         raise BaselineValidationError(
-            "검사 일정은 사전 시작≤사전 종료<교육일<사후 시작≤사후 종료 순서여야 합니다."
+            "검사 일정 순서가 올바르지 않습니다. 교육 전 검사 시작일, 종료일, 교육일, "
+            "교육 후 검사 시작일, 종료일 순서여야 합니다."
         )
     if not allow_schedule_override and not (pre_start <= pre_completed <= pre_end):
         raise BaselineValidationError(
-            "검사 일정상 사전 완료일은 설정된 사전검사 기간 안이어야 합니다."
+            "검사 일정이 맞지 않습니다. 교육 전 검사 완료일은 설정된 교육 전 검사 기간 안이어야 합니다."
         )
 
     normalized = dict(project)
@@ -193,7 +194,7 @@ def _validate_v3_project(project: Mapping[str, Any]) -> dict[str, Any]:
 
 def _validated_responses(value: Any, expected_codes: list[str]) -> dict[str, int]:
     if not isinstance(value, dict):
-        raise BaselineValidationError("사전검사 문항 응답 형식이 올바르지 않습니다.")
+        raise BaselineValidationError("교육 전 검사 문항 응답 형식이 올바르지 않습니다.")
 
     responses: dict[str, int] = {}
     for raw_code, raw_score in value.items():
@@ -212,7 +213,7 @@ def _validated_responses(value: Any, expected_codes: list[str]) -> dict[str, int
         missing = len(expected - actual)
         extra = len(actual - expected)
         raise BaselineValidationError(
-            "완료된 사전검사의 전체 문항 응답이 필요합니다"
+            "완료된 교육 전 검사의 전체 문항 응답이 필요합니다"
             f"(누락 {missing}개, 알 수 없는 문항 {extra}개)."
         )
     return responses
@@ -242,18 +243,18 @@ def build_pre_baseline_payload(state: Mapping[str, Any]) -> dict[str, Any]:
 
     selected_factors, snapshot_codes, assessment_version, snapshot_hash = _state_context(state)
     selected_factors = _clean_string_list(selected_factors, "선택 역량")
-    snapshot_codes = _clean_string_list(snapshot_codes, "문항 스냅샷")
+    snapshot_codes = _clean_string_list(snapshot_codes, "문항 구성")
     if not assessment_version:
         raise BaselineValidationError("검사 버전 정보가 없어 기준파일을 만들 수 없습니다.")
     if not _SHA256_PATTERN.fullmatch(snapshot_hash):
-        raise BaselineValidationError("문항 스냅샷 해시가 올바르지 않습니다.")
+        raise BaselineValidationError("문항 구성 해시가 올바르지 않습니다.")
 
     completed_by_phase = state.get("assessment_completed_by_phase", {})
     if not isinstance(completed_by_phase, Mapping) or completed_by_phase.get("pre") is not True:
         raise BaselineValidationError("완료된 교육 전 검사만 기준파일로 저장할 수 있습니다.")
     responses_by_phase = state.get("responses_by_phase", {})
     if not isinstance(responses_by_phase, Mapping):
-        raise BaselineValidationError("사전검사 응답 저장소가 올바르지 않습니다.")
+        raise BaselineValidationError("교육 전 검사 응답 저장소가 올바르지 않습니다.")
     responses = _validated_responses(responses_by_phase.get("pre"), snapshot_codes)
 
     target_means = state.get("target_means", {})
@@ -335,7 +336,7 @@ def validate_pre_baseline(
     """Parse and validate a baseline against the active post instrument."""
 
     if str(current_state.get("assessment_phase", "")).lower() != "post":
-        raise BaselineValidationError("사전 기준파일은 교육 후 검사에서만 불러올 수 있습니다.")
+        raise BaselineValidationError("교육 전 검사 기준파일은 교육 후 검사에서만 불러올 수 있습니다.")
 
     if isinstance(raw, bytes):
         if len(raw) > MAX_BASELINE_BYTES:
@@ -354,7 +355,7 @@ def validate_pre_baseline(
     try:
         payload = json.loads(text)
     except (json.JSONDecodeError, TypeError) as exc:
-        raise BaselineValidationError("올바른 TAP 사전검사 JSON 파일이 아닙니다.") from exc
+        raise BaselineValidationError("올바른 TAP 교육 전 검사 JSON 파일이 아닙니다.") from exc
     if not isinstance(payload, dict):
         raise BaselineValidationError("기준파일의 최상위 형식이 올바르지 않습니다.")
     if set(payload) != _TOP_LEVEL_FIELDS:
@@ -388,7 +389,7 @@ def validate_pre_baseline(
         or supplied_checksum != _checksum(payload)
     ):
         raise BaselineValidationError(
-            "파일 내용이 저장 이후 변경되었거나 손상되었습니다. SHA-256은 전자서명이 아닌 변경 확인용 검사값입니다."
+            "파일 내용이 저장 후 바뀌었거나 손상되었습니다. 교육 전 검사 직후 저장한 원본 파일을 다시 선택해 주세요."
         )
 
     payload_factors = _clean_string_list(payload.get("selected_factors"), "선택 역량")
@@ -423,7 +424,7 @@ def validate_pre_baseline(
     except (TypeError, ValueError) as exc:
         raise BaselineValidationError("프로젝트 목표값 형식이 올바르지 않습니다.") from exc
     if any(not isfinite(value) or not 1 <= value <= 5 for value in baseline_targets.values()):
-        raise BaselineValidationError("프로젝트 목표값은 1~5 범위의 유한한 수여야 합니다.")
+        raise BaselineValidationError("프로젝트 목표값은 1~5 사이의 숫자여야 합니다.")
     if baseline_targets != current_targets:
         raise BaselineValidationError(
             "기준파일의 역량 목표값이 현재 프로젝트와 일치하지 않습니다. "
@@ -435,15 +436,15 @@ def validate_pre_baseline(
         "course_name": "교육과정명",
         "target_level": "대상 직급",
         "training_date": "교육일",
-        "pre_end_date": "사전검사 종료일",
+        "pre_end_date": "교육 전 검사 종료일",
     }
     if int(schema_version) >= 2:
         project_identity_fields.update(
             {
                 "project_id": "프로젝트 ID",
-                "pre_start_date": "사전검사 시작일",
-                "post_start_date": "사후검사 시작일",
-                "post_end_date": "사후검사 종료일",
+                "pre_start_date": "교육 전 검사 시작일",
+                "post_start_date": "교육 후 검사 시작일",
+                "post_end_date": "교육 후 검사 종료일",
             }
         )
     for field, label in project_identity_fields.items():
@@ -484,21 +485,21 @@ def validate_pre_baseline(
         raise BaselineValidationError("검사 도구 정보가 올바르지 않습니다.")
     if instrument.get("response_scale") != {"minimum": 0, "maximum": 5}:
         raise BaselineValidationError("기준파일의 응답 척도가 현재 지원 범위(0~5)와 다릅니다.")
-    payload_codes = _clean_string_list(instrument.get("question_snapshot_codes"), "문항 스냅샷")
+    payload_codes = _clean_string_list(instrument.get("question_snapshot_codes"), "문항 구성")
     payload_version = str(instrument.get("assessment_version", "")).strip()
     payload_hash = str(instrument.get("question_snapshot_hash", "")).strip().lower()
     if not _SHA256_PATTERN.fullmatch(payload_hash):
-        raise BaselineValidationError("기준파일의 문항 스냅샷 해시가 올바르지 않습니다.")
+        raise BaselineValidationError("기준파일의 문항 구성 해시가 올바르지 않습니다.")
 
     current_factors, current_codes, current_version, current_hash = _state_context(current_state)
     current_factors = _clean_string_list(current_factors, "현재 선택 역량")
-    current_codes = _clean_string_list(current_codes, "현재 문항 스냅샷")
+    current_codes = _clean_string_list(current_codes, "현재 문항 구성")
     if set(payload_factors) != set(current_factors):
-        raise BaselineValidationError("교육 전·후 검사의 선택 역량이 일치하지 않습니다.")
+        raise BaselineValidationError("교육 전후 검사의 선택 역량이 일치하지 않습니다.")
     if payload_version != current_version:
-        raise BaselineValidationError("교육 전·후 검사 버전이 일치하지 않습니다.")
+        raise BaselineValidationError("교육 전후 검사 버전이 일치하지 않습니다.")
     if payload_hash != current_hash or set(payload_codes) != set(current_codes):
-        raise BaselineValidationError("교육 전·후 문항 스냅샷이 일치하지 않습니다.")
+        raise BaselineValidationError("교육 전후 문항 구성이 일치하지 않습니다.")
 
     responses = _validated_responses(payload.get("responses"), payload_codes)
     normalized = deepcopy(payload)
@@ -530,7 +531,7 @@ def _bootstrap_payload_preview(raw: bytes | str) -> dict[str, Any]:
     try:
         payload = json.loads(text)
     except (json.JSONDecodeError, TypeError) as exc:
-        raise BaselineValidationError("올바른 TAP 사전검사 JSON 파일이 아닙니다.") from exc
+        raise BaselineValidationError("올바른 TAP 교육 전 검사 JSON 파일이 아닙니다.") from exc
     if not isinstance(payload, dict):
         raise BaselineValidationError("기준파일의 최상위 형식이 올바르지 않습니다.")
     return payload
@@ -568,13 +569,13 @@ def _normalize_legacy_project(payload: Mapping[str, Any]) -> tuple[dict[str, Any
     """Derive deterministic v2-era state from a validated v1 project."""
 
     project = dict(payload["project"])
-    pre_end = _parse_iso_date(project.get("pre_end_date"), "v1 사전검사 종료일")
+    pre_end = _parse_iso_date(project.get("pre_end_date"), "v1 교육 전 검사 종료일")
     training = _parse_iso_date(project.get("training_date"), "v1 교육일")
     completed_value = str(project.get("pre_completed_at", "")).strip() or pre_end.isoformat()
-    pre_completed = _parse_iso_date(completed_value, "v1 사전검사 완료일")
+    pre_completed = _parse_iso_date(completed_value, "v1 교육 전 검사 완료일")
     if not (pre_completed <= pre_end < training):
         raise BaselineValidationError(
-            "v1 검사 일정은 사전 완료≤사전 종료<교육일 순서여야 합니다."
+            "v1 검사 일정 순서가 올바르지 않습니다. 교육 전 검사 완료일, 종료일, 교육일 순서여야 합니다."
         )
 
     pre_start = min(pre_end - timedelta(days=11), pre_completed)
@@ -608,8 +609,8 @@ def _normalize_legacy_project(payload: Mapping[str, Any]) -> tuple[dict[str, Any
         }
     )
     warnings = [
-        "v1 기준파일에 없던 프로젝트 ID와 검사 일정을 결정적 규칙으로 재구성했습니다.",
-        "v1 기준파일에 없던 조직 우선역량·학습 희망역량·교육방식 선호를 빈 목록·전체 방식으로 초기화했습니다.",
+        "v1 기준파일에는 프로젝트 ID와 검사 일정이 없어 파일 정보와 교육일을 기준으로 채웠습니다(교육 후 검사는 교육 8~10주 후).",
+        "v1 기준파일에는 조직 우선역량·학습 희망역량·교육방식 선호가 없어 빈 값으로 두고, 교육방식은 '무관'으로 설정했습니다.",
     ]
     return project, warnings
 
@@ -685,20 +686,20 @@ def bootstrap_post_from_pre_baseline(
         )
     if payload_hash != current_hash:
         raise BaselineValidationError(
-            "기준파일의 문항 스냅샷이 현재 문항은행과 일치하지 않습니다."
+            "기준파일의 문항 구성이 현재 문항은행과 일치하지 않습니다."
         )
 
     existing_hash = str(state.get("question_snapshot_hash", "")).strip().lower()
     if existing_hash and existing_hash != payload_hash:
         raise BaselineValidationError(
-            "현재 세션에 다른 문항 스냅샷이 설정되어 있어 기준파일을 연결할 수 없습니다."
+            "이 브라우저에 다른 문항 구성이 설정되어 있어 기준파일을 연결할 수 없습니다."
         )
     existing_codes = [
         str(code).strip() for code in (state.get("question_snapshot_codes") or [])
     ]
     if existing_codes and set(existing_codes) != set(payload_codes):
         raise BaselineValidationError(
-            "현재 세션의 문항 코드가 기준파일과 일치하지 않습니다."
+            "이 브라우저의 문항 코드가 기준파일과 일치하지 않습니다."
         )
 
     if int(payload["schema_version"]) == 1:

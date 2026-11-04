@@ -151,15 +151,15 @@ class AccountDashboardTests(unittest.TestCase):
 
     def test_phase_status_and_schedule_checks_use_inclusive_dates(self):
         expected = {
-            "2026-09-30":"사전검사 예정", "2026-10-01":"사전검사 진행", "2026-10-07":"사전검사 진행",
-            "2026-10-08":"사후검사 대기", "2026-12-02":"사후검사 대기", "2026-12-03":"사후검사 진행",
-            "2026-12-10":"사후검사 진행", "2026-12-11":"사후검사 종료",
+            "2026-09-30":"교육 전 검사 예정", "2026-10-01":"교육 전 검사 진행", "2026-10-07":"교육 전 검사 진행",
+            "2026-10-08":"교육 후 검사 대기", "2026-12-02":"교육 후 검사 대기", "2026-12-03":"교육 후 검사 진행",
+            "2026-12-10":"교육 후 검사 진행", "2026-12-11":"교육 후 검사 종료",
         }
         for day, status in expected.items():
             with self.subTest(day=day):
                 self.assertEqual(project_status(PROJECT, date.fromisoformat(day)), status)
         checks = schedule_checks([PROJECT], date(2026, 12, 10))
-        self.assertEqual([row["확인할 내용"] for row in checks], ["사전검사 마감 · 미완료 2명", "사후검사 진행 · 미완료 7명"])
+        self.assertEqual([row["확인할 내용"] for row in checks], ["교육 전 검사 마감 · 미완료 2명", "교육 후 검사 진행 · 미완료 7명"])
         self.assertEqual(schedule_checks([{**PROJECT, "pre_completed":10, "post_completed":10}], date(2026, 12, 11)), [])
         self.assertEqual(project_status({**PROJECT, "post_completed":10}, date(2026, 12, 11)), "검사 완료")
         self.assertEqual(project_status({**PROJECT, "assigned":0}, date(2026, 12, 11)), "참여자 배정 필요")
@@ -167,7 +167,7 @@ class AccountDashboardTests(unittest.TestCase):
         self.assertEqual(project_status({**PROJECT, "config":{}}, date(2026, 12, 11)), "일정 확인 필요")
         same_day = {**PROJECT, "config": {key:"2026-10-08" for key in (
             "pre_start_date", "pre_end_date", "training_date", "post_start_date", "post_end_date")}}
-        self.assertEqual(project_status(same_day, date(2026, 10, 8)), "사전·사후검사 진행")
+        self.assertEqual(project_status(same_day, date(2026, 10, 8)), "교육 전후 검사 진행")
 
     def test_search_matches_company_project_course_and_all_words(self):
         for query in ("알파", "성장", "lEaDeR", "알파 Leadership", "1058201810", "105820", "알파 1058201810"):

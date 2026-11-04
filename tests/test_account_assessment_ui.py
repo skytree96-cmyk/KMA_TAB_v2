@@ -198,8 +198,8 @@ class AccountAssessmentTests(unittest.TestCase):
         comparison = app.dataframe[0].value
         self.assertEqual(float(comparison.iloc[0]["관찰 변화"]), 1.0)
         click(app, "내 교육으로 돌아가기")
-        click(app, "나의 전·후 리포트 보기")
-        self.assertTrue(any(item.value == "나의 교육 전·후 리포트" for item in app.subheader))
+        click(app, "나의 교육 전후 리포트 보기")
+        self.assertTrue(any(item.value == "나의 교육 전후 리포트" for item in app.subheader))
         self.assertEqual(float(app.dataframe[0].value.iloc[0]["관찰 변화"]), 1.0)
 
     def test_assignment_switch_cannot_reuse_response_widgets(self):
@@ -376,7 +376,7 @@ class ParticipantOwnReportPdfTests(unittest.TestCase):
             store.records["a", phase] = {"assignment_id": "a", "phase": phase, "completed": True,
                                          "payload": {"responses": {code: value for code in codes}}}
         app = participant_app(store, focus=False)
-        click(app, "나의 전·후 리포트 보기")
+        click(app, "나의 교육 전후 리포트 보기")
         downloads = app.get("download_button")
         self.assertEqual([button.proto.label for button in downloads], ["내 리포트 PDF 다운로드"])
 

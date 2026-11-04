@@ -27,6 +27,8 @@ PALE = colors.HexColor("#e8f5f2")
 LINE = colors.HexColor("#dbe9e6")
 PRE = colors.HexColor("#75beb3")
 RULE_VERSION = "TAP-CHANGE-1.0"
+# Four courses with long KMA URLs stay well under one A4 frame; nine in one panel did not.
+COURSES_PER_PANEL = 4
 _FONT_LOCK = Lock()
 
 
@@ -105,26 +107,30 @@ def report_summary(rows: list[Mapping[str, Any]]) -> dict[str, Any]:
 def _guidance(row: Mapping[str, Any]) -> str:
     post, change = row.get("post_score"), row.get("change")
     if post is None or change is None:
-        return "비교 가능한 응답이 부족합니다. 수행 기회와 응답 누락을 확인한 뒤, 다음 검사에서 동일한 행동 기준으로 응답해 주세요."
+        return "비교할 수 있는 응답이 부족합니다. 수행 기회와 응답 누락 여부를 확인해 주세요."
     if post >= 4.2:
-        action = "교육 후 해당 행동이 높은 빈도로 보고되었습니다. 실제 적용 사례를 기록하고 다른 상황에서도 유지해 보세요."
+        action = "교육 후 행동 빈도가 높습니다. 다른 업무와 상황에도 넓혀 적용하세요."
     elif post >= 3.4:
-        action = "교육 후 해당 행동이 비교적 자주 보고되었습니다. 주 1회 적용 사례를 돌아보며 반복 실천의 범위를 넓혀 보세요."
+        action = "교육 후 행동 빈도가 비교적 높습니다. 주 1회 적용 사례를 돌아보고 실천 범위를 넓히세요."
     elif post >= 2.6:
-        action = "교육 후 해당 행동이 중간 빈도로 보고되었습니다. 한 가지 구체적인 실천 행동을 정해 업무 중 반복해 보세요."
+        action = "교육 후 행동 빈도가 중간 수준입니다. 구체적인 실천 행동 하나를 정해 업무에서 반복하세요."
     elif post >= 1.8:
-        action = "교육 후 해당 행동이 낮은 빈도로 보고되었습니다. 행동을 적용할 수 있는 업무와 시점을 먼저 정해 보세요."
+        action = "교육 후 행동 빈도가 낮습니다. 이 행동을 적용할 업무와 시점부터 정하세요."
     else:
-        action = "교육 후 해당 행동의 보고 빈도가 매우 낮습니다. 작은 실습 과제와 피드백을 통해 적용 기회를 마련해 보세요."
-    change_tip = {"큰 향상": "증가한 행동이 유지되는지 후속 점검을 권장합니다.",
-                  "향상": "개선된 행동의 구체적인 사례를 기록해 보세요.",
-                  "유지": "변화 폭이 작으므로 수행 환경과 실천 목표를 함께 점검해 보세요.",
-                  "하락": "업무 변화나 수행 기회 감소가 있었는지 먼저 확인해 보세요."}
+        action = "교육 후 행동 빈도가 매우 낮습니다. 작은 실습 과제와 피드백으로 적용 기회를 만드세요."
+    change_tip = {"큰 향상": "늘어난 행동이 유지되는지 지켜보세요.",
+                  "향상": "나아진 행동의 사례를 기록해 두세요.",
+                  "유지": "변화 폭이 작습니다. 수행 환경과 실천 목표를 함께 점검하세요.",
+                  "하락": "업무 변화나 수행 기회 감소가 있었는지 살펴보세요."}
     return action + " " + change_tip[effect_level(change)]
 
 
 def _fmt(value: float | None, signed: bool = False) -> str:
-    return "미산출" if value is None else (f"{value:+.2f}" if signed else f"{value:.2f}")
+    if value is None:
+        return "미산출"
+    if signed and round(value, 2) == 0:
+        return "0.00"  # not "+0.00" or "-0.00"
+    return f"{value:+.2f}" if signed else f"{value:.2f}"
 
 
 def _p(text: Any, *, size: float = 10, bold: bool = False, color=INK, align=0, leading: float | None = None) -> Paragraph:
@@ -245,10 +251,9 @@ def _followup_story(transfer: Mapping[str, Any] | None, courses: list[Mapping[st
     """Transfer climate (organization only) and follow-up courses, continuing after the competency details."""
     from tap.account_insights import COURSE_INQUIRY_URL, course_context_note, transfer_notes
     is_org = transfer is not None
-    inquiry = [Spacer(1, 6), _link("맞춤형 교육 문의  ·  www.kma.or.kr 문의하기", COURSE_INQUIRY_URL)] if is_org else []
+    inquiry = [Spacer(1, 6), _link("맞춤형 교육 문의  ·  www.kma.or.kr", COURSE_INQUIRY_URL)] if is_org else []
     heading: list[Any] = [Spacer(1, 10), _p("현업 적용과 후속 과정" if is_org else "보완 학습 제안", size=20, bold=True), Spacer(1, 6),
-                        _p("변화의 조건과 다음 교육 검토 후보를 함께 안내합니다." if is_org
-                           else "교육 후에도 목표보다 0.2점 이상 낮은 역량을 보완할 학습을 제안합니다. 본인 응답(자기보고)에 근거합니다.",
+                        _p("현업 적용 여건과 다음 교육 검토 후보입니다." if is_org else "본인 응답(자기보고)에 근거한 제안입니다.",
                            size=9, color=MUTED), Spacer(1, 15)]
     panels: list[Any] = []
     if transfer is not None:
@@ -261,30 +266,39 @@ def _followup_story(transfer: Mapping[str, Any] | None, courses: list[Mapping[st
                               for row in transfer["barriers"]], colWidths=[width - 172, 60, 60])
             barriers.setStyle(TableStyle([("LINEBELOW", (0, 0), (-1, -2), .4, LINE), ("LEFTPADDING", (0, 0), (-1, -1), 0),
                                           ("TOPPADDING", (0, 0), (-1, -1), 3), ("BOTTOMPADDING", (0, 0), (-1, -1), 3)]))
-            body = [_p(f"현업전이 환경  ·  사후검사 응답 {transfer['n']}명 평균(1~5)", size=12, bold=True), Spacer(1, 9), grid,
+            body = [_p(f"현업전이 환경  ·  교육 후 검사 응답 {transfer['n']}명 평균(1~5)", size=12, bold=True), Spacer(1, 9), grid,
                     Spacer(1, 10), _p("적용 장애요인(복수 선택)", size=9, bold=True, color=TEAL), Spacer(1, 3), barriers,
                     Spacer(1, 9), *[_p("· " + note, size=9) for note in transfer_notes(transfer)]]
         else:
             body = [_p("현업전이 환경", size=12, bold=True), Spacer(1, 7),
-                    _p(f"사후검사 현업전이 응답이 5명 미만({transfer.get('n', 0)}명)이므로 평균과 장애요인을 공개하지 않습니다.", size=9)]
+                    _p(f"교육 후 현업전이 응답이 5명 미만({transfer.get('n', 0)}명)이라 평균과 장애요인을 공개하지 않습니다.", size=9)]
         panels.extend([_panel(body, width), Spacer(1, 12)])
     if courses:
         note = course_context_note(transfer)
         items: list[Any] = [_p("교육과정 검토 우선순위" if is_org else "제안 과정", size=12, bold=True), Spacer(1, 4),
-                            _p("교육 후 점수가 목표보다 0.2점 이상 낮은 역량을 부족한 정도가 큰 순서로 골랐고, 역량마다 가장 잘 맞는 과정을 먼저 보여 줍니다.",
+                            _p(f"교육 후 {'평균이' if is_org else '점수가'} 목표보다 0.2점 이상 낮은 역량을 차이가 큰 순서로 골랐습니다. 역량마다 내용이 잘 맞는 과정이 먼저 나옵니다.",
                                size=8, color=MUTED),
                             *([Spacer(1, 8), _p(note, size=8.8, bold=True, color=TEAL)] if note else [])]
+        explained: set[str] = set()
         for index, course in enumerate(courses, 1):
+            if index > 1 and index % COURSES_PER_PANEL == 1:
+                # A panel is one table cell and cannot break across pages; long lists continue in a new panel.
+                panels.extend([_panel(items, width), Spacer(1, 12)])
+                items = []
+            # The score reason is the same for every course of one competency, so it is printed once.
+            competency = str(course["factor_name_ko"])
+            reason = "" if competency in explained else f"  ·  {course['reason']}"
+            explained.add(competency)
             items.extend([Spacer(1, 10), _p(f"{index}. {course['title']}  ({course['delivery_label']})", size=10.5, bold=True),
-                          _p(f"관련 역량 {course['factor_name_ko']}  ·  {course['reason']}", size=8.4, color=MUTED),
-                          *([_p(f"{course['schedule']}  ·  {course['url']}", size=7.6, color=MUTED)]
+                          _p(f"관련 역량 {competency}{reason}", size=8.4, color=MUTED),
+                          *([_p("  ·  ".join(str(course[key]) for key in ("schedule", "url") if course.get(key)), size=7.6, color=MUTED)]
                             if course.get("schedule") or course.get("url") else []),
                           *([_p(course["advice"], size=8.4)] if course.get("advice") else [])])
         items.extend([Spacer(1, 9), _p("개설 여부와 일정은 KMA 교육 페이지(www.kma.or.kr)에서 확인해 주세요.", size=7.8, color=MUTED), *inquiry])
         panels.append(_panel(items, width))
     elif courses is not None:
         panels.append(_panel([_p("교육과정 검토 우선순위" if is_org else "제안 과정", size=12, bold=True), Spacer(1, 7),
-                              _p("모든 역량이 목표 수준에 도달했거나 차이가 0.2점 미만이어서 우선 검토할 후속 과정이 없습니다.", size=9), *inquiry], width))
+                              _p("목표보다 0.2점 이상 낮은 역량이 없어 검토할 후속 과정이 없습니다.", size=9), *inquiry], width))
     # No forced page break: the heading travels with its first panel, so a half-empty page is filled first.
     return [KeepTogether(heading + panels[:1]), *panels[1:]]
 
@@ -303,20 +317,24 @@ def build_report_pdf(project: Mapping[str, Any], rows: list[Mapping[str, Any]], 
     label = "조직" if is_org else "개인"
     generated = datetime.now(ZoneInfo("Asia/Seoul")).strftime("%Y.%m.%d")
     doc = SimpleDocTemplate(output, pagesize=A4, rightMargin=36, leftMargin=36,
-                            topMargin=39, bottomMargin=42, title=f"KMA TAP {label} 교육 전·후 리포트",
+                            topMargin=39, bottomMargin=42, title=f"KMA TAP {label} 교육 전후 리포트",
                             author="KMA TAP", pageCompression=1)
     story: list[Any] = [_p("KMA TAP.", size=20, bold=True, color=TEAL), Spacer(1, 5),
-        _p(f"{label} 교육 전·후 리포트", size=22, bold=True), Spacer(1, 9),
+        _p(f"{label} 교육 전후 리포트", size=22, bold=True), Spacer(1, 9),
         _p(f"{project.get('company_name') or '회원사'}  |  {project.get('name') or '교육 프로젝트'}", size=10, bold=True),
         _p(f"교육명 {config.get('course_name') or '-'}  ·  교육일 {config.get('training_date') or '-'}", size=9, color=MUTED),
-        _p(f"보고 대상 {subject}" + (f"  ·  전·후 완료 {max(0, int(participant_count))}명" if is_org else ""), size=9, color=MUTED),
+        _p(f"보고 대상 {subject}" + (f"  ·  교육 전후 완료 {max(0, int(participant_count))}명" if is_org else ""), size=9, color=MUTED),
         Spacer(1, 15)]
     if summary["change"] is None:
-        overview = "비교 가능한 역량 점수가 부족하여 교육 전·후 변화를 산출하지 않았습니다. 수행 기회와 유효응답을 확인해 주세요."
+        overview = "비교할 수 있는 역량 점수가 부족해 교육 전후 변화를 산출하지 않았습니다."
     else:
-        overview = (f"비교 가능한 {summary['valid_count']}개 역량의 평균은 교육 전 {_fmt(summary['pre'])}점에서 "
-                    f"교육 후 {_fmt(summary['post'])}점으로 {_fmt(summary['change'], True)}점 변화했습니다. "
-                    f"운영 참고 기준상 '{summary['effect']}' 구간입니다. 실제 업무 적용 사례와 함께 해석해 주세요.")
+        change = summary["change"]
+        # Direction in words: "+0.00점 변화했습니다" is not a sentence a reader can use.
+        movement = (f"교육 전후 모두 {_fmt(summary['pre'])}점입니다" if change == 0 else
+                    f"교육 전 {_fmt(summary['pre'])}점에서 교육 후 {_fmt(summary['post'])}점으로 "
+                    f"{abs(change):.2f}점 {'올랐습니다' if change > 0 else '내려갔습니다'}")
+        overview = (f"비교 가능한 {summary['valid_count']}개 역량의 평균은 {movement}. "
+                    f"참고 기준으로 '{summary['effect']}' 구간입니다. 업무 적용 사례와 함께 해석해 주세요.")
     effect = _panel([_p("교육효과", size=11, bold=True), Spacer(1, 9),
                      _p(summary["effect"], size=25, bold=True, color=TEAL), Spacer(1, 5),
                      _p(f"평균 변화 {_fmt(summary['change'], True)}점" if summary["change"] is not None else "비교 점수 부족", size=10),
@@ -331,42 +349,47 @@ def build_report_pdf(project: Mapping[str, Any], rows: list[Mapping[str, Any]], 
         title = "선택 역량 프로파일" + (f"  {index + 1}/{len(groups)}" if len(groups) > 1 else "")
         radar_width = 302
         chart = _panel([_p(title, size=12, bold=True), Spacer(1, 3), Radar(group, radar_width - 28),
-            Spacer(1, 5), _p("1~5점 척도 · 미산출 역량은 점·선 생략" + ("\n3개 미만 역량은 점으로 표시" if len(group) < 3 else ""), size=7.7, color=MUTED),
+            Spacer(1, 5), _p("1~5점 척도 · 미산출 역량은 점·선 생략" + ("\n역량이 3개 미만이면 점으로 표시" if len(group) < 3 else ""), size=7.7, color=MUTED),
             *([_p("긴 역량명은 상세 결과의 번호로 표시합니다.", size=7.7, color=MUTED)] if any(len(r["factor_name_ko"]) > 22 for r in group) else [])], radar_width, padding=14)
         valid = [row for row in group if row.get("change") is not None]
         guide = [_p("업무 적용 가이드", size=12, bold=True), Spacer(1, 9)]
-        if valid:
-            strongest = max(valid, key=lambda r: r["post_score"])
+        short_name = lambda r: r["factor_name_ko"] if len(r["factor_name_ko"]) <= 42 else f"역량 {r['_axis_number']:02d} (상세 결과 참조)"
+        if len(valid) == 1:
+            # One comparable competency cannot be both the one to spread and the one to check first.
+            guide.extend([_p("비교 가능한 역량", size=9, color=TEAL, bold=True),
+                _p(short_name(valid[0]), size=11, bold=True), _p(_guidance(valid[0]), size=9)])
+        elif valid:
             priority = min(valid, key=lambda r: (r["post_score"], r["change"]))
+            strongest = max((r for r in valid if r is not priority), key=lambda r: r["post_score"])
             guide.extend([_p("유지·확산할 역량", size=9, color=TEAL, bold=True),
-                _p(strongest["factor_name_ko"] if len(strongest["factor_name_ko"]) <= 42 else f"역량 {strongest['_axis_number']:02d} (상세 결과 참조)", size=11, bold=True),
-                _p(f"교육 후 {_fmt(strongest['post_score'])}점. 실천 사례를 기록하고 다른 업무에도 적용해 보세요.", size=9),
+                _p(short_name(strongest), size=11, bold=True),
+                _p(f"교육 후 {_fmt(strongest['post_score'])}점입니다. 실천 사례를 다른 업무에도 적용하세요.", size=9),
                 Spacer(1, 14), _p("우선 점검할 역량", size=9, color=TEAL, bold=True),
-                _p(priority["factor_name_ko"] if len(priority["factor_name_ko"]) <= 42 else f"역량 {priority['_axis_number']:02d} (상세 결과 참조)", size=11, bold=True),
+                _p(short_name(priority), size=11, bold=True),
                 _p(_guidance(priority), size=9)])
         else:
-            guide.append(_p("유효한 전·후 점수 확보 후 업무 적용 가이드를 확인할 수 있습니다.", size=9))
+            guide.append(_p("비교할 수 있는 교육 전후 점수가 없어 가이드를 표시하지 않습니다.", size=9))
         story.extend([_columns(chart, _panel(guide, width - radar_width - 12), (radar_width, width - radar_width - 12)), Spacer(1, 12)])
     story.extend([_p("읽는 방법", size=10, bold=True), Spacer(1, 4),
         _p("교육효과는 동일 참여자·동일 문항의 자기보고 변화 요약이며 교육의 인과효과나 합격 판정이 아닙니다. "
-           "수행 기회 없음(0)은 점수에서 제외합니다. 비교 가능한 역량에 동일 가중치를 적용하며, 미산출 역량은 평균에서 제외합니다.", size=8.2, color=MUTED),
-        Spacer(1, 4), _p("변화량 기준: 큰 향상 ≥ +0.50 / 향상 +0.20 이상 +0.50 미만 / 유지 -0.20 초과 +0.20 미만 / 하락 ≤ -0.20. 운영 참고 기준, 인과효과 아님.", size=7.8, color=MUTED)])
+           "수행 기회 없음(0)은 점수에서 뺍니다. 평균은 비교 가능한 역량을 같은 비중으로 계산하고, 미산출 역량은 넣지 않습니다.", size=8.2, color=MUTED),
+        Spacer(1, 4), _p("변화량 구간(운영 참고 기준): 큰 향상 +0.50 이상 / 향상 +0.20 이상 +0.50 미만 / 유지 -0.20 초과 +0.20 미만 / 하락 -0.20 이하", size=7.8, color=MUTED)])
     if prepared:
         story.extend([PageBreak(), _p("역량별 결과와 보완 가이드", size=20, bold=True), Spacer(1, 6),
-            _p("각 역량의 전·후 변화와 교육 후 행동 빈도 구간에 따라 안내합니다.", size=9, color=MUTED), Spacer(1, 15)])
+            _p("역량별 교육 전후 변화와 교육 후 행동 빈도 구간에 따른 안내입니다.", size=9, color=MUTED), Spacer(1, 15)])
         for index, row in enumerate(prepared):
             hidden = is_org and row["valid_n"] < 5
             stats = "유효응답 5명 미만 · 점수 비공개" if hidden else (
                 f"교육 전 {_fmt(row['pre_score'])}  →  교육 후 {_fmt(row['post_score'])}  |  변화 {_fmt(row['change'], True)}  |  {effect_level(row['change'])}")
             detail = [_p(f"{index + 1:02d}  {row['module_group']}", size=8, bold=True, color=TEAL), Spacer(1, 4),
                       _p(row["factor_name_ko"], size=13, bold=True), Spacer(1, 7), _p(stats, size=10, bold=True), Spacer(1, 7),
-                      _p("해당 역량은 비교 가능한 참여자가 5명 미만이므로 점수와 평가를 공개하지 않습니다." if hidden else _guidance(row), size=9)]
+                      _p("개인 응답이 드러나지 않도록 점수와 평가를 공개하지 않습니다." if hidden else _guidance(row), size=9)]
             if is_org and not hidden:
-                detail.extend([Spacer(1, 4), _p(f"전·후 유효 인원 {row['valid_n']}명", size=8, color=MUTED)])
+                detail.extend([Spacer(1, 4), _p(f"교육 전후 유효 인원 {row['valid_n']}명", size=8, color=MUTED)])
             story.extend([_panel(detail, width), Spacer(1, 11)])
     if transfer is not None or courses is not None:
         story.extend(_followup_story(transfer, courses, width))
-    story.extend([Spacer(1, 4), _p(f"평가 규칙 {RULE_VERSION} · 고정 구간에 따른 평가", size=7.5, color=MUTED),
+    story.extend([Spacer(1, 4), _p(f"평가 규칙 {RULE_VERSION} · 고정 구간 기준", size=7.5, color=MUTED),
         _p("교육 후 빈도 구간: 4.20 이상 / 3.40~4.19 / 2.60~3.39 / 1.80~2.59 / 1.00~1.79. 규준·합격 기준이 아닌 운영 참고 구간입니다.", size=7.5, color=MUTED)])
 
     def page(canvas, document):

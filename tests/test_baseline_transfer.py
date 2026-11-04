@@ -141,7 +141,7 @@ class BaselineTransferTests(unittest.TestCase):
         target = deepcopy(source)
         target["assessment_phase"] = "post"
 
-        with self.assertRaisesRegex(BaselineValidationError, "변경되었거나 손상"):
+        with self.assertRaisesRegex(BaselineValidationError, "바뀌었거나 손상"):
             validate_pre_baseline(json.dumps(payload), target)
 
         wrong = deepcopy(target)
@@ -179,7 +179,7 @@ class BaselineTransferTests(unittest.TestCase):
         target = deepcopy(source)
         target["assessment_phase"] = "post"
         target["question_snapshot_hash"] = "b" * 64
-        with self.assertRaisesRegex(BaselineValidationError, "문항 스냅샷"):
+        with self.assertRaisesRegex(BaselineValidationError, "문항 구성"):
             validate_pre_baseline(raw, target)
 
     def test_rejects_a_baseline_from_another_project(self) -> None:
@@ -321,7 +321,7 @@ class BaselineTransferTests(unittest.TestCase):
 
         strict = deepcopy(source)
         strict["allow_schedule_override"] = False
-        with self.assertRaisesRegex(BaselineValidationError, "사전 완료일"):
+        with self.assertRaisesRegex(BaselineValidationError, "교육 전 검사 완료일"):
             pre_baseline_json_bytes(strict)
 
     def test_bootstrap_still_accepts_v2_baseline(self) -> None:
@@ -427,7 +427,7 @@ class BaselineTransferTests(unittest.TestCase):
         existing = deepcopy(fresh)
         existing["question_snapshot_hash"] = "c" * 64
         before_existing = deepcopy(existing)
-        with self.assertRaisesRegex(BaselineValidationError, "다른 문항 스냅샷"):
+        with self.assertRaisesRegex(BaselineValidationError, "다른 문항 구성"):
             bootstrap_post_from_pre_baseline(existing, pre_baseline_json_bytes(source))
         self.assertEqual(before_existing, existing)
 

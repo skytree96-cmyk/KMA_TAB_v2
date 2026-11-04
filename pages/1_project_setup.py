@@ -64,7 +64,7 @@ def _save_project_to_demo_store() -> None:
         st.session_state["demo_store_project_pending"] = True
         st.session_state["demo_store_notice"] = {
             "level": "error",
-            "message": f"기획검증 저장 설정을 확인하지 못했습니다({type(exc).__name__}). 현 세션의 프로젝트는 유지됩니다.",
+            "message": f"기획검증 저장 설정을 확인하지 못했습니다({type(exc).__name__}). 프로젝트는 이 브라우저에 그대로 있습니다.",
         }
         return
 
@@ -72,7 +72,7 @@ def _save_project_to_demo_store() -> None:
         st.session_state["demo_store_project_pending"] = False
         st.session_state["demo_store_notice"] = {
             "level": "info",
-            "message": "기획검증용 저장소가 미설정되어 현재 브라우저 세션과 JSON 파일 방식으로 진행합니다.",
+            "message": "기획검증용 저장소가 설정되지 않아 이 브라우저와 JSON 파일로 진행합니다.",
         }
         return
     company_access_code = company_business_number_from_page(
@@ -120,7 +120,7 @@ def _save_project_to_demo_store() -> None:
         st.session_state["demo_store_project_pending"] = True
         st.session_state["demo_store_notice"] = {
             "level": "error",
-            "message": f"테스트 프로젝트 저장에 실패했습니다({type(exc).__name__}). 현 세션은 유지되며 검사 화면에서 다시 시도할 수 있습니다.",
+            "message": f"테스트 프로젝트 저장에 실패했습니다({type(exc).__name__}). 검사 화면에서 다시 시도할 수 있습니다.",
         }
         return
 
@@ -218,9 +218,9 @@ def _render_limited_factor_checkboxes(
 
 page_header(
     "교육평가 프로젝트 만들기",
-    "교육 전·후 역량평가 설계",
+    "교육 전후 역량평가 설계",
     "같은 참여자의 교육 전 기준선과 교육 후 변화를 비교할 수 있도록 일정과 측정역량을 고정합니다.",
-    badge="사전·사후 비교",
+    badge="교육 전후 비교",
 )
 
 try:
@@ -270,7 +270,7 @@ if company_scope_ready and project_store_config is not None:
 with st.container(border=True):
     st.markdown('<h3 class="tap-card-title">2. 교육과 검사 일정</h3>', unsafe_allow_html=True)
     st.markdown(
-        '<p class="tap-card-sub">교육과정·교육일·사전/사후 검사 기간을 먼저 고정합니다. 최근 8주 회상기간이 교육 전을 포함하지 않도록 사후검사는 교육 8~10주 후를 권장합니다.</p>',
+        '<p class="tap-card-sub">교육과정, 교육일, 교육 전후 검사 기간을 먼저 정합니다. 최근 8주 회상기간에 교육 전 기간이 섞이지 않도록 교육 후 검사는 교육 8~10주 후를 권장합니다.</p>',
         unsafe_allow_html=True,
     )
     _initialize_checkbox("project_name_input_initialized", True)
@@ -335,7 +335,7 @@ with st.container(border=True):
     allow_schedule_override = st.checkbox(
         "공개 시연에서 검사기간 예외 허용",
         value=bool(st.session_state.get("allow_schedule_override", True)),
-        help="시연 중에는 설정 기간 밖에서도 실제 검사를 제출할 수 있습니다. 운영 전환 시에는 해제하세요.",
+        help="시연 중에는 설정 기간 밖에서도 검사를 제출할 수 있습니다. 운영 전환 시에는 해제하세요.",
     )
 
 base_rows = [
@@ -480,9 +480,9 @@ with st.container(border=True):
             next(iter(dict(st.session_state.get("target_means") or {}).values()), 3.5)
         ),
         0.1,
-        help="파일럿 전 임시 운영값입니다. 실제 운영에서는 직무분석과 전문가 합의로 역량·대상별 목표를 정하세요.",
+        help="실제 운영에서는 직무분석과 전문가 합의로 역량·대상별 목표를 정하세요.",
     )
-    st.caption("목표 3.5는 표준이나 규준이 아니라 교육 우선순위 대화를 위한 임시 설정값입니다.")
+    st.caption("목표 3.5는 파일럿 전 임시값입니다. 표준이나 규준이 아니며 교육 우선순위를 논의하는 데만 씁니다.")
 
     selected_factor_rows = [row_by_code[code] for code in selected]
     domain_header("조직 우선역량", "최대 3개 · 교육담당자 설정")
@@ -507,7 +507,7 @@ with st.container(border=True):
     training_cause = "mixed_or_unknown"
     callout(
         "격차 원인은 교육 후에 확인",
-        "프로젝트 생성 시 원인을 미리 단정하지 않습니다. 교육 전·후 변화와 적용 기회, 상사 지원, 도구·권한, 시간·프로세스 응답을 함께 확인하세요.",
+        "프로젝트 생성 시 원인을 미리 단정하지 않습니다. 교육 전후 변화와 적용 기회, 상사 지원, 도구·권한, 시간·프로세스 응답을 함께 보세요.",
         icon="i",
     )
     delivery_preference = st.radio(
@@ -538,7 +538,7 @@ for message in date_errors:
 post_delay_days = (post_start_date - training_date).days
 if not date_errors and not 56 <= post_delay_days <= 70:
     st.warning(
-        f"현재 사후검사는 교육 {post_delay_days}일 후 시작합니다. "
+        f"현재 교육 후 검사는 교육 {post_delay_days}일 후 시작합니다. "
         "최근 8주 행동에 교육 전 기간이 섞이지 않도록 교육 8~10주(56~70일) 후를 권장합니다."
     )
 

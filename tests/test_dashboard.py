@@ -229,7 +229,7 @@ class DashboardTests(unittest.TestCase):
 
         self.assertEqual(1, len(rows))
         self.assertEqual(
-            ["프로젝트", "검사 참여자", "사전·사후 모두 완료율(%)", "최근 집계 갱신"],
+            ["프로젝트", "검사 참여자", "교육 전후 모두 완료율(%)", "최근 집계 갱신"],
             list(rows[0]),
         )
         self.assertEqual(len(rows[0]), len(set(rows[0])))
@@ -426,7 +426,7 @@ class DashboardTests(unittest.TestCase):
         self.assertEqual([], rows)
         self.assertEqual(2, len(warnings))
         self.assertIn("문항 코드 구성", warnings[0])
-        self.assertIn("스냅샷 버전", warnings[1])
+        self.assertIn("문항 구성 버전", warnings[1])
 
     def test_empty_session_does_not_show_mock_activity(self) -> None:
         dashboard = build_session_dashboard(
@@ -584,7 +584,7 @@ class DashboardTests(unittest.TestCase):
         rendered = "\n".join(str(item.value) for item in app.markdown)
         notices = "\n".join(str(item.value) for item in app.info)
         self.assertIn("실제 세션 교육", rendered)
-        self.assertIn("현재 브라우저 세션", notices)
+        self.assertIn("이 브라우저", notices)
         self.assertNotIn("83.8%", rendered)
         self.assertNotIn("216명", rendered)
 

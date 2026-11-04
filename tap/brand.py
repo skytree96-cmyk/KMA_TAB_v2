@@ -9,7 +9,7 @@ from pathlib import Path
 
 FONT_DIR = Path(__file__).resolve().parents[1] / "assets" / "fonts"
 BRAND_VARIANTS = ("navy-teal", "navy", "teal", "reverse")
-BRAND_DESCRIPTION = "교육 전·후\n변화 평가 플랫폼"
+BRAND_DESCRIPTION = "교육 전후\n변화 평가 플랫폼"
 
 
 @lru_cache(maxsize=1)

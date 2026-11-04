@@ -21,7 +21,7 @@ class PortalAccessTests(unittest.TestCase):
         with patch.dict(os.environ, {"TAP_APP_MODE": "production", "DATABASE_URL": ""}):
             app = AppTest.from_function(_portal_entry).run()
         self.assertEqual(len(app.exception), 0)
-        self.assertTrue(any("연결을 준비" in item.value for item in app.info))
+        self.assertTrue(any("아직 연결되지 않아" in item.value for item in app.info))
         self.assertTrue(all(item.disabled for item in app.text_input))
         self.assertFalse(any(item.label in {"교육담당자", "참여자", "KMA 관리자"} for item in app.button))
         self.assertFalse(any("공개 데모" in item.value for item in app.markdown))

@@ -142,7 +142,10 @@ class CourseRecommendationTests(unittest.TestCase):
             return recommend_courses(self.config, [row])[0]
 
         rising = advice(2.4)
-        self.assertEqual(rising["reason"], "교육 후 3.00점, 목표 3.50점보다 0.50점 낮음 · 교육 전보다 +0.60점")
+        self.assertEqual(rising["reason"], "교육 후 3.00점, 목표 3.50점보다 0.50점 낮음 · 교육 전보다 0.60점 높음")
+        self.assertTrue(advice(3.4)["reason"].endswith("교육 전보다 0.40점 낮음"))
+        # A zero change is said in words, never as a signed "+0.00점".
+        self.assertTrue(advice(3.0)["reason"].endswith("교육 전과 같음"))
         self.assertIn("심화", rising["advice"])
         self.assertIn("큰 차이가 없습니다", advice(3.1)["advice"])
         self.assertIn("낮아졌습니다", advice(3.4)["advice"])
@@ -172,7 +175,7 @@ class DetailRowsTests(unittest.TestCase):
         summaries = [{"factor_code": "CORE-CO", "factor_name_ko": "소통", "pre_n": 6, "post_n": 5, "paired_n": 5,
                       "attrition_n": 1, "pre_mean": 3.0, "post_mean": 3.2, "observed_change": 0.2, "status": "공개"},
                      {"factor_code": "CORE-CL", "factor_name_ko": "협업", "pre_n": 3, "post_n": 3, "paired_n": 3,
-                      "attrition_n": 0, "pre_mean": None, "post_mean": None, "observed_change": None, "status": "비공개(전·후 유효응답 N<5)"}]
+                      "attrition_n": 0, "pre_mean": None, "post_mean": None, "observed_change": None, "status": "비공개(교육 전후 유효응답 N<5)"}]
         transfer = summarize_transfer([_result(4, ["적용 기회 부족"]) for _ in range(5)])
         rows = organization_detail_rows(summaries, {"target_means": {"CORE-CO": 3.5, "CORE-CL": 3.5}}, transfer)
         self.assertEqual([row["구분"] for row in rows].count("역량"), 2)

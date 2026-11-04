@@ -149,7 +149,7 @@ class PrePostPageTests(unittest.TestCase):
 
     def test_assessment_uses_same_eight_week_instruction_for_both_phases(self) -> None:
         source = (ROOT / "pages" / "2_assessment.py").read_text(encoding="utf-8")
-        self.assertIn("사전·사후 모두 동일하게 최근 8주", source)
+        self.assertIn("교육 전후 모두 최근 8주", source)
         self.assertIn('class="tap-period-pill">최근 8주</span>', source)
         self.assertNotIn("최근 4주", source)
         self.assertIn("sync_assessment_phase", source)

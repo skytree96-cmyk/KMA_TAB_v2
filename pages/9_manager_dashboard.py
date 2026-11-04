@@ -60,8 +60,8 @@ def _read_github_demo_snapshot(
 
 page_header(
     "KMA 교육효과 평가",
-    "교육 전후의 변화를 다음 개선으로",
-    "교육담당자가 사전·사후 검사를 운영하고, 동일 참여자의 전후 변화와 현업 적용환경을 다음 교육 설계로 연결합니다.",
+    "교육평가 운영 현황",
+    "교육 전후 검사 진행 상태를 확인하고, 결과를 다음 교육 설계에 반영합니다.",
     badge="교육담당자 화면",
 )
 
@@ -135,14 +135,14 @@ if dashboard_source == "store":
         )
 elif store_error:
     st.warning(
-        f"누적 저장소를 읽지 못해 현재 브라우저 세션으로 대체했습니다: {store_error}"
+        f"누적 저장소를 읽지 못해 이 브라우저의 데이터로 대신 표시합니다: {store_error}"
     )
     if st.button("누적 데이터 다시 읽기"):
         _read_github_demo_snapshot.clear()
         st.rerun()
 else:
     st.info(
-        f"{company_scope.company_name} 범위에 저장된 프로젝트가 없어 현재 브라우저 세션을 표시합니다."
+        f"{company_scope.company_name} 범위에 저장된 프로젝트가 없어 이 브라우저의 데이터를 표시합니다."
     )
 
 metric_grid(dashboard["metrics"])
@@ -150,23 +150,23 @@ metric_grid(dashboard["metrics"])
 left, right = st.columns([1.35, 1], gap="large")
 with left:
     with st.container(border=True):
-        project_title = "누적 프로젝트" if dashboard_source == "store" else "현재 세션 프로젝트"
+        project_title = "누적 프로젝트" if dashboard_source == "store" else "이 브라우저의 프로젝트"
         project_subtitle = (
-            "저장소에 누적된 프로젝트별 교육 전·후 완료 제출 현황입니다."
+            "저장소에 누적된 프로젝트별 교육 전후 완료 제출 현황입니다."
             if dashboard_source == "store"
-            else "현재 브라우저에서 만든 프로젝트와 한 참여자의 교육 전·후 완료 상태입니다."
+            else "이 브라우저에서 만든 프로젝트와 한 참여자의 교육 전후 완료 상태입니다."
         )
         st.markdown(f'<h3 class="tap-card-title">{project_title}</h3>', unsafe_allow_html=True)
         st.markdown(f'<p class="tap-card-sub">{project_subtitle}</p>', unsafe_allow_html=True)
         if dashboard["projects"]:
             project_rows(dashboard["projects"])
-            participant_scope = "누적 참여자" if dashboard_source == "store" else "현재 세션 참여자"
+            participant_scope = "누적 참여자" if dashboard_source == "store" else "이 브라우저의 참여자"
             st.caption(
                 f"검사 단계 진행률 {dashboard['phase_completion_pct']:.0f}% · "
-                f"교육 전·후 모두 완료한 {participant_scope} {dashboard['paired_count']}명"
+                f"교육 전후 모두 완료한 {participant_scope} {dashboard['paired_count']}명"
             )
         else:
-            empty_scope = "누적 저장소" if dashboard_source == "store" else "현재 세션"
+            empty_scope = "누적 저장소" if dashboard_source == "store" else "이 브라우저"
             st.info(f"{empty_scope}에 완료 제출이 없습니다. 먼저 교육평가 검사를 완료해 주세요.")
 
 with right:
@@ -178,13 +178,7 @@ with right:
         )
         callout(
             "HR은 조직 집계가 기본",
-            "개인결과는 참여자가 별도로 동의한 범위만 열람하며, 조직 변화는 동일 참여자의 유효한 사전·사후 결과만 집계합니다.",
-        )
-        callout(
-            "채용·승진·성과평가에 사용 금지",
-            "TAP은 자기보고형 교육 요구진단이며 인사평가 도구가 아닙니다.",
-            icon="!",
-            tone="warn",
+            "개인결과는 참여자가 별도로 동의한 범위만 열람하며, 조직 변화는 동일 참여자의 유효한 교육 전후 결과만 집계합니다.",
         )
         callout(
             "표본 보호",
@@ -193,7 +187,7 @@ with right:
         )
         callout(
             "변화와 인과효과는 다릅니다",
-            "비교집단이 없는 사전·사후 자기보고 결과는 교육 전후 관찰된 변화로 표현합니다.",
+            "비교집단이 없는 자기보고 결과는 ‘교육 전후 관찰된 변화’로 표현합니다.",
             icon="i",
         )
 
@@ -202,18 +196,18 @@ next_a, next_b, next_c = st.columns(3)
 with next_a:
     with st.container(border=True):
         st.markdown("**① 교육·평가 일정 구성**")
-        st.caption("교육명과 교육일, 사전검사·사후검사 기간, 공통 측정역량을 함께 정합니다.")
+        st.caption("교육명, 교육일, 교육 전후 검사 기간과 공통 측정역량을 함께 정합니다.")
         if st.button("프로젝트 설정", key="home_project", width="stretch"):
             safe_switch_page("pages/1_project_setup.py")
 with next_b:
     with st.container(border=True):
-        st.markdown("**② 사전·사후 화면 확인**")
-        st.caption("두 시점 모두 같은 문항·척도와 최근 8주 회상기간을 사용하고, 동일 교육 참여자 ID로 전·후 결과를 연결합니다.")
-        if st.button("실제 검사 시작", key="home_assessment", width="stretch"):
+        st.markdown("**② 교육 전후 검사 화면 확인**")
+        st.caption("두 시점 모두 같은 문항·척도와 최근 8주 회상기간을 사용하고, 같은 교육 참여자 ID로 교육 전후 결과를 연결합니다.")
+        if st.button("교육 전 검사 열기", key="home_assessment", width="stretch"):
             safe_switch_page("pages/7_pre_assessment.py")
 with next_c:
     with st.container(border=True):
         st.markdown("**③ 관찰된 변화 확인**")
-        st.caption("N≥5 동일 참여자 전·후 집계, 역량별 전후 변화, 수행기회와 전이 장애요인을 함께 검토합니다.")
+        st.caption("동일 참여자 N≥5 교육 전후 집계, 역량별 변화, 수행기회와 전이 장애요인을 함께 검토합니다.")
         if st.button("교육 전후 리포트", key="home_org", width="stretch"):
             safe_switch_page("pages/4_organization_report.py")
