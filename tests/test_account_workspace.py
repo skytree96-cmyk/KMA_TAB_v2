@@ -125,7 +125,8 @@ class AccountWorkspaceTests(unittest.TestCase):
         app.radio(key="account_admin_project_select").set_value("p1")
         rerun(app)
         self.assertEqual(app.session_state["assignment_target"], "p1")
-        self.assertEqual(app.multiselect(key="account_admin_assign_p1").options, ["홍길동 · alpha-hong"])
+        self.assertEqual([box.label for box in app.checkbox if box.key and box.key.startswith("account_admin_assign_p1_pick_")],
+                         ["홍길동 · alpha-hong · 교육팀 · 대리"])
         app.text_input(key="account_admin_project_search").input("Beta")
         rerun(app)
         self.assertFalse(app.radio)
@@ -145,7 +146,8 @@ class AccountWorkspaceTests(unittest.TestCase):
         self.assertEqual(app.radio(key="account_admin_manage_user").options, ["알파 담당자 · alpha-manager"])
         app.button_group(key="account_admin_manage_user_role").set_value("participant")
         rerun(app)
-        self.assertEqual(app.radio(key="account_admin_manage_user").options, ["홍길동 · alpha-hong", "김하나 · Beta-Kim"])
+        # People lists are in 가나다 order (LXP people list).
+        self.assertEqual(app.radio(key="account_admin_manage_user").options, ["김하나 · Beta-Kim", "홍길동 · alpha-hong"])
         # Company managers only see their participants, so no role split is offered.
         self.assertFalse(any(item.key == "account_admin_manage_user_role" for item in self.app("accounts", "company").get("button_group")))
 

@@ -682,6 +682,56 @@ def _board_page(page_key: str, page: int) -> None:
     st.session_state[page_key] = page
 
 
+# People lists follow the LXP console (교육 개설 사람 목록, 조직원 목록): 가나다순,
+# '전체' plus up to four initial-consonant ranges once a list passes ten people,
+# and ten people per page.
+PEOPLE_PAGE_SIZE = BOARD_PAGE_SIZE
+
+
+def _move_people_page(page_key: str, page: int, clear_key: str | None = None) -> None:
+    st.session_state[page_key] = page
+    if clear_key:
+        # A different page must not leave actions aimed at a hidden person.
+        st.session_state[clear_key] = None
+
+
+def _people_window(
+    rows: list[Mapping[str, Any]], *, range_key: str, page_key: str, name_key: str, clear_key: str | None = None,
+) -> tuple[list[Mapping[str, Any]], Callable[[], None]]:
+    """Draw the range chips and return this page's people plus a pager to draw below them."""
+    ordered = sorted(rows, key=lambda row: (name_initial(row.get(name_key)) == "기타", str(row.get(name_key) or "")))
+    ranges = initial_ranges(ordered, name_key)
+    visible = ordered
+    if len(ranges) > 1:
+        labels = [f"전체 {len(ordered)}", *(label for label, _ in ranges)]
+        # Labels carry counts, so a new search result falls back to '전체'.
+        if st.session_state.get(range_key) not in labels:
+            st.session_state[range_key] = labels[0]
+        chosen = st.segmented_control("이름 구간", labels, key=range_key, label_visibility="collapsed",
+                                      on_change=_move_people_page, args=(page_key, 0, clear_key)) or labels[0]
+        visible = ordered if chosen == labels[0] else dict(ranges)[chosen]
+    pages = max(1, -(-len(visible) // PEOPLE_PAGE_SIZE))
+    page = max(0, min(int(st.session_state.get(page_key, 0)), pages - 1))
+    st.session_state[page_key] = page
+    start = page * PEOPLE_PAGE_SIZE
+    window = visible[start:start + PEOPLE_PAGE_SIZE]
+
+    def pager() -> None:
+        if pages == 1:
+            return
+        left, center, right = st.columns([1, 1, 1], vertical_alignment="center")
+        with left:
+            st.button("이전", key=page_key + "_previous", disabled=page == 0,
+                      on_click=_move_people_page, args=(page_key, page - 1, clear_key))
+        with center:
+            st.caption(f"{len(visible)}명 중 {start + 1}~{start + len(window)} · {page + 1} / {pages} 페이지")
+        with right:
+            st.button("다음", key=page_key + "_next", disabled=page == pages - 1,
+                      on_click=_move_people_page, args=(page_key, page + 1, clear_key))
+
+    return window, pager
+
+
 def _render_department(project_id: str, department: str, members: list[Mapping[str, Any]], everyone: list[Mapping[str, Any]], expanded: bool) -> None:
     active = [row for row in everyone if row.get("active", True)]
     phase = "post" if any(row.get("post_answered") or row.get("post_completed") for row in active) else "pre"
@@ -692,29 +742,10 @@ def _render_department(project_id: str, department: str, members: list[Mapping[s
     with st.expander(label, expanded=expanded, key=PREFIX + f"board_{project_id}_{digest}"):
         if active:
             st.progress(done / len(active))
-        ranges = initial_ranges(members)
-        visible = ranges[0][1]
-        if len(ranges) > 1:
-            labels = [name for name, _ in ranges]
-            range_key = PREFIX + f"board_range_{project_id}_{digest}"
-            if st.session_state.get(range_key) not in labels:
-                st.session_state[range_key] = labels[0]
-            chosen = st.segmented_control("이름 구간", labels, key=range_key, label_visibility="collapsed") or labels[0]
-            visible = dict(ranges)[chosen]
-        page_key = PREFIX + f"board_page_{project_id}_{digest}"
-        pages = max(1, -(-len(visible) // BOARD_PAGE_SIZE))
-        page = max(0, min(int(st.session_state.get(page_key, 0)), pages - 1))
-        st.session_state[page_key] = page
-        rows = visible[page * BOARD_PAGE_SIZE:(page + 1) * BOARD_PAGE_SIZE]
+        rows, pager = _people_window(members, range_key=PREFIX + f"board_range_{project_id}_{digest}",
+                                     page_key=PREFIX + f"board_page_{project_id}_{digest}", name_key="user_name")
         st.dataframe([_board_row(row) for row in rows], hide_index=True, width="stretch")
-        if pages > 1:
-            left, center, right = st.columns([1, 1, 1], vertical_alignment="center")
-            with left:
-                st.button("이전", key=page_key + "_previous", disabled=page == 0, on_click=_board_page, args=(page_key, page - 1))
-            with center:
-                st.caption(f"{len(visible)}명 중 {page * BOARD_PAGE_SIZE + 1}~{page * BOARD_PAGE_SIZE + len(rows)} · {page + 1} / {pages} 페이지")
-            with right:
-                st.button("다음", key=page_key + "_next", disabled=page == pages - 1, on_click=_board_page, args=(page_key, page + 1))
+        pager()
 
 
 def _render_progress_board(project: Mapping[str, Any], everyone: list[Mapping[str, Any]], matched: list[Mapping[str, Any]]) -> None:
@@ -744,6 +775,22 @@ def _department(row: Mapping[str, Any]) -> str:
     return str(row.get("department") or "").strip() or NO_DEPARTMENT
 
 
+def _person_label(row: Mapping[str, Any]) -> str:
+    return " · ".join(str(part) for part in (row.get("display_name"), row.get("login_id"), row.get("department"), row.get("job_title")) if part)
+
+
+def _toggle_person(pick_key: str, value: str, box_key: str) -> None:
+    picked = [item for item in st.session_state.get(pick_key) or [] if item != value]
+    if st.session_state.get(box_key):
+        picked.append(value)
+    st.session_state[pick_key] = picked
+
+
+def _pick_people(pick_key: str, values: list[str]) -> None:
+    picked = list(st.session_state.get(pick_key) or [])
+    st.session_state[pick_key] = picked + [value for value in values if value not in picked]
+
+
 def _bulk_pick(
     rows: list[Mapping[str, Any]], pick_key: str, *, search_key: str, search_label: str, unit_label: str,
     group: Callable[[Mapping[str, Any]], str] = _department, group_label: str = "부서 전체 선택",
@@ -767,11 +814,25 @@ def _bulk_pick(
         help="부서 전체 선택에 없는 사람을 한 명씩 더할 때 씁니다. 영문 대소문자는 구분하지 않습니다.",
     ).strip().casefold()
     matched = {_identifier(row): row for row in rows if _identifier(row) not in in_groups and _participant_matches(row, query)}
-    st.session_state[pick_key] = [value for value in st.session_state.get(pick_key) or [] if value in matched]
+    picked = [value for value in st.session_state.get(pick_key) or [] if value in matched]
+    st.session_state[pick_key] = picked
+    if st.session_state.get(pick_key + "_query") != query:
+        st.session_state[pick_key + "_query"] = query
+        st.session_state[pick_key + "_page"] = 0
     st.caption(f"검색 결과 {len(matched)}명 · {unit_label} {len(rows)}명")
     if matched:
-        st.multiselect("개별 추가", list(matched), key=pick_key, placeholder="검색한 사람 중에서 한 명씩 고르세요",
-                       format_func=lambda value: f"{matched[value].get('display_name', '')} · {matched[value].get('login_id', '')}")
+        window, pager = _people_window(list(matched.values()), range_key=pick_key + "_range",
+                                       page_key=pick_key + "_page", name_key="display_name")
+        page_ids = [_identifier(row) for row in window]
+        if any(value not in picked for value in page_ids):
+            st.button(f"이 페이지 {len(page_ids)}명 모두 선택", key=pick_key + "_page_all", type="tertiary",
+                      icon=":material/done_all:", on_click=_pick_people, args=(pick_key, page_ids))
+        for row in window:
+            value = _identifier(row)
+            box_key = f"{pick_key}_pick_{value}"
+            st.session_state[box_key] = value in picked
+            st.checkbox(_person_label(row), key=box_key, on_change=_toggle_person, args=(pick_key, value, box_key))
+        pager()
     elif query:
         st.info("검색 결과가 없습니다. 검색어를 다시 입력해 주세요.")
     by_id = {_identifier(row): row for row in rows}
@@ -907,7 +968,9 @@ def _workspace_pick(
     search_label: str, placeholder: str, label: str, unit: str,
     search_values: Callable[[Mapping[str, Any]], list[Any]],
     title: Callable[[Mapping[str, Any]], str], caption: Callable[[Mapping[str, Any]], str],
+    name_key: str | None = None,
 ) -> Mapping[str, Any] | None:
+    """Search, then pick one row. With name_key it is a people list (initials, ten per page)."""
     query = st.text_input(
         search_label, key=search_key, placeholder=placeholder,
         help="일부 글자로 검색할 수 있습니다. 영문 대소문자는 구분하지 않습니다.",
@@ -924,14 +987,32 @@ def _workspace_pick(
     if st.session_state.get(query_key) != query:
         st.session_state[page_key] = 0
         st.session_state[query_key] = query
-    pages = max(1, (len(matched) + WORKSPACE_PAGE_SIZE - 1) // WORKSPACE_PAGE_SIZE)
-    page = max(0, min(int(st.session_state.get(page_key, 0)), pages - 1))
-    st.session_state[page_key] = page
     st.caption(f"검색 결과 {len(matched)}{unit} · 전체 {len(rows)}{unit}")
     if not matched:
         st.info("검색 결과가 없습니다. 검색어를 다시 입력해 주세요." if rows else f"등록된 {_josa(label, '이', '가')} 없습니다.")
         return None
-    visible = list(by_id)[page * WORKSPACE_PAGE_SIZE:(page + 1) * WORKSPACE_PAGE_SIZE]
+    if name_key:
+        window, pager = _people_window(matched, range_key=selection_key + "_range", page_key=page_key,
+                                       name_key=name_key, clear_key=selection_key)
+        visible = [_identifier(row) for row in window]
+    else:
+        pages = max(1, (len(matched) + WORKSPACE_PAGE_SIZE - 1) // WORKSPACE_PAGE_SIZE)
+        page = max(0, min(int(st.session_state.get(page_key, 0)), pages - 1))
+        st.session_state[page_key] = page
+        visible = list(by_id)[page * WORKSPACE_PAGE_SIZE:(page + 1) * WORKSPACE_PAGE_SIZE]
+
+        def pager() -> None:
+            if pages == 1:
+                return
+            left, center, right = st.columns([1, 1, 1], vertical_alignment="center")
+            with left:
+                st.button("이전", key=selection_key + "_previous_page", disabled=page == 0,
+                          on_click=_workspace_page, args=(selection_key, page_key, page - 1))
+            with center:
+                st.caption(f"{page + 1} / {pages} 페이지")
+            with right:
+                st.button("다음", key=selection_key + "_next_page", disabled=page == pages - 1,
+                          on_click=_workspace_page, args=(selection_key, page_key, page + 1))
     if st.session_state.get(selection_key) not in visible:
         st.session_state[selection_key] = None
     selected = st.radio(
@@ -940,16 +1021,7 @@ def _workspace_pick(
         key=selection_key, index=None, label_visibility="collapsed",
         width="stretch", persist_state="session",
     )
-    if pages > 1:
-        left, center, right = st.columns([1, 1, 1], vertical_alignment="center")
-        with left:
-            st.button("이전", key=selection_key + "_previous_page", disabled=page == 0,
-                      on_click=_workspace_page, args=(selection_key, page_key, page - 1))
-        with center:
-            st.caption(f"{page + 1} / {pages} 페이지")
-        with right:
-            st.button("다음", key=selection_key + "_next_page", disabled=page == pages - 1,
-                      on_click=_workspace_page, args=(selection_key, page_key, page + 1))
+    pager()
     return by_id.get(selected)
 
 
@@ -984,9 +1056,9 @@ def _render_workspace_users(store: Any, token: str, principal: Mapping[str, Any]
                     allowed = [row for row in allowed if row.get("role") == role_filter]
             user = _workspace_pick(
                 allowed, selection_key=PREFIX + "manage_user", search_key=PREFIX + "manage_user_search",
-                search_label="계정 검색", placeholder="이름, 아이디, 회사명으로 검색", label="관리할 계정", unit="명",
-                search_values=lambda row: [row.get(field) for field in ("display_name", "login_id", "company_name")],
-                title=lambda row: f"{row.get('display_name', '')} · {row.get('login_id', '')}",
+                search_label="계정 검색", placeholder="이름, 아이디, 부서, 회사명으로 검색", label="관리할 계정", unit="명",
+                search_values=lambda row: [row.get(field) for field in ("display_name", "login_id", "company_name", "department", "job_title")],
+                title=lambda row: f"{row.get('display_name', '')} · {row.get('login_id', '')}", name_key="display_name",
                 caption=lambda row: " · ".join(part for part in (
                     str(row.get("company_name") or ""), ROLE_LABELS.get(row["role"], ""),
                     "사용 중" if row.get("active", True) else "중지",

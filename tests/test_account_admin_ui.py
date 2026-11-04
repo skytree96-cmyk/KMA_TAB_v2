@@ -192,6 +192,11 @@ render_admin(Store(), "opaque-token", {"id":"u1", "role":ROLE, "company_id":"co1
 '''
 
 
+def picks(app: AppTest, key: str) -> list[str]:
+    """Labels of the person checkboxes a bulk picker shows on the current page."""
+    return [box.label for box in app.checkbox if box.key and box.key.startswith(key + "_pick_")]
+
+
 def run_app(app: AppTest) -> AppTest:
     # Streamlit 1.61 AppTest treats tabs and expanders as Blocks, so its public
     # run() omits their widget values. Supply the same values a browser sends.
@@ -264,9 +269,17 @@ _render_assignments(Store(), "token", {"id": "p1", "company_id": "co1", "config"
         self.assertEqual(list(app.exception), [])
         expanders = [item.label for item in app.expander if "완료" in item.label]
         self.assertEqual(expanders, ["영업본부 · 교육 전 완료 10/23명", "부서 미등록 · 교육 전 완료 0/1명"])
-        ranges = app.segmented_control(key="account_admin_board_range_p1_" + __import__("hashlib").sha256("영업본부".encode()).hexdigest()[:10])
-        self.assertEqual(len(ranges.options), 3)
-        self.assertEqual(len(app.dataframe[0].value), int(ranges.value.rsplit(" ", 1)[1]))
+        range_key = "account_admin_board_range_p1_" + __import__("hashlib").sha256("영업본부".encode()).hexdigest()[:10]
+        ranges = app.segmented_control(key=range_key)
+        # LXP people list: '전체' first, then up to four initial ranges, ten people per page.
+        self.assertEqual(len(ranges.options), 4)
+        self.assertEqual(ranges.value, "전체 23")
+        self.assertEqual(len(app.dataframe[0].value), 10)
+        self.assertEqual(sum(int(option.rsplit(" ", 1)[1]) for option in ranges.options[1:]), 23)
+        ranges.set_value(ranges.options[1])
+        run_app(app)
+        first = app.segmented_control(key=range_key).options[1]
+        self.assertEqual(len(app.dataframe[0].value), min(10, int(first.rsplit(" ", 1)[1])))
         app.session_state["account_admin_board_status_p1"] = "미시작"
         run_app(app)
         self.assertEqual(list(app.exception), [])
@@ -275,6 +288,49 @@ _render_assignments(Store(), "token", {"id": "p1", "company_id": "co1", "config"
         self.assertEqual(sum(len(frame.value) for frame in app.dataframe), 9)
 
 class BulkActionTests(unittest.TestCase):
+    def test_people_list_pages_by_ten_with_initial_ranges_and_keeps_picks(self):
+        app = AppTest.from_string('''
+import streamlit as st
+from tap.account_admin_ui import _render_assignments
+names = "가나다라마바사아자차카타파하"
+users = [{"id": f"u{i:02d}", "display_name": names[i % 14] + str(i), "login_id": f"user{i}", "department": "영업"} for i in range(25)]
+users = [{"role": "participant", "company_id": "co1", "active": True, **row} for row in users]
+class Store:
+    def list_assignments(self, token, project_id):
+        return []
+    def assign_participants(self, token, project_id, user_ids):
+        st.session_state["calls"] = list(user_ids)
+        return len(user_ids)
+_render_assignments(Store(), "token", {"id": "p1", "company_id": "co1"}, users)
+''').run(timeout=30)
+        self.assertEqual(list(app.exception), [])
+        first = picks(app, "account_admin_assign_p1")
+        self.assertEqual(len(first), 10)
+        self.assertEqual(first, sorted(first))
+        ranges = app.segmented_control(key="account_admin_assign_p1_range")
+        self.assertEqual(ranges.value, "전체 25")
+        self.assertEqual(len(ranges.options), 4)
+        app.button(key="account_admin_assign_p1_page_all").click()
+        run_app(app)
+        self.assertEqual(len(app.session_state["account_admin_assign_p1"]), 10)
+        app.button(key="account_admin_assign_p1_page_next").click()
+        run_app(app)
+        second = picks(app, "account_admin_assign_p1")
+        self.assertEqual(len(second), 10)
+        self.assertFalse(set(first) & set(second))
+        box = next(item for item in app.checkbox if item.key.startswith("account_admin_assign_p1_pick_"))
+        box.check()
+        run_app(app)
+        # Picks on page 1 stay picked while page 2 is open.
+        self.assertEqual(len(app.session_state["account_admin_assign_p1"]), 11)
+        app.segmented_control(key="account_admin_assign_p1_range").set_value(app.segmented_control(key="account_admin_assign_p1_range").options[-1])
+        run_app(app)
+        self.assertEqual(app.session_state["account_admin_assign_p1_page"], 0)
+        app.button(key="account_admin_assign_save_p1").click()
+        run_app(app)
+        self.assertEqual(list(app.exception), [])
+        self.assertEqual(len(app.session_state["calls"]), 11)
+
     def test_department_chip_assigns_everyone_in_one_call(self):
         app = AppTest.from_string('''
 import streamlit as st
@@ -295,8 +351,8 @@ _render_assignments(Store(), "token", {"id": "p1", "company_id": "co1"}, users)
         chips.set_value(["영업본부"])
         run_app(app)
         # Department members leave the individual list, so nobody is counted twice.
-        self.assertEqual(app.multiselect(key="account_admin_assign_p1").options, ["인사 · hr1"])
-        app.multiselect(key="account_admin_assign_p1").set_value(["h1"])
+        self.assertEqual(picks(app, "account_admin_assign_p1"), ["인사 · hr1"])
+        app.checkbox(key="account_admin_assign_p1_pick_h1").check()
         run_app(app)
         self.assertEqual(len(app.dataframe[-1].value), 13)
         app.button(key="account_admin_assign_save_p1").click()
@@ -424,15 +480,15 @@ _render_assignments(Store(), "token", {"id":"p1", "company_id":"co1"}, users)
         for query in ("새봄", "NEW-ONE", "발tEaM", "과장"):
             app.text_input(key="account_admin_assign_search_p1").input(query)
             run_app(app)
-            self.assertEqual(app.multiselect(key="account_admin_assign_p1").options, ["박새봄 · new-one"])
-        app.multiselect(key="account_admin_assign_p1").set_value(["n1"])
+            self.assertEqual(picks(app, "account_admin_assign_p1"), ["박새봄 · new-one · 개발Team · 과장"])
+        app.checkbox(key="account_admin_assign_p1_pick_n1").check()
         run_app(app)
         app.text_input(key="account_admin_assign_search_p1").input("new-two")
         app.button(key="account_admin_assign_save_p1").click()
         run_app(app)
-        self.assertEqual(app.multiselect(key="account_admin_assign_p1").value, [])
+        self.assertEqual(app.session_state["account_admin_assign_p1"], [])
         self.assertNotIn("new_assignment", app.session_state.filtered_state)
-        app.multiselect(key="account_admin_assign_p1").set_value(["n2"])
+        app.checkbox(key="account_admin_assign_p1_pick_n2").check()
         run_app(app)
         app.button(key="account_admin_assign_save_p1").click()
         run_app(app)
@@ -442,7 +498,7 @@ _render_assignments(Store(), "token", {"id":"p1", "company_id":"co1"}, users)
         run_app(app)
         self.assertEqual(list(app.exception), [])
         self.assertFalse(app.selectbox)
-        self.assertFalse(app.multiselect)
+        self.assertEqual(picks(app, "account_admin_assign_p1"), [])
         self.assertIsNone(app.session_state["account_admin_assignment_change_p1"])
         self.assertEqual(app.session_state["account_admin_assign_p1"], [])
 
