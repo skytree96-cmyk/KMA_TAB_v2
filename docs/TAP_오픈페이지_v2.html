@@ -204,6 +204,8 @@ body{margin:0;background:#fff}
 .tap-landing .foot-links{display:flex;flex-wrap:wrap;gap:8px}
 .tap-landing .foot-links a{display:inline-flex;align-items:center;height:40px;padding:0 16px;border-radius:999px;border:1px solid rgba(255,255,255,.24);color:#fff;font-weight:600;text-decoration:none}
 .tap-landing .foot-links a:hover{background:rgba(255,255,255,.08)}
+.tap-landing .foot-links a.is-privacy{background:#fff;border-color:#fff;color:var(--navy-900);font-weight:800}
+.tap-landing .foot-links a.is-privacy:hover{background:#e9eef5}
 .tap-landing .foot-note{margin-top:32px;padding-top:24px;border-top:1px solid rgba(255,255,255,.12)}
 
 @media (max-width:1080px){
@@ -476,7 +478,7 @@ body{margin:0;background:#fff}
   <div class="container">
     <div class="foot-grid">
       <div class="foot-brand"><!-- TAP:BRAND_FOOTER --><span class="tap-ci-wordmark">KMA TAP</span><!-- /TAP:BRAND_FOOTER --></div>
-      <div class="foot-links"><a href="/guide">사용설명서</a><a href="https://www.kma.or.kr/kr/main.do" target="_blank" rel="noreferrer">KMA 홈페이지</a></div>
+      <div class="foot-links"><a class="is-privacy" href="https://membership.kma.or.kr/privacy.html" target="_blank" rel="noopener">개인정보 처리방침</a><a href="/guide">사용설명서</a><a href="https://www.kma.or.kr/kr/main.do" target="_blank" rel="noreferrer">KMA 홈페이지</a></div>
     </div>
     <p class="foot-note">© KMA TAP. 교육 전후 변화 평가 플랫폼.</p>
   </div>

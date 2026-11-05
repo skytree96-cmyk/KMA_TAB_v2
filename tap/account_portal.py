@@ -16,6 +16,8 @@ from tap.account_navigation import (
 
 
 TOKEN_KEY = "_tap_account_session"
+# KMA's published privacy policy; the law asks for it on every page that collects or shows personal data.
+PRIVACY_POLICY_URL = "https://membership.kma.or.kr/privacy.html"
 ROLE_LABELS = {"kma": "KMA 관리자", "company": "교육담당자", "participant": "참여자"}
 
 PORTAL_CSS = account_theme_css()
@@ -88,7 +90,9 @@ def _login(store: AccountStore | None) -> None:
                         login_slot.empty()
                         st.rerun()
                 st.html('<div class="tap-login-foot">참여자 계정과 비밀번호는 교육담당자에게, 교육담당자 계정은 KMA 관리자에게 문의해 주세요.'
-                        '<a href="/open" target="_self">서비스 소개</a></div>')
+                        '<div class="tap-login-links">'
+                        f'<a class="is-privacy" href="{PRIVACY_POLICY_URL}" target="_blank" rel="noopener">개인정보 처리방침</a>'
+                        '<a href="/open" target="_self">서비스 소개</a></div></div>')
 
 
 def _password_change(store: AccountStore, token: str, required: bool) -> None:
