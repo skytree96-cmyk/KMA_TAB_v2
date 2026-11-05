@@ -11,7 +11,10 @@ fi
 image="$REGION-docker.pkg.dev/$PROJECT_ID/$AR_REPO/$SERVICE:$(date +%Y%m%d-%H%M%S)"
 
 echo "== Building $image"
+# The staging folder is named explicitly: with the default bucket gcloud first lists every bucket of the
+# project to check ownership, which the GitHub Actions deployer (bucket-level access only) may not do.
 gcloud builds submit "$REPO_ROOT" --region="$REGION" \
+  --gcs-source-staging-dir="gs://${PROJECT_ID}_cloudbuild/source" \
   --service-account="projects/$PROJECT_ID/serviceAccounts/$BUILD_SA" \
   --config="$GCP_DIR/cloudbuild.yaml" --substitutions="_IMAGE=$image"
 
