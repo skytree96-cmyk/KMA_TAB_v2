@@ -180,6 +180,58 @@ class AccountReportPDFTests(unittest.TestCase):
         only_deep = PdfReader(BytesIO(build_report_pdf(PROJECT, deep, kind="individual", subject="참여자"))).pages[0].extract_text()
         self.assertIn("심화역량 프로파일", only_deep)
 
+    def test_radar_names_axes_without_scores_instead_of_leaving_a_broken_shape(self):
+        try:
+            from pypdf import PdfReader
+        except ImportError:
+            self.skipTest("pypdf is not installed")
+        rows = [row("F1"), row("F2", pre=None, post=None, name="실행력"), row("F3", pre=None, name="문제해결력"),
+                row("F4", name="전략적 사고"), row("F5", name="고객지향")]
+        first = PdfReader(BytesIO(build_report_pdf(PROJECT, rows, kind="individual", subject="참여자"))).pages[0].extract_text()
+        self.assertIn("(미산출)", first)
+        self.assertIn("(교육 전 미산출)", first)
+        # The reader is told why the shape skips an axis, by name.
+        self.assertIn("도형에서 건너뛰었습니다", first)
+        self.assertIn("수행 기회 없음", first)
+        hidden = PdfReader(BytesIO(build_report_pdf(PROJECT, [row("F1"), row("F2", n=4, name="실행력"), row("F3", name="문제해결력")],
+                                                    kind="organization", subject="조직 전체", participant_count=5))).pages[0].extract_text()
+        self.assertIn("(비공개)", hidden)
+        self.assertNotIn("(미산출)", hidden)
+        self.assertIn("5명 미만", hidden)
+        complete = PdfReader(BytesIO(build_report_pdf(PROJECT, [row("F1"), row("F2", name="실행력"), row("F3", name="문제해결력")],
+                                                      kind="individual", subject="참여자"))).pages[0].extract_text()
+        self.assertNotIn("도형에서 건너뛰었습니다", complete)
+
+    def test_organization_report_adds_the_department_grid_only_when_it_says_something(self):
+        try:
+            from pypdf import PdfReader
+        except ImportError:
+            self.skipTest("pypdf is not installed")
+
+        def cell(code, post, change, n=6, shown=True):
+            return {"factor_code": code, "paired_n": n, "shown": shown, "post_mean": post if shown else None,
+                    "change": change if shown else None}
+
+        grid = {"factors": [{"factor_code": "F1", "factor_name_ko": "성장 마인드셋"}, {"factor_code": "F2", "factor_name_ko": "실행력"}],
+                "rows": [{"team": "영업1팀", "paired_n": 6, "cells": [cell("F1", 4.21, 0.5), cell("F2", 2.63, -0.25)]},
+                         {"team": "생산관리팀", "paired_n": 7, "cells": [cell("F1", 3.17, 0.0), cell("F2", None, None, n=3, shown=False)]},
+                         {"team": "부서 미지정", "paired_n": 2, "cells": [cell("F1", None, None, n=2, shown=False),
+                                                                          cell("F2", None, None, n=0, shown=False)]}]}
+        rows = [row("F1", n=13), row("F2", n=9, name="실행력")]
+
+        def text(kind="organization", heatmap=grid):
+            pdf = build_report_pdf(PROJECT, rows, kind=kind, subject="조직 전체", participant_count=13, heatmap=heatmap)
+            return "\n".join(page.extract_text() for page in PdfReader(BytesIO(pdf)).pages)
+
+        shown = text()
+        for expected in ("팀(부서)별 교육 후 평균", "조직 전체", "영업1팀", "생산관리팀", "4.21", "2.63", "-0.25", "비공개"):
+            self.assertIn(expected, shown)
+        # A department with nothing to show is left out rather than listed as a row of grey cells.
+        self.assertNotIn("부서 미지정", shown)
+        self.assertNotIn("팀(부서)별", text(heatmap=None))
+        self.assertNotIn("팀(부서)별", text(kind="individual"))
+        self.assertNotIn("팀(부서)별", text(heatmap={**grid, "rows": grid["rows"][:1]}))
+
     def test_zero_change_and_single_competency_read_as_sentences(self):
         try:
             from pypdf import PdfReader
