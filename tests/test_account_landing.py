@@ -64,6 +64,9 @@ class AccountLandingTests(unittest.TestCase):
         self.assertNotIn('class="brand-mark"', page)
         self.assertIn("tap-ci--reverse", page)
         self.assertNotIn("TAP:BRAND", page)
+        # Privacy policy: required on the public page, named exactly and set apart from the other links.
+        self.assertIn('class="is-privacy" href="https://membership.kma.or.kr/privacy.html"', page)
+        self.assertIn("개인정보 처리방침", copy)
 
     def test_page_survives_streamlit_html_sanitizer(self):
         # st.html runs DOMPurify with the HTML profile: inline <svg> is dropped,

@@ -171,4 +171,7 @@
 .tap-login-foot {margin-top: 8px; padding-top: 16px; border-top: 1px solid var(--line); font-size: var(--fs-xs); line-height: 1.6; color: var(--muted);}
 .tap-login-foot a {display: block; width: max-content; margin-top: 8px; color: var(--brand-deep); font-weight: 600; text-decoration: none;}
 .tap-login-foot a:hover {text-decoration: underline;}
+.tap-login-links {display: flex; flex-wrap: wrap; gap: 6px 16px; margin-top: 8px;}
+.tap-login-links a {display: inline; width: auto; margin-top: 0;}
+.tap-login-links a.is-privacy {color: var(--ink); font-weight: 800;}
 @media (max-width: 520px) {.stApp .st-key-tap_login_card {padding: 26px 20px 20px;}}
