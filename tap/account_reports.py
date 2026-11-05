@@ -9,7 +9,8 @@ import streamlit as st
 from tap.account_insights import (COURSE_INQUIRY_URL, TRANSFER_ATTENTION_MEAN, course_context_note, course_gap_counts,
                                   hidden_team_note, organization_detail_rows, team_heatmap,
                                   recommend_courses, summarize_transfer, transfer_notes)
-from tap.account_ui_kit import bar_rows, chip, fmt, foot, heatmap, notes, pair_bar_rows, section, stat_tiles
+from tap.account_ui_kit import (bar_rows, change_scale, change_summary, chip, fmt, foot, heatmap, notes, section,
+                                stat_tiles)
 from tap.aggregation import aggregate_paired_factor_results
 from tap.config import MIN_GROUP_N
 from tap.data import questions_for_factors
@@ -227,13 +228,12 @@ def _render_individual_report(store: Any, token: str, project: Mapping[str, Any]
         questions = config.get("question_snapshot") or questions_for_factors(config["selected_factors"])
         scored = score_pre_post_responses(questions, (result.get("pre_payload") or {}).get("responses", {}),
                                          (result.get("post_payload") or {}).get("responses", {}), config.get("target_means"))
-        frame = pd.DataFrame([{"역량": row["factor_name_ko"], "교육 전": row["pre_score"], "교육 후": row["post_score"],
-                               "변화": row["self_reported_change"], "전후 유효 문항": row["paired_valid_items"]} for row in scored])
-        st.dataframe(frame, hide_index=True, width="stretch")
-        plotted = [row for row in scored if row["pre_score"] is not None and row["post_score"] is not None]
-        if plotted:
-            st.html(pair_bar_rows([(row["factor_name_ko"], row["pre_score"], row["post_score"],
-                                    f"{fmt(row['pre_score'])} → {fmt(row['post_score'])}") for row in plotted]))
+        st.html(change_summary([(row["factor_name_ko"], row["pre_score"], row["post_score"]) for row in scored]))
+        st.html(change_scale(score_scale_rows(scored)))
+        with st.expander("숫자 표로 보기", key=key + "table"):
+            frame = pd.DataFrame([{"역량": row["factor_name_ko"], "교육 전": row["pre_score"], "교육 후": row["post_score"],
+                                   "변화": row["self_reported_change"], "전후 유효 문항": row["paired_valid_items"]} for row in scored])
+            st.dataframe(frame, hide_index=True, width="stretch")
         st.html(foot(COMPARE_NOTE))
 
 
@@ -281,32 +281,55 @@ def render_project_report(store: Any, token: str, project: Mapping[str, Any]) ->
         chips.append(chip(f"공개 역량 {len(disclosed)} / {len(summaries)}", icon_name="verified", tone="ok"))
         chips.append(chip(f"전후 비교 {paired}명", icon_name="group"))
     with section("organization", "bar_chart", "조직 교육 전후 리포트",
-                 "같은 참여자가 같은 문항에 답한 역량별 평균 변화. 역량별 유효응답 5명 이상만 공개", chips=chips):
+                 f"교육 전후 완료 {paired}명 · 측정 역량 {len(summaries)}개. 같은 참여자가 같은 문항에 답한 역량별 평균 변화이며, "
+                 f"역량별 유효응답 {MIN_GROUP_N}명 이상만 공개", chips=chips):
         if not summaries:
             st.info("교육 전후 검사를 모두 마친 참여자가 있으면 변화 리포트가 표시됩니다.")
         elif not disclosed:
             st.info(f"각 역량의 교육 전후 유효응답이 {MIN_GROUP_N}명 이상일 때 평균과 변화량을 공개합니다.")
         else:
-            st.download_button("조직 리포트 PDF 다운로드", data=lambda: export_report_pdf(store, token, project),
-                               file_name="KMA_TAP_조직리포트.pdf", mime="application/pdf", on_click="ignore", type="primary",
-                               icon=":material/download:", key=f"account_report_pdf_{project['id']}")
-            display_rows = [{"역량": row["factor_name_ko"], "전후 유효 인원": row["paired_n"], "교육 전": row["pre_mean"], "교육 후": row["post_mean"],
-                             "변화": row["observed_change"], "상태": row["status"]} for row in summaries]
-            st.dataframe(pd.DataFrame(display_rows), hide_index=True, width="stretch")
-            # Side by side, not stacked: pre and post are two readings of the same 1~5 scale.
-            st.html(pair_bar_rows([(row["factor_name_ko"], row["pre_mean"], row["post_mean"],
-                                    f"{fmt(row['pre_mean'])} → {fmt(row['post_mean'])}") for row in disclosed]))
-            st.html(foot("같은 참여자가 같은 문항에 답한 자기보고 변화입니다. 수행 기회 없음(0)은 점수에서 빼며, 교육의 인과효과를 뜻하지 않습니다."))
+            # The web page is the report; the PDF is the same content to keep or send.
+            pdf_column, csv_column = st.columns(2, gap="small")
+            with pdf_column:
+                st.download_button("조직 리포트 PDF 다운로드", data=lambda: export_report_pdf(store, token, project),
+                                   file_name="KMA_TAP_조직리포트.pdf", mime="application/pdf", on_click="ignore", type="primary",
+                                   icon=":material/download:", key=f"account_report_pdf_{project['id']}", width="stretch")
+            with csv_column:
+                st.download_button("상세 CSV 다운로드", data=lambda: _detail_csv(project, results, summaries),
+                                   file_name="kma-tap-detail.csv", mime="text/csv", on_click="ignore",
+                                   icon=":material/table_view:", key=f"account_report_download_{project['id']}", width="stretch")
+            st.html(change_summary([(row["factor_name_ko"], row["pre_mean"], row["post_mean"]) for row in disclosed]))
+            st.html(change_scale(summary_scale_rows(summaries)))
+            with st.expander("숫자 표로 보기", key=f"account_report_table_{project['id']}"):
+                display_rows = [{"역량": row["factor_name_ko"], "전후 유효 인원": row["paired_n"], "교육 전": row["pre_mean"],
+                                 "교육 후": row["post_mean"], "변화": row["observed_change"], "상태": row["status"]} for row in summaries]
+                st.dataframe(pd.DataFrame(display_rows), hide_index=True, width="stretch")
+            st.html(foot("같은 참여자가 같은 문항에 답한 자기보고 변화입니다. 수행 기회 없음(0)은 점수에서 빼며, 교육의 인과효과를 뜻하지 않습니다. "
+                         "상세 CSV에는 역량별 응답 인원, 교육 전후 점수, 목표 대비 차이와 현업전이 환경 집계가 담기고 개인별 응답은 들어가지 않습니다."))
     if not disclosed:
         return
     _render_team_heatmap(project, results)
     transfer = _render_transfer(results)
     _, below = course_gap_counts(project["config"], _disclosed_scores(summaries))
     _render_courses(_organization_courses(project["config"], summaries), transfer, has_gap=bool(below))
-    detail = pd.DataFrame(organization_detail_rows(summaries, project["config"], transfer))
+
+
+def _detail_csv(project: Mapping[str, Any], results: list[dict[str, Any]], summaries: list[dict[str, Any]]) -> bytes:
+    detail = pd.DataFrame(organization_detail_rows(summaries, project["config"], summarize_transfer(results)))
     # Mixed row types leave blanks; nullable integers keep counts as 8, not 8.0, in the CSV.
     detail = detail.astype({column: "Int64" for column in ("교육 전 응답", "교육 후 응답", "교육 전후 유효 인원", "교육 후 미응답", "응답 수", "비율(%)")
                             if column in detail})
-    st.download_button("조직 리포트 상세 CSV", detail.to_csv(index=False).encode("utf-8-sig"), file_name="kma-tap-detail.csv", mime="text/csv",
-                       icon=":material/table_view:", key=f"account_report_download_{project['id']}")
-    st.caption("상세 CSV에는 역량별 응답 인원, 교육 전후 점수, 목표 대비 차이와 현업전이 환경, 장애요인 집계가 담깁니다. 개인별 응답은 넣지 않습니다.")
+    return detail.to_csv(index=False).encode("utf-8-sig")
+
+
+def summary_scale_rows(summaries: list[Mapping[str, Any]]) -> list[tuple]:
+    """Organization rows for change_scale; a competency under the group-size rule says so instead of a track."""
+    return [(row["factor_name_ko"], f"교육 전후 {row['paired_n']}명", row["pre_mean"], row["post_mean"], row["observed_change"],
+             f"비공개 · {MIN_GROUP_N}명 미만" if row["paired_n"] < MIN_GROUP_N else "미산출")
+            for row in summaries]
+
+
+def score_scale_rows(scored: list[Mapping[str, Any]]) -> list[tuple]:
+    """One person's rows for change_scale, from score_pre_post_responses."""
+    return [(row["factor_name_ko"], f"전후 유효 문항 {row['paired_valid_items']}개", row["pre_score"], row["post_score"],
+             row["self_reported_change"], "유효 문항이 부족해 미산출") for row in scored]

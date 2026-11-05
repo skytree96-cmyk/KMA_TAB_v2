@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from contextlib import contextmanager
 from html import escape
+import math
 from typing import Iterable, Iterator, Sequence
 
 import streamlit as st
@@ -75,6 +76,79 @@ def pair_bar_rows(rows: Sequence[tuple[str, float | None, float | None, str]], *
                    for label, pre, post, text in rows)
     legend = f'<div class="tap-legend"><span><i class="is-pre"></i>{escape(labels[0])}</span><span><i></i>{escape(labels[1])}</span></div>'
     return f'<div class="tap-bars is-pair">{body}{legend}</div>'
+
+
+# Change bands, the same as the PDF report (account_report_pdf.effect_level).
+LEVEL_TONES = {"크게 향상": "big", "향상": "up", "유지": "keep", "하락": "down"}
+
+
+def change_level(change: float | None) -> str:
+    if change is None or not math.isfinite(float(change)):
+        return "미산출"
+    change = round(float(change), 4)
+    if change >= 0.5:
+        return "크게 향상"
+    if change >= 0.2:
+        return "향상"
+    if change <= -0.2:
+        return "하락"
+    return "유지"
+
+
+def change_summary(rows: Sequence[tuple[str, float | None, float | None]]) -> str:
+    """Report summary tiles from (label, pre, post): mean before, mean after, mean change, largest rise.
+
+    Means are equal-weighted over the competencies that have both readings, as in the PDF.
+    """
+    scored = [(label, float(pre), float(post)) for label, pre, post in rows if pre is not None and post is not None]
+    if not scored:
+        return ""
+    pre = sum(row[1] for row in scored) / len(scored)
+    post = sum(row[2] for row in scored) / len(scored)
+    change = round(post - pre, 2)
+    top_label, top_pre, top_post = max(scored, key=lambda row: row[2] - row[1])
+    top = round(top_post - top_pre, 2)
+    return stat_tiles([
+        ("교육 전 평균", fmt(pre), "/ 5", None, False),
+        ("교육 후 평균", fmt(post), "/ 5", None, False),
+        ("평균 변화", signed(change), change_level(change), None, change <= -0.2),
+        ("상승 폭 1위" if top > 0 else "변화가 가장 큰 역량", top_label, signed(top), None, top <= -0.2),
+    ]).replace('class="tap-stats"', 'class="tap-stats is-summary"', 1)
+
+
+def _scale_pos(value: float) -> float:
+    return max(0.0, min(100.0, (float(value) - 1) / 4 * 100))
+
+
+def change_scale(rows: Sequence[tuple[str, str, float | None, float | None, float | None, str]], *,
+                 labels: tuple[str, str] = ("교육 전", "교육 후")) -> str:
+    """Each competency on one 1~5 track: rows are (label, meta, pre, post, change, note).
+
+    A hollow ring is the pre reading and a filled dot the post reading, so the pair reads by shape
+    as well as colour. A row without both readings shows ``note`` (why it is not shown) instead.
+    """
+    items = []
+    for label, meta, pre, post, change, note in rows:
+        name = f'<div class="tap-srow__name"><b>{escape(label)}</b>' + (f"<small>{escape(meta)}</small>" if meta else "") + "</div>"
+        if pre is None or post is None:
+            items.append(f'<div class="tap-srow is-hidden"><div class="tap-srow__head">{name}'
+                         f'<div class="tap-srow__val"><span class="tap-lv">{escape(note or "미산출")}</span></div></div></div>')
+            continue
+        level = change_level(change)
+        tone = LEVEL_TONES.get(level, "keep")
+        low, high = sorted((_scale_pos(pre), _scale_pos(post)))
+        items.append(
+            f'<div class="tap-srow"><div class="tap-srow__head">{name}<div class="tap-srow__val">'
+            f'<span class="tap-srow__nums">{fmt(pre)} → <b>{fmt(post)}</b></span>'
+            f'<strong class="is-{tone}">{escape(signed(change))}</strong><span class="tap-lv is-{tone}">{escape(level)}</span></div></div>'
+            f'<div class="tap-srow__track" aria-hidden="true">'
+            f'<i class="tap-srow__fill{" is-down" if tone == "down" else ""}" style="left:{low:.1f}%;width:{high - low:.1f}%"></i>'
+            f'<i class="tap-srow__pre" style="left:{_scale_pos(pre):.1f}%"></i>'
+            f'<i class="tap-srow__post" style="left:{_scale_pos(post):.1f}%"></i></div></div>')
+    legend = (f'<div class="tap-scale__legend"><span><i class="is-pre"></i>{escape(labels[0])}</span>'
+              f'<span><i class="is-post"></i>{escape(labels[1])}</span><em>1~5 행동빈도</em></div>')
+    ticks = "".join(f"<span>{number}</span>" for number in range(1, 6))
+    return f'<div class="tap-scale">{legend}{"".join(items)}<div class="tap-scale__ticks">{ticks}</div></div>'
 
 
 HEAT_LOW, HEAT_HIGH = (242, 246, 255), (11, 79, 204)  # #F2F6FF → #0B4FCC, as in the PDF
