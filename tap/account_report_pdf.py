@@ -126,6 +126,7 @@ def prepare_rows(rows: list[Mapping[str, Any]], kind: str) -> list[dict[str, Any
                    change=round(round(post, 2) - round(pre, 2), 2) if pre is not None and post is not None else None)
         row["factor_name_ko"] = str(row.get("factor_name_ko") or row.get("factor_code") or "역량")
         row["tier"], row["module_group"] = _tier(row)
+        row["_hidden"] = kind == "organization" and n < 5
         prepared.append(row)
     return prepared
 
@@ -523,7 +524,8 @@ def _columns(left: Any, right: Any, widths: tuple[float, float], gap: float = 12
 
 
 class Radar(Flowable):
-    """All axes retained; missing observations create gaps, never zero scores."""
+    """All axes retained. An axis without a score gets no point, never a zero: its label says so, and the
+    line joins the scored axes on either side so the profile is always one closed shape."""
     def __init__(self, rows: list[Mapping[str, Any]], width: float = 280, height: float = 245):
         super().__init__()
         self.rows, self.width, self.height = rows, width, height
@@ -550,16 +552,24 @@ class Radar(Flowable):
                 c.drawPath(path)
             else:
                 c.circle(cx, cy, radius * step / 5)
-            c.setFont("TAPMedium", 7)
-            c.setFillColor(MUTED)
-            c.drawString(cx + 3, cy + radius * step / 5 - 3, str(step))
         for i, row in enumerate(self.rows):
-            c.setStrokeColor(LINE)
+            c.saveState()
+            if row.get("pre_score") is None and row.get("post_score") is None:
+                c.setStrokeColor(FAINT)
+                c.setLineWidth(.7)
+                c.setDash([2, 2.2])
+            else:
+                c.setStrokeColor(LINE)
             c.line(cx, cy, *point(i, 5))
+            c.restoreState()
             x = cx + (radius + 24) * math.cos(angles[i])
             y = cy + (radius + 24) * math.sin(angles[i])
             axis_name = row["factor_name_ko"] if len(row["factor_name_ko"]) <= 22 else f"역량 {row['_axis_number']:02d}"
-            name = _p(axis_name, size=8.2, align=TA_CENTER, bold=True, leading=10.5)
+            pre_missing, post_missing = row.get("pre_score") is None, row.get("post_score") is None
+            note = (("비공개" if row.get("_hidden") else "미산출") if pre_missing and post_missing
+                    else "교육 전 미산출" if pre_missing else "교육 후 미산출" if post_missing else "")
+            name = _p(escape(axis_name) + (f'<br/><font name="TAPMedium" size="6.8" color="#8ea6a3">({note})</font>' if note else ""),
+                      size=8.2, align=TA_CENTER, bold=True, leading=10.5, color=FAINT if pre_missing and post_missing else INK, markup=True)
             w = min(76, self.width / 3)
             _, h = name.wrap(w, 200)
             name.drawOn(c, max(0, min(self.width - w, x - w / 2)), y - h / 2)
@@ -569,33 +579,216 @@ class Radar(Flowable):
             c.setFillColor(color)
             c.setLineWidth(1.8)
             c.setDash(dash)
-            if n >= 3 and all(value is not None for value in values):
+            scored = [i for i, value in enumerate(values) if value is not None]
+            if n >= 3 and len(scored) >= 3:
+                # The shape runs through every axis that has a score and skips the ones that do not.
                 path = c.beginPath()
-                path.moveTo(*point(0, values[0]))
-                for i in range(1, n):
+                path.moveTo(*point(scored[0], values[scored[0]]))
+                for i in scored[1:]:
                     path.lineTo(*point(i, values[i]))
                 path.close()
                 c.saveState()
+                c.setLineJoin(1)
                 c.setFillAlpha(.12 if key == "pre_score" else .07)
                 c.drawPath(path, fill=1, stroke=1)
                 c.restoreState()
-            elif n >= 3:
-                # Only adjacent valid axes join; do not bridge over missing values.
-                for i in range(n):
-                    j = (i + 1) % n
-                    if values[i] is not None and values[j] is not None:
-                        c.line(*point(i, values[i]), *point(j, values[j]))
+            elif len(scored) == 2 and n >= 3:
+                c.line(*point(scored[0], values[scored[0]]), *point(scored[1], values[scored[1]]))
             c.setDash([])
             for i, value in enumerate(values):
                 if value is not None:
                     x, y = point(i, value)
                     c.circle(x, y, 2.4, stroke=0, fill=1)
+        # Scale numbers go on last, between the first two axes: a data point only ever sits on an axis,
+        # so a number can interrupt a line but never hide a score.
+        between = math.pi / 2 - math.pi / n if n >= 3 else 0.0
+        for step in range(1, 6):
+            reach = radius * step / 5 * (math.cos(math.pi / n) if n >= 3 else 1)
+            x, y = cx + reach * math.cos(between), cy + reach * math.sin(between)
+            c.setFillColor(colors.white)
+            c.circle(x, y, 3.3, stroke=0, fill=1)
+            c.setFont("TAPMedium", 6.4)
+            c.setFillColor(MUTED)
+            c.drawCentredString(x, y - 2.2, str(step))
         c.setFont("TAPMedium", 8)
         for x, text, color in ((self.width / 2 - 65, "교육 전", PRE), (self.width / 2 + 14, "교육 후", TEAL)):
             c.setFillColor(color)
             c.circle(x, 7, 3, fill=1, stroke=0)
             c.setFillColor(INK)
             c.drawString(x + 9, 4, text)
+
+
+def _missing_notice(rows: list[Mapping[str, Any]], width: float) -> Table | None:
+    """Says, under the chart, which competencies have no score and that the shape skips them.
+
+    Without it a reader sees a lopsided profile and cannot tell a low score from a missing one.
+    """
+    short = lambda row: row["factor_name_ko"] if len(row["factor_name_ko"]) <= 22 else f"역량 {row['_axis_number']:02d}"
+    kinds: dict[str, list[str]] = {}
+    for row in rows:
+        pre_missing, post_missing = row.get("pre_score") is None, row.get("post_score") is None
+        kind = (("비공개" if row.get("_hidden") else "미산출") if pre_missing and post_missing
+                else "교육 전 미산출" if pre_missing else "교육 후 미산출" if post_missing else "")
+        if kind:
+            kinds.setdefault(kind, []).append(short(row))
+    if not kinds:
+        return None
+    # Kept to a chip line and one sentence per reason: the box has to fit beside the guide without pushing
+    # the summary tiles off the first page.
+    padding = 6
+    inner = width - 2 * padding
+    items: list[Any] = []
+    for kind, names in kinds.items():
+        items.extend([_inline(Chip(kind, colors.white, MUTED, size=6.6, stroke=FAINT), _p(", ".join(names), size=7.8, bold=True), inner, gap=6),
+                      Spacer(1, 2)])
+    if any(kind != "비공개" for kind in kinds):
+        items.append(_p("점수가 없어('수행 기회 없음' 등) 도형에서 건너뛰었습니다.", size=7.2, color=MUTED))
+    if "비공개" in kinds:
+        items.append(_p("유효응답 5명 미만이라 공개하지 않고 도형에서 건너뛰었습니다.", size=7.2, color=MUTED))
+    return _panel(items, width, GREY, padding=padding)
+
+
+HEAT_ROWS_PER_PANEL = 14   # departments on one grid; more continue in the next box
+HEAT_COLUMNS = 12          # competencies across one grid
+
+
+def _heat_color(score: float):
+    """1 is almost white, 5 is the brand teal: darker means a higher post-training mean."""
+    share = max(0.0, min(1.0, (score - 1) / 4))
+    low, high = (0xee, 0xf6, 0xf4), (0x08, 0x7b, 0x76)
+    return colors.Color(*((a + (b - a) * share) / 255 for a, b in zip(low, high))), share
+
+
+class HeatGrid(Flowable):
+    """Departments down, competencies across. A cell holds the post mean and, smaller, the change.
+
+    A cell that is not shown says so in words and stays grey, so it is never read as a low score.
+    """
+    LABEL, ROW, GAP = 96, 30, 3
+
+    def __init__(self, factors: list[Mapping[str, Any]], rows: list[Mapping[str, Any]], width: float, names: Mapping[str, str]):
+        super().__init__()
+        self.factors, self.rows, self.width = factors, rows, width
+        self.cell = (width - self.LABEL) / max(1, len(factors))
+        self.heads = [_p(names.get(str(factor["factor_code"]), str(factor["factor_name_ko"])), size=6.6, bold=True, color=MUTED,
+                         align=TA_CENTER, leading=8.2) for factor in factors]
+        self.head_height = max((head.wrap(self.cell - 4, 200)[1] for head in self.heads), default=0)
+        # The organization row, when there is one, stands a little apart from the departments.
+        self.split = 6 if rows and rows[0].get("total") else 0
+        self.height = self.head_height + 6 + len(rows) * self.ROW + self.split
+
+    def wrap(self, available_width, available_height):
+        return self.width, self.height
+
+    def draw(self):
+        c = self.canv
+        c.saveState()
+        for index, head in enumerate(self.heads):
+            head.wrap(self.cell - 4, 200)
+            head.drawOn(c, self.LABEL + index * self.cell + 2, self.height - self.head_height)
+        top = self.height - self.head_height - 6
+        for position, row in enumerate(self.rows):
+            y = top - (position + 1) * self.ROW - (self.split if position else 0)
+            middle = y + self.ROW / 2
+            total = bool(row.get("total"))
+            c.setFillColor(TEAL if total else INK)
+            c.setFont("TAPBold", 8.2)
+            c.drawString(0, middle + 1.5, _fit(str(row["team"]), "TAPBold", 8.2, self.LABEL - 8))
+            c.setFillColor(MUTED)
+            c.setFont("TAPMedium", 6.6)
+            c.drawString(0, middle - 8, f"{row['paired_n']}명")
+            for index, cell in enumerate(row["cells"]):
+                x, width, height = self.LABEL + index * self.cell + self.GAP / 2, self.cell - self.GAP, self.ROW - self.GAP
+                centre = x + width / 2
+                if cell.get("shown") and cell.get("post_mean") is not None:
+                    fill, share = _heat_color(float(cell["post_mean"]))
+                    dark = share >= .7  # white text only where the teal is deep enough to carry it
+                    c.setFillColor(fill)
+                    c.roundRect(x, y + self.GAP / 2, width, height, 4, stroke=0, fill=1)
+                    c.setFillColor(colors.white if dark else INK)
+                    c.setFont("TAPBold", 9)
+                    c.drawCentredString(centre, middle + .5, f"{float(cell['post_mean']):.2f}")
+                    change = cell.get("change")
+                    if change is not None:
+                        # The warm colour for a drop only reads on a pale cell; on a mid teal the minus sign carries it.
+                        c.setFillColor(colors.white if dark else WARN if share < .4 and effect_level(change) == "하락" else INK)
+                        c.setFont("TAPMedium", 6.4)
+                        c.drawCentredString(centre, middle - 8.5, _fmt(float(change), True))
+                else:
+                    c.setFillColor(GREY)
+                    c.roundRect(x, y + self.GAP / 2, width, height, 4, stroke=0, fill=1)
+                    c.setFillColor(FAINT)
+                    c.setFont("TAPMedium", 6.4)
+                    c.drawCentredString(centre, middle - 2.2, "비공개" if cell.get("paired_n") else "응답 없음")
+        c.restoreState()
+
+
+class HeatLegend(Flowable):
+    """The colour scale of the heat grid and the grey of a cell that is not shown."""
+
+    def __init__(self, width: float, height: float = 12):
+        super().__init__()
+        self.width, self.height = width, height
+
+    def wrap(self, available_width, available_height):
+        return self.width, self.height
+
+    def draw(self):
+        c = self.canv
+        c.saveState()
+        c.setFont("TAPMedium", 7)
+        c.setFillColor(MUTED)
+        c.drawString(0, 2.5, "교육 후 평균  1점")
+        x = pdfmetrics.stringWidth("교육 후 평균  1점", "TAPMedium", 7) + 6
+        for step in range(9):
+            c.setFillColor(_heat_color(1 + step / 2)[0])
+            c.rect(x + step * 13, 1, 13.4, 9, stroke=0, fill=1)
+        x += 9 * 13 + 6
+        c.setFillColor(MUTED)
+        c.drawString(x, 2.5, "5점")
+        x += pdfmetrics.stringWidth("5점", "TAPMedium", 7) + 18
+        c.setFillColor(GREY)
+        c.roundRect(x, 1, 18, 9, 2, stroke=0, fill=1)
+        c.setFillColor(MUTED)
+        c.drawString(x + 23, 2.5, "비공개")
+        c.restoreState()
+
+
+def _heatmap_story(heatmap: Mapping[str, Any] | None, prepared: list[Mapping[str, Any]], width: float) -> list[Any]:
+    """The department page of the organization report, from account_insights.team_heatmap.
+
+    Nothing is drawn for fewer than two departments with a shown cell: that grid would repeat the
+    organization result, or give one department's answers away.
+    """
+    factors = list((heatmap or {}).get("factors") or [])
+    teams = [row for row in (heatmap or {}).get("rows") or [] if any(cell.get("shown") for cell in row["cells"])]
+    if not factors or len(teams) < 2:
+        return []
+    by_code = {str(row.get("factor_code")): row for row in prepared}
+    # Column heads follow the radar: a long name becomes the competency's number on the details page.
+    names = {code: f"역량 {row['_axis_number']:02d}" for code, row in by_code.items() if len(row["factor_name_ko"]) > 22}
+    total = {"team": "조직 전체", "total": True,
+             "paired_n": max((int(row.get("valid_n") or 0) for row in prepared), default=0),
+             "cells": [{"paired_n": int((by_code.get(str(factor["factor_code"])) or {}).get("valid_n") or 0),
+                        "shown": (by_code.get(str(factor["factor_code"])) or {}).get("post_score") is not None,
+                        "post_mean": (by_code.get(str(factor["factor_code"])) or {}).get("post_score"),
+                        "change": (by_code.get(str(factor["factor_code"])) or {}).get("change")} for factor in factors]}
+    lead: list[Any] = [Spacer(1, 6), _p("팀(부서)별 교육 후 평균", size=20, bold=True), Spacer(1, 6),
+                       _p("부서마다 역량별 교육 후 평균을 나란히 놓았습니다. 색이 진할수록 점수가 높습니다.\n"
+                          "칸의 큰 숫자는 교육 후 평균(1~5점), 작은 숫자는 교육 전과 비교한 변화입니다.", size=9, color=MUTED),
+                       Spacer(1, 12)]
+    story: list[Any] = []
+    inner = width - 28
+    for column in range(0, len(factors), HEAT_COLUMNS):
+        picked = slice(column, column + HEAT_COLUMNS)
+        for offset in range(0, len(teams), HEAT_ROWS_PER_PANEL):
+            rows = [{**row, "cells": row["cells"][picked]} for row in (total, *teams[offset:offset + HEAT_ROWS_PER_PANEL])]
+            grid = _panel([HeatGrid(factors[picked], rows, inner, names), Spacer(1, 10), HeatLegend(inner)], width, padding=14)
+            story.extend([KeepTogether(lead + [grid]), Spacer(1, 9)])
+            lead = []
+    story.extend([_p("※ 비공개는 교육 전후 유효응답이 5명 미만인 칸입니다. 한 역량에서 한 부서만 가려지면 조직 평균으로 그 값을 "
+                     "계산해 낼 수 있어, 인원이 가장 적은 부서의 칸도 함께 가립니다.", size=7.5, color=MUTED), Spacer(1, 6)])
+    return story
 
 
 def _chart_groups(rows: list[Mapping[str, Any]]) -> list[list[Mapping[str, Any]]]:
@@ -764,7 +957,8 @@ def _followup_story(transfer: Mapping[str, Any] | None, courses: list[Mapping[st
 
 def build_report_pdf(project: Mapping[str, Any], rows: list[Mapping[str, Any]], *, kind: str,
                      subject: str, participant_count: int = 1, transfer: Mapping[str, Any] | None = None,
-                     courses: list[Mapping[str, Any]] | None = None) -> bytes:
+                     courses: list[Mapping[str, Any]] | None = None, heatmap: Mapping[str, Any] | None = None) -> bytes:
+    """``heatmap`` is account_insights.team_heatmap's result; it adds the department grid to an organization report."""
     prepared = prepare_rows(rows, kind)
     _fonts()
     summary = report_summary(prepared)
@@ -816,8 +1010,10 @@ def build_report_pdf(project: Mapping[str, Any], rows: list[Mapping[str, Any]], 
         only_deep = bool(group) and all(row["tier"] == "deep" for row in group)
         title = ("심화역량 프로파일" if only_deep else "역량 프로파일") + (f"  {index + 1}/{len(groups)}" if len(groups) > 1 else "")
         radar_width = 302
+        notice = _missing_notice(group, radar_width - 28)
         chart_items = lambda radar_height: [_p(title, size=12, bold=True), Spacer(1, 3), Radar(group, radar_width - 28, radar_height),
-            Spacer(1, 5), _p("1~5점 척도 · 미산출 역량은 점·선 생략" + ("\n역량이 3개 미만이면 점으로 표시" if len(group) < 3 else ""), size=7.7, color=MUTED),
+            Spacer(1, 5), _p("1~5점 척도" + (" · 역량이 3개 미만이면 점으로 표시" if len(group) < 3 else ""), size=7.7, color=MUTED),
+            *([Spacer(1, 4), notice] if notice is not None else []),
             *([_p("긴 역량명은 상세 결과의 번호로 표시합니다.", size=7.7, color=MUTED)] if any(len(r["factor_name_ko"]) > 22 for r in group) else [])]
         chart = chart_items(245)
         valid = [row for row in group if row.get("change") is not None]
@@ -870,6 +1066,8 @@ def build_report_pdf(project: Mapping[str, Any], rows: list[Mapping[str, Any]], 
                 size=7.5, color=MUTED)]
     if prepared:
         story.extend([*rules, Spacer(1, 6)])
+    if is_org:
+        story.extend(_heatmap_story(heatmap, prepared, width))
     if transfer is not None or courses is not None:
         story.extend(_followup_story(transfer, courses, width))
     if not prepared:
