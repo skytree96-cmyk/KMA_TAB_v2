@@ -18,11 +18,11 @@ class SelectionTests(unittest.TestCase):
     def test_fourth_specialty_is_rejected(self) -> None:
         selected = ["AI_USE", "PLAN_STR", "DATA_ANA", "DX_APPLY"]
         errors = selection_errors(selected, self.rows)
-        self.assertTrue(any("전문·미래역량" in error for error in errors))
+        self.assertTrue(any("심화역량 중 전문·미래" in error for error in errors))
 
     def test_second_job_function_is_rejected(self) -> None:
         errors = selection_errors(["SALES_CORE", "MKT_CORE"], self.rows)
-        self.assertTrue(any("직무역량" in error for error in errors))
+        self.assertTrue(any("심화역량 중 직무" in error for error in errors))
 
     def test_sanitize_removes_inapplicable_and_over_limit(self) -> None:
         selected = ["AI_USE", "PLAN_STR", "DATA_ANA", "DX_APPLY", "STRAT_CORE"]

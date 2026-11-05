@@ -27,12 +27,12 @@ def selection_errors(
         str(rows[code].get("library_type")) for code in codes if code in rows
     )
     if counts["specialty"] > MAX_SPECIALTY:
-        errors.append(f"전문·미래역량은 최대 {MAX_SPECIALTY}개입니다.")
+        errors.append(f"심화역량 중 전문·미래는 최대 {MAX_SPECIALTY}개입니다.")
     if counts["job_function"] > MAX_JOB_FUNCTION:
-        errors.append(f"직무역량은 최대 {MAX_JOB_FUNCTION}개입니다.")
+        errors.append(f"심화역량 중 직무는 최대 {MAX_JOB_FUNCTION}개입니다.")
     optional_count = counts["specialty"] + counts["job_function"]
     if optional_count > MAX_OPTIONAL:
-        errors.append(f"선택역량은 총 {MAX_OPTIONAL}개를 넘을 수 없습니다.")
+        errors.append(f"심화역량은 모두 합쳐 {MAX_OPTIONAL}개를 넘을 수 없습니다.")
     return errors
 
 
