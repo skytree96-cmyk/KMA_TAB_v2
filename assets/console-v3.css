@@ -130,3 +130,50 @@ a.tap-course:hover .tap-course__btn {border-color: var(--c2-teal); color: var(--
   .tap-gap {grid-column: 1 / -1;}
   .stApp [class*="st-key-tap_sec_"] {padding: 18px 16px;}
 }
+
+/* Responsive web report (2026-11): read on screen first, PDF from the same page.
+   One 1~5 track per competency; the change bands match the PDF. */
+.tap-scale {display: grid; gap: 0;}
+.tap-scale__legend {display: flex; gap: 14px; align-items: center; flex-wrap: wrap; font-size: 12.5px; color: var(--c2-ink-3); padding-bottom: 8px;}
+.tap-scale__legend span {display: inline-flex; align-items: center; gap: 6px;}
+.tap-scale__legend i {display: inline-block; width: 11px; height: 11px; border-radius: 50%; box-sizing: border-box;}
+.tap-scale__legend i.is-pre {border: 3px solid #7f8da1; background: #fff;}
+.tap-scale__legend i.is-post {background: var(--c2-teal);}
+.tap-scale__legend em {margin-left: auto; font-style: normal; color: var(--c2-ink-4);}
+.tap-srow {padding: 12px 0 10px; border-top: 1px solid var(--c2-line-2);}
+.tap-srow__head {display: flex; justify-content: space-between; align-items: center; gap: 6px 12px; flex-wrap: wrap;}
+.tap-srow__name {min-width: 0;}
+.tap-srow__name b {display: block; font-size: 14.5px; font-weight: 700; color: var(--c2-ink); line-height: 1.35;}
+.tap-srow__name small {display: block; font-size: 12px; color: var(--c2-ink-4); margin-top: 1px;}
+.tap-srow__val {display: flex; align-items: center; gap: 8px; font-variant-numeric: tabular-nums;}
+.tap-srow__nums {font-size: 13px; color: var(--c2-ink-3); white-space: nowrap;}
+.tap-srow__nums b {color: var(--c2-ink); font-weight: 700;}
+.tap-srow__val strong {font-size: 15px; font-weight: 800; min-width: 3.2em; text-align: right;}
+.tap-srow__val strong.is-big, .tap-srow__val strong.is-up {color: var(--c2-teal);}
+.tap-srow__val strong.is-keep {color: var(--c2-ink-2);}
+.tap-srow__val strong.is-down {color: var(--c2-orange);}
+.tap-lv {display: inline-flex; align-items: center; height: 24px; padding: 0 9px; border-radius: 999px; font-size: 12px; font-weight: 700; white-space: nowrap; background: var(--c2-soft); color: var(--c2-ink-3);}
+.tap-lv.is-big {background: var(--c2-teal); color: #fff;}
+.tap-lv.is-up {background: var(--c2-teal-tint); color: var(--c2-teal-strong);}
+.tap-lv.is-down {background: var(--c2-orange-tint); color: var(--c2-orange-ink);}
+.tap-srow__track {position: relative; height: 20px; margin: 8px 8px 0;
+  background:
+    linear-gradient(var(--c2-line), var(--c2-line)) 0 50% / 100% 2px no-repeat,
+    linear-gradient(var(--c2-line), var(--c2-line)) 0% 50% / 1px 10px no-repeat,
+    linear-gradient(var(--c2-line), var(--c2-line)) 25% 50% / 1px 10px no-repeat,
+    linear-gradient(var(--c2-line), var(--c2-line)) 50% 50% / 1px 10px no-repeat,
+    linear-gradient(var(--c2-line), var(--c2-line)) 75% 50% / 1px 10px no-repeat,
+    linear-gradient(var(--c2-line), var(--c2-line)) 100% 50% / 1px 10px no-repeat;}
+.tap-srow__fill {position: absolute; top: 50%; height: 6px; transform: translateY(-50%); border-radius: 999px; background: var(--c2-teal-line);}
+.tap-srow__fill.is-down {background: #fbd5bf;}
+.tap-srow__pre, .tap-srow__post {position: absolute; top: 50%; width: 14px; height: 14px; border-radius: 50%; transform: translate(-50%, -50%); box-sizing: border-box;}
+.tap-srow__pre {background: #fff; border: 3px solid #7f8da1;}
+.tap-srow__post {background: var(--c2-teal); box-shadow: 0 0 0 2px #fff;}
+.tap-scale__ticks {display: flex; justify-content: space-between; padding: 4px 4px 0; border-top: 1px solid var(--c2-line-2); font-size: 11.5px; color: var(--c2-ink-4); font-variant-numeric: tabular-nums;}
+.tap-stats.is-summary {grid-template-columns: repeat(auto-fit, minmax(128px, 1fr));}
+.tap-stats.is-summary strong small {display: inline-block; white-space: nowrap;}
+@media (max-width: 640px) {
+  .tap-stats.is-summary {grid-template-columns: repeat(2, minmax(0, 1fr));}
+  .tap-srow__val {width: 100%;}
+  .tap-srow__val strong {min-width: 0; text-align: left;}
+}

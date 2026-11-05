@@ -18,7 +18,7 @@ from typing import Any
 import streamlit as st
 
 from tap.account_insights import TRANSFER_FACTORS
-from tap.account_ui_kit import chip, fmt, foot, pair_bar_rows, section, stat_tiles
+from tap.account_ui_kit import change_scale, change_summary, chip, foot, section, stat_tiles
 from tap.config import LIKERT_OPTIONS
 from tap.data import questions_for_factors
 from tap.scoring import score_pre_post_responses, score_responses
@@ -239,22 +239,26 @@ def _render_transfer_answers(transfer: Mapping[str, Any]) -> None:
                     f'<div class="tap-quote">{escape(str(transfer["applied_content"]))}</div>')
 
 
-def _render_results(questions: list[dict[str, Any]], config: Mapping[str, Any], pre: Mapping[str, Any], post: Mapping[str, Any] | None = None) -> None:
+def _render_results(questions: list[dict[str, Any]], config: Mapping[str, Any], pre: Mapping[str, Any], post: Mapping[str, Any] | None = None,
+                    *, download: Any = None) -> None:
     targets = config.get("target_means", {})
     pre_responses = pre["payload"]["responses"]
     if post is not None and post.get("completed"):
+        from tap.account_reports import score_scale_rows
+
         results = score_pre_post_responses(questions, pre_responses, post["payload"]["responses"], targets)
         with section("my_report", "insights", "나의 교육 전후 리포트", "같은 문항에 교육 전후로 답한 역량별 변화"):
-            st.dataframe([
-                {"역량": r["factor_name_ko"], "교육 전(1~5)": r["pre_score"], "교육 후(1~5)": r["post_score"],
-                 "관찰 변화": r["self_reported_change"], "공통 유효문항": r["paired_valid_items"], "문항 수": r["total_items"], "산출 상태": r["status"]}
-                for r in results
-            ], hide_index=True, width="stretch")
-            scored = [r for r in results if r["pre_score"] is not None and r["post_score"] is not None]
-            if scored:
-                # Same shape and colour pair as the manager report.
-                st.html(pair_bar_rows([(r["factor_name_ko"], r["pre_score"], r["post_score"],
-                                        f"{fmt(r['pre_score'])} → {fmt(r['post_score'])}") for r in scored]))
+            if download is not None:
+                download()
+            # Same summary and scale as the report KMA opens, and the same bands as the PDF.
+            st.html(change_summary([(r["factor_name_ko"], r["pre_score"], r["post_score"]) for r in results]))
+            st.html(change_scale(score_scale_rows(results)))
+            with st.expander("숫자 표로 보기", key=PREFIX + "my_report_table"):
+                st.dataframe([
+                    {"역량": r["factor_name_ko"], "교육 전(1~5)": r["pre_score"], "교육 후(1~5)": r["post_score"],
+                     "관찰 변화": r["self_reported_change"], "공통 유효문항": r["paired_valid_items"], "문항 수": r["total_items"], "산출 상태": r["status"]}
+                    for r in results
+                ], hide_index=True, width="stretch")
             st.html(foot("교육 전후 모두 1~5로 답한 문항만 비교합니다. 0(수행 기회 없음)은 빼고, 공통 유효문항이 부족한 역량은 비웁니다. "
                          "자기보고로 관찰된 변화이며 교육의 인과효과를 뜻하지 않습니다."))
         transfer = post["payload"].get("post_transfer_responses", {})
@@ -528,8 +532,8 @@ def render_participant(store: Any, token: str, principal: Mapping[str, Any]) -> 
             except Exception as exc:
                 _show_error("비교 결과를 불러오지 못했습니다.", exc)
                 return
-            _render_results(questions, config, pre, active_record)
-            _render_report_download(assignment, config, questions, pre, active_record, principal)
+            _render_results(questions, config, pre, active_record,
+                            download=lambda: _render_report_download(assignment, config, questions, pre, active_record, principal))
         if phase == "pre" and not post_complete:
             st.button("교육 후 검사 열기", on_click=_choose_phase, args=("post",), key=PREFIX + "open_post", type="primary")
         return
