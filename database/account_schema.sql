@@ -33,6 +33,7 @@ CREATE TABLE IF NOT EXISTS tap_assignments (
  id TEXT PRIMARY KEY, project_id TEXT NOT NULL REFERENCES tap_projects(id),
  user_id TEXT NOT NULL REFERENCES tap_users(id),
  active INTEGER NOT NULL DEFAULT 1 CHECK (active IN (0,1)), created_at DOUBLE PRECISION NOT NULL,
+ report_department TEXT, report_job_title TEXT,
  UNIQUE (project_id,user_id)
 );
 CREATE TABLE IF NOT EXISTS tap_assessments (

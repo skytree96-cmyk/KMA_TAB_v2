@@ -7,7 +7,7 @@ import pandas as pd
 import streamlit as st
 
 from tap.account_insights import (COURSE_INQUIRY_URL, TRANSFER_ATTENTION_MEAN, course_context_note, course_gap_counts,
-                                  organization_detail_rows, team_heatmap,
+                                  hidden_team_note, organization_detail_rows, team_heatmap,
                                   recommend_courses, summarize_transfer, transfer_notes)
 from tap.account_ui_kit import bar_rows, chip, fmt, foot, heatmap, notes, pair_bar_rows, section, stat_tiles
 from tap.aggregation import aggregate_paired_factor_results
@@ -36,16 +36,36 @@ def summarize_project(project: Mapping[str, Any], results: list[dict[str, Any]])
 
 
 UNASSIGNED_TEAM = "부서 미지정"
+# What the heatmap can be grouped by: one department and one job title per person. Groups a person can be
+# in several of are left out on purpose: overlapping averages can be subtracted down to a few people.
+TEAM_BASES = {"department": ("부서별", UNASSIGNED_TEAM), "job_title": ("직급별", "직급 미지정")}
+# Only a KMA administrator opens another person's report. The participant reads their own on their own screen.
+INDIVIDUAL_REPORT_ROLES = frozenset({"kma"})
+INDIVIDUAL_REPORT_RULE = "개인별 리포트는 참여자 본인과 KMA 담당자만 열 수 있습니다."
 
 
-def summarize_by_team(project: Mapping[str, Any], results: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    """The organization summary again per department, for the team heatmap."""
+def can_open_individual_reports(store: Any, token: str) -> bool:
+    """Asked from the store on every call, so a changed role or an ended session is noticed. Fails closed."""
+    try:
+        return str(store.principal(token).get("role")) in INDIVIDUAL_REPORT_ROLES
+    except AttributeError:
+        return False
+
+
+def team_of(result: Mapping[str, Any], basis: str = "department") -> str:
+    """The group a result counts in: the membership kept at the post assessment, else the account as it is now."""
+    return str(result.get("report_" + basis) or result.get(basis) or "").strip() or TEAM_BASES[basis][1]
+
+
+def summarize_by_team(project: Mapping[str, Any], results: list[dict[str, Any]], basis: str = "department") -> list[dict[str, Any]]:
+    """The organization summary again per department (or job title), for the team heatmap."""
+    unassigned = TEAM_BASES[basis][1]
     groups: dict[str, list[dict[str, Any]]] = {}
     for result in results:
-        groups.setdefault(str(result.get("department") or "").strip() or UNASSIGNED_TEAM, []).append(result)
+        groups.setdefault(team_of(result, basis), []).append(result)
     return [{"team": team, "summaries": summarize_project(project, rows),
              "paired_n": len({row["user_id"] for row in rows if row.get("pre_completed") and row.get("post_completed")})}
-            for team, rows in sorted(groups.items(), key=lambda item: (item[0] == UNASSIGNED_TEAM, item[0]))]
+            for team, rows in sorted(groups.items(), key=lambda item: (item[0] == unassigned, item[0]))]
 
 
 def individual_report_pdf(project: Mapping[str, Any], questions: list[dict[str, Any]], pre_responses: Mapping[str, Any],
@@ -54,7 +74,7 @@ def individual_report_pdf(project: Mapping[str, Any], questions: list[dict[str, 
     from tap.account_report_pdf import build_report_pdf
     scores = score_pre_post_responses(questions, pre_responses, post_responses, (project.get("config") or {}).get("target_means"))
     rows = [{**row, "change": row["self_reported_change"], "valid_n": row["paired_valid_items"]} for row in scores]
-    # Personal transfer answers stay out of the PDF: managers can also download it.
+    # Personal transfer answers stay out of the PDF.
     # Same picks as the participant screen: three competencies, each with a public course and an e-learning course.
     courses = recommend_courses(project.get("config") or {}, scores, limit=6)
     return build_report_pdf(project, rows, kind="individual", subject=subject, participant_count=1, courses=courses)
@@ -63,7 +83,9 @@ def individual_report_pdf(project: Mapping[str, Any], questions: list[dict[str, 
 def export_report_pdf(store: Any, token: str, project: Mapping[str, Any], assignment_id: str | None = None) -> bytes:
     """Generate on download, rechecking the session and project scope each time."""
     from tap.account_report_pdf import build_report_pdf
-    from tap.account_store import ValidationError
+    from tap.account_store import AuthorizationError, ValidationError
+    if assignment_id is not None and not can_open_individual_reports(store, token):
+        raise AuthorizationError(INDIVIDUAL_REPORT_RULE)
     results = store.project_results(token, project["id"])
     config = project["config"]
     questions = config.get("question_snapshot") or questions_for_factors(config["selected_factors"])
@@ -109,7 +131,7 @@ def _rate_text(value: int, total: int) -> str:
     return f"명 · {value / total * 100:.0f}%" if total else "명"
 
 
-def _render_participation(results: list[dict[str, Any]]) -> None:
+def _render_participation(results: list[dict[str, Any]], *, individual_reports: bool = True) -> None:
     assigned = len(results)
     pre = sum(bool(row.get("pre_completed")) for row in results)
     post = sum(bool(row.get("post_completed")) for row in results)
@@ -121,6 +143,8 @@ def _render_participation(results: list[dict[str, Any]]) -> None:
             ("교육 후 검사 완료", f"{post}", _rate_text(post, assigned), _percent(post, assigned), False),
             ("교육 전후 비교 가능", f"{paired}", "명", None, False),
         ]))
+        if not individual_reports:
+            st.html(foot(INDIVIDUAL_REPORT_RULE + " 이 화면에는 조직 결과만 나옵니다."))
 
 
 def _render_transfer(results: list[dict[str, Any]]) -> dict[str, Any]:
@@ -201,24 +225,38 @@ def _render_individual_report(store: Any, token: str, project: Mapping[str, Any]
 
 
 def _render_team_heatmap(project: Mapping[str, Any], results: list[dict[str, Any]]) -> None:
-    teams = summarize_by_team(project, results)
-    if len([team for team in teams if team["paired_n"]]) < 2:
-        return  # One department is the organization result again.
-    grid = team_heatmap(teams)
+    # A basis is offered only when it splits the people in two or more groups: one group is the organization result again.
+    grids = {}
+    for basis in TEAM_BASES:
+        teams = summarize_by_team(project, results, basis)
+        if len([team for team in teams if team["paired_n"]]) >= 2:
+            grids[basis] = team_heatmap(teams)
+    if not grids:
+        return
     with section("teams", "grid_view", "팀(부서)별 교육 후 평균",
-                 "부서별 역량 평균(1~5)과 교육 전후 변화. 부서·역량별 교육 전후 유효응답 5명 이상만 공개"):
+                 "부서·직급별 역량 평균(1~5)과 교육 전후 변화. 묶음·역량별 교육 전후 유효응답 5명 이상만 공개"):
+        basis = next(iter(grids))
+        if len(grids) > 1:
+            basis = st.segmented_control("묶는 기준", list(grids), format_func=lambda value: TEAM_BASES[value][0], default=basis,
+                                         key=f"account_team_basis_{project['id']}", label_visibility="collapsed") or basis
+        grid = grids[basis]
         st.html(heatmap([factor["factor_name_ko"] for factor in grid["factors"]],
                         [(row["team"], f"전후 비교 {row['paired_n']}명",
-                          [(cell["post_mean"], cell["change"]) for cell in row["cells"]]) for row in grid["rows"]]))
+                          [(cell["post_mean"], cell["change"]) for cell in row["cells"]], hidden_team_note(row))
+                         for row in grid["rows"]]))
+        unassigned = next((row["paired_n"] for row in grid["rows"] if row["team"] == TEAM_BASES[basis][1]), 0)
         st.html(foot("칸의 큰 숫자는 교육 후 평균, 작은 숫자는 교육 전후 변화입니다. 진할수록 평균이 높습니다. "
-                     "부서가 하나만 비공개이면 다른 부서와 조직 평균으로 역산할 수 있어, 인원이 가장 적은 부서도 함께 가립니다."))
+                     "교육 후 검사를 마친 시점의 소속으로 묶습니다. 그 뒤에 부서나 직급을 옮겨도 이 표는 바뀌지 않습니다."
+                     + (f" {TEAM_BASES[basis][1]} {unassigned}명은 한 줄로 모았습니다." if unassigned else "")))
 
 
 def render_project_report(store: Any, token: str, project: Mapping[str, Any]) -> None:
     # This read checks the live session role and company/project scope on the server.
     results = store.project_results(token, project["id"])
-    _render_participation(results)
-    _render_individual_report(store, token, project, results)
+    individual_reports = can_open_individual_reports(store, token)
+    _render_participation(results, individual_reports=individual_reports)
+    if individual_reports:
+        _render_individual_report(store, token, project, results)
     summaries = summarize_project(project, results)
     disclosed = [row for row in summaries if row["paired_n"] >= MIN_GROUP_N]
     paired = len({row["user_id"] for row in results if row.get("pre_completed") and row.get("post_completed")})

@@ -423,6 +423,61 @@ class AccountStoreTests(unittest.TestCase):
         self.assertTrue(result["pre_completed"] and result["post_completed"])
         self.assertEqual(result["post_payload"]["post_transfer_responses"]["barriers"], [])
 
+    def finish(self, token_login, assignment, project):
+        """Submit pre and post for one participant, on the dates the project allows."""
+        self.now = datetime(2026, 9, 8, 0, 0, tzinfo=timezone.utc).timestamp()
+        token = self.store.login(token_login, CHANGED)
+        self.store.save_assessment(token, assignment["id"], "pre", self.payload(project), True)
+        self.now = datetime(2026, 9, 11, 0, 0, tzinfo=timezone.utc).timestamp()
+        token = self.store.login(token_login, CHANGED)
+        self.store.save_assessment(token, assignment["id"], "post", self.payload(project, True), True)
+        self.admin = self.store.login("kma-admin", CHANGED)
+
+    def test_profile_edits_are_scoped_and_reports_keep_the_department_of_the_post_assessment(self):
+        user, _ = self.user(profile={"department": "영업팀", "job_title": "대리"})
+        late, _ = self.user(suffix="002")                     # no department when the post assessment is submitted
+        project = self.project()
+        first = self.store.assign_participant(self.admin, project["id"], user["id"])
+        second = self.store.assign_participant(self.admin, project["id"], late["id"])
+        self.finish(user["login_id"], first, project)
+        self.finish(late["login_id"], second, project)
+
+        def teams():
+            return {row["login_id"]: (row["department"], row["report_department"], row["report_job_title"])
+                    for row in self.store.project_results(self.admin, project["id"])}
+
+        self.assertEqual(teams(), {user["login_id"]: ("영업팀", "영업팀", "대리"), late["login_id"]: ("", "", "")})
+        # Moving someone after the post assessment changes the account, not the finished project's grouping.
+        self.assertEqual(self.store.set_profiles(self.admin, [{"user_id": user["id"], "department": "기획팀"},
+                                                             {"user_id": late["id"], "department": "생산팀", "job_title": "사원"}]), 2)
+        self.assertEqual(teams(), {user["login_id"]: ("기획팀", "영업팀", "대리"), late["login_id"]: ("생산팀", "생산팀", "사원")})
+        # The first department given to someone who had none is kept for that project too.
+        self.store.set_profiles(self.admin, [{"user_id": late["id"], "department": "품질팀"}])
+        self.assertEqual(teams()[late["login_id"]], ("품질팀", "생산팀", "사원"))
+        self.assertEqual(self.store.set_profiles(self.admin, [{"user_id": late["id"], "department": "품질팀"}]), 0)
+        # Before the post assessment the report follows the account.
+        open_user, _ = self.user(suffix="003", profile={"department": "총무팀"})
+        self.store.assign_participant(self.admin, project["id"], open_user["id"])
+        self.store.set_profiles(self.admin, [{"user_id": open_user["id"], "department": "재무팀"}])
+        self.assertEqual(teams()[open_user["login_id"]], ("재무팀", "재무팀", ""))
+
+        _, manager = self.user("company", suffix="manager-a")
+        other, _ = self.user(company=self.b, suffix="009")
+        self.assertEqual(self.store.set_profiles(manager, [{"user_id": user["id"], "job_title": "과장"}]), 1)
+        for token, change in ((manager, {"user_id": other["id"], "department": "타사"}),            # another company
+                              (manager, {"user_id": self.store.principal(manager)["id"], "department": "본인"})):  # not a participant
+            with self.assertRaises(AuthorizationError):
+                self.store.set_profiles(token, [change])
+        for bad in ([], [{"user_id": user["id"]}], [{"user_id": user["id"], "email": "a@b.c"}],
+                    [{"user_id": user["id"], "department": "줄\n바꿈"}], [{"user_id": user["id"], "department": "가" * 101}],
+                    [{"user_id": user["id"], "department": "A"}, {"user_id": user["id"], "department": "B"}]):
+            with self.assertRaises(ValidationError):
+                self.store.set_profiles(self.admin, bad)
+        # All or none: one refused row leaves the others unchanged.
+        with self.assertRaises(AuthorizationError):
+            self.store.set_profiles(manager, [{"user_id": user["id"], "department": "바뀌면 안 됨"}, {"user_id": other["id"], "department": "타사"}])
+        self.assertEqual(self.store.principal(self.store.login(user["login_id"], CHANGED))["department"], "기획팀")
+
     def test_korean_date_window_and_snapshot_mismatch_fail_closed(self):
         _, token, project, assignment = self.assignment()
         # 15:00 UTC is the next midnight in Korea, after pre_end_date.
@@ -521,6 +576,36 @@ class AccountProfileMigrationTests(unittest.TestCase):
             self.assertEqual(principal["login_id"], "existing-admin")
             self.assertEqual(principal["display_name"], "기존 관리자")
             self.assertTrue(all(principal[key] == "" for key in ("department", "job_title", "email", "phone")))
+
+
+class ReportMembershipMigrationTests(unittest.TestCase):
+    def test_old_assignments_gain_report_columns_and_finished_posts_take_the_current_profile_once(self):
+        schema = (Path(__file__).resolve().parents[1] / "database" / "account_schema.sql").read_text(encoding="utf-8")
+        legacy = schema.replace(" report_department TEXT, report_job_title TEXT,\n", "")
+        self.assertNotEqual(legacy, schema)
+        with tempfile.TemporaryDirectory() as directory:
+            path = str(Path(directory) / "legacy.sqlite")
+            with closing(sqlite3.connect(path)) as conn:
+                conn.executescript(legacy)
+                conn.execute("INSERT INTO tap_companies(id,name,slug,created_at) VALUES ('c','회사','0123456789',1)")
+                for user_id, department in (("done", "영업팀"), ("open", "기획팀")):
+                    conn.execute("INSERT INTO tap_users(id,login_id,display_name,role,company_id,password_hash,created_at,department,job_title)"
+                                 " VALUES (?,?,?,?,?,?,?,?,?)", (user_id, "0123456789-" + user_id, "참여자", "participant", "c", hash_password("kma"), 1, department, "대리"))
+                conn.execute("INSERT INTO tap_projects(id,company_id,name,config_json,created_by,created_at) VALUES ('p','c','프로젝트','{}','done',1)")
+                for user_id in ("done", "open"):
+                    conn.execute("INSERT INTO tap_assignments(id,project_id,user_id,created_at) VALUES (?,?,?,1)", ("a-" + user_id, "p", user_id))
+                conn.execute("INSERT INTO tap_assessments(assignment_id,phase,payload_json,completed,completed_at,updated_at) VALUES ('a-done','post','{}',1,1,1)")
+                conn.commit()
+                self.assertNotIn("report_department", {row[1] for row in conn.execute("PRAGMA table_info(tap_assignments)")})
+            store = AccountStore("sqlite:///" + path, allow_sqlite_for_tests=True)
+            store.initialize()
+            with closing(sqlite3.connect(path)) as conn:
+                conn.execute("UPDATE tap_users SET department='옮긴 부서' WHERE id='done'")
+                conn.commit()
+            store.initialize()  # a second start must not overwrite what the first one froze
+            with closing(sqlite3.connect(path)) as conn:
+                rows = dict((row[0], row[1:]) for row in conn.execute("SELECT id,report_department,report_job_title FROM tap_assignments"))
+            self.assertEqual(rows, {"a-done": ("영업팀", "대리"), "a-open": (None, None)})
 
 
 class PasswordLengthTests(unittest.TestCase):

@@ -72,13 +72,13 @@ class AccountWorkspaceTests(unittest.TestCase):
         return app
 
     def test_workspace_dispatch_has_no_internal_tabs_and_rejects_wrong_role_section(self):
-        for role, sections in (("kma", ("companies", "accounts", "projects")), ("company", ("projects", "create_project", "accounts"))):
+        for role, sections in (("kma", ("companies", "accounts", "projects")), ("company", ("projects", "create_project", "accounts", "departments"))):
             for section in sections:
                 with self.subTest(role=role, section=section):
                     app = self.app(section, role)
                     self.assertEqual(len(app.tabs), 0)
                     self.assertEqual(len(app.title), 1)
-        for role, section in (("company", "companies"), ("kma", "create_project"), ("participant", "accounts")):
+        for role, section in (("company", "companies"), ("kma", "create_project"), ("kma", "departments"), ("participant", "accounts")):
             with self.subTest(role=role, section=section):
                 app = self.app(section, role)
                 self.assertTrue(app.error)
@@ -90,6 +90,7 @@ class AccountWorkspaceTests(unittest.TestCase):
             ("company", "create_project", ["companies"]),
             ("kma", "accounts", ["companies", "users"]),
             ("company", "accounts", ["companies", "users", "projects"]),
+            ("company", "departments", ["companies", "users"]),
             ("kma", "projects", ["companies", "projects"]),
             ("company", "projects", ["companies", "users", "projects"]),
         ):

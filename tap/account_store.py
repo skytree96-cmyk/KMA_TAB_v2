@@ -66,6 +66,8 @@ _PROFILE_LIMITS = {"department": 100, "job_title": 80, "email": 254, "phone": 40
 # Bulk actions run in one transaction; the UI's CSV limit is 200 rows.
 _MAX_BULK = 200
 _PROFILE_LABELS = {"department": "부서", "job_title": "직급", "email": "이메일", "phone": "연락처"}
+# What a report groups people by. Each has a copy on the assignment, frozen when the post assessment is submitted.
+_TEAM_FIELDS = ("department", "job_title")
 _EMAIL_RE = re.compile(r"[^@\s]+@[^@\s]+\.[^@\s]+\Z")
 _PHONE_RE = re.compile(r"\+?[0-9][0-9 ().-]*\Z")
 _TRANSFER_KEYS = frozenset({"application_opportunity", "supervisor_support", "resources_authority", "time_process_support"})
@@ -243,6 +245,19 @@ class AccountStore:
                         self._execute(conn, f"ALTER TABLE tap_users ADD COLUMN {field} TEXT NOT NULL DEFAULT ''")
                 else:
                     self._execute(conn, f"ALTER TABLE tap_users ADD COLUMN IF NOT EXISTS {field} TEXT NOT NULL DEFAULT ''")
+            # Additive migration for the membership a report is grouped by (NULL until the post assessment is in).
+            existing = {row["name"] for row in self._all(conn, "PRAGMA table_info(tap_assignments)")} if self._sqlite else set()
+            for field in _TEAM_FIELDS:
+                if self._sqlite:
+                    if "report_" + field not in existing:
+                        self._execute(conn, f"ALTER TABLE tap_assignments ADD COLUMN report_{field} TEXT")
+                else:
+                    self._execute(conn, f"ALTER TABLE tap_assignments ADD COLUMN IF NOT EXISTS report_{field} TEXT")
+            # Posts submitted before this column existed take the profile as it is now, once.
+            self._execute(conn, "UPDATE tap_assignments SET "
+                          + ",".join(f"report_{field}=(SELECT u.{field} FROM tap_users u WHERE u.id=tap_assignments.user_id)" for field in _TEAM_FIELDS)
+                          + " WHERE report_department IS NULL AND EXISTS (SELECT 1 FROM tap_assessments s"
+                            " WHERE s.assignment_id=tap_assignments.id AND s.phase='post' AND s.completed=1)")
 
     def bootstrap_admin(self, login_id: str, password_hash: str) -> bool:
         """Server-only seed hook. Never expose this method as an end-user form."""
@@ -563,6 +578,54 @@ class AccountStore:
                 self._assign(conn, actor, project_id, [row["id"] for row in created] + list(existing_user_ids or []))
             return created
 
+    def set_profiles(self, token: str, changes: list[dict]) -> int:
+        """Change participants' department and job title: every change or none. Returns how many accounts changed.
+
+        changes: [{"user_id": ..., "department": ..., "job_title": ...}]; a key that is left out is not touched,
+        an empty string clears it.
+
+        A report groups people by the department they had when they submitted the post assessment, so moving
+        someone later does not shift a finished project's department averages (two downloads around one move
+        would otherwise give that person's score away). Someone who had no department then takes the first one
+        they are given, and keeps it for that project.
+        """
+        if not isinstance(changes, list) or not 1 <= len(changes) <= _MAX_BULK:
+            raise ValidationError(f"한 번에 1~{_MAX_BULK}명까지 처리할 수 있습니다.")
+        cleaned = []
+        for change in changes:
+            if (not isinstance(change, dict) or not isinstance(change.get("user_id"), str)
+                    or set(change) - {"user_id", *_TEAM_FIELDS} or len(change) < 2):
+                raise ValidationError("부서·직급 변경 형식을 확인해 주세요.")
+            fields = {}
+            for field in _TEAM_FIELDS:
+                if field in change:
+                    value = change[field]
+                    if (not isinstance(value, str) or any(ord(c) < 32 or 127 <= ord(c) <= 159 for c in value)
+                            or len(value.strip()) > _PROFILE_LIMITS[field]):
+                        raise ValidationError(f"{_PROFILE_LABELS[field]}는 제어문자 없이 {_PROFILE_LIMITS[field]}자 이내로 입력해 주세요.")
+                    fields[field] = value.strip()
+            cleaned.append((change["user_id"], fields))
+        if len({user_id for user_id, _ in cleaned}) != len(cleaned):
+            raise ValidationError("같은 사람이 두 번 있습니다.")
+        with self._transaction() as conn:
+            actor = self._require(conn, token, {"kma", "company"})
+            changed = 0
+            for user_id, fields in cleaned:
+                target = self._managed_user(conn, actor, user_id)
+                if target["role"] != "participant":
+                    raise AuthorizationError("참여자 계정의 부서와 직급만 바꿀 수 있습니다.")
+                fields = {field: value for field, value in fields.items() if target[field] != value}
+                if not fields:
+                    continue
+                self._execute(conn, "UPDATE tap_users SET " + ",".join(f"{field}=?" for field in fields) + " WHERE id=?",
+                              (*fields.values(), user_id))
+                for field, value in fields.items():
+                    if value:
+                        self._execute(conn, f"UPDATE tap_assignments SET report_{field}=? WHERE user_id=? AND report_{field}=''", (value, user_id))
+                self._audit(conn, actor["id"], "set_profile", user_id)
+                changed += 1
+            return changed
+
     def _managed_user(self, conn, actor, user_id):
         target = self._one(conn, "SELECT * FROM tap_users WHERE id=?", (user_id,), lock=True)
         if not target or target["role"] == "kma" or (actor["role"] == "company" and (target["company_id"] != actor["company_id"] or target["role"] != "participant")):
@@ -717,11 +780,14 @@ class AccountStore:
         return added
 
     def _assignments(self, conn, where, params):
-        rows = self._all(conn, "SELECT a.*,u.display_name AS user_name,u.login_id,u.department,p.name AS project_name,p.company_id,p.config_json,COALESCE(pre.completed,0) AS pre_completed,COALESCE(post.completed,0) AS post_completed FROM tap_assignments a JOIN tap_users u ON u.id=a.user_id JOIN tap_projects p ON p.id=a.project_id LEFT JOIN tap_assessments pre ON pre.assignment_id=a.id AND pre.phase='pre' LEFT JOIN tap_assessments post ON post.assignment_id=a.id AND post.phase='post' WHERE " + where + " ORDER BY a.created_at,a.id", params)
+        rows = self._all(conn, "SELECT a.*,u.display_name AS user_name,u.login_id,u.department,u.job_title,p.name AS project_name,p.company_id,p.config_json,COALESCE(pre.completed,0) AS pre_completed,COALESCE(post.completed,0) AS post_completed FROM tap_assignments a JOIN tap_users u ON u.id=a.user_id JOIN tap_projects p ON p.id=a.project_id LEFT JOIN tap_assessments pre ON pre.assignment_id=a.id AND pre.phase='pre' LEFT JOIN tap_assessments post ON post.assignment_id=a.id AND post.phase='post' WHERE " + where + " ORDER BY a.created_at,a.id", params)
         for row in rows:
             row["config"] = json.loads(row.pop("config_json"))
             for key in ("active", "pre_completed", "post_completed"):
                 row[key] = bool(row[key])
+            # department / job_title are the account as it is now (people lists); report_* is what reports group by.
+            for field in _TEAM_FIELDS:
+                row["report_" + field] = row.get("report_" + field) or row[field]
         return rows
 
     def list_assignments(self, token: str, project_id: str | None = None) -> list[dict]:
@@ -857,6 +923,9 @@ class AccountStore:
             now = self._clock()
             self._execute(conn, "INSERT INTO tap_assessments(assignment_id,phase,payload_json,completed,completed_at,updated_at) VALUES (?,?,?,?,?,?) ON CONFLICT (assignment_id,phase) DO UPDATE SET payload_json=excluded.payload_json,completed=excluded.completed,completed_at=excluded.completed_at,updated_at=excluded.updated_at", (assignment_id, phase, encoded, int(completed), now if completed else None, now))
             if completed:
+                if phase == "post":
+                    self._execute(conn, "UPDATE tap_assignments SET report_department=?,report_job_title=? WHERE id=?",
+                                  (actor["department"], actor["job_title"], assignment_id))
                 self._audit(conn, actor["id"], "submit_" + phase, assignment_id)
             return {"assignment_id": assignment_id, "phase": phase, "payload": payload, "completed": completed, "completed_at": now if completed else None, "updated_at": now}
 

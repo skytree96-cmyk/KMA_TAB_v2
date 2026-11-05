@@ -77,12 +77,18 @@ def pair_bar_rows(rows: Sequence[tuple[str, float | None, float | None, str]], *
     return f'<div class="tap-bars is-pair">{body}{legend}</div>'
 
 
-def heatmap(columns: Sequence[str], rows: Sequence[tuple[str, str, Sequence[tuple[float | None, float | None]]]], *,
-            hidden: str = "비공개") -> str:
-    """A table of 1~5 means, shaded by value: rows are (label, note, [(mean, change), ...]); None hides a cell."""
+def heatmap(columns: Sequence[str], rows: Sequence[tuple], *, hidden: str = "비공개") -> str:
+    """A table of 1~5 means, shaded by value: rows are (label, note, [(mean, change), ...]); None hides a cell.
+
+    A fourth item, when given, replaces the row's cells with that one line (a department hidden as a whole).
+    """
     head = "".join(f"<th>{escape(name)}</th>" for name in columns)
     body = []
-    for label, note, cells in rows:
+    for label, note, cells, *whole in rows:
+        if whole and whole[0]:
+            body.append(f'<tr><th>{escape(label)}<small>{escape(note)}</small></th>'
+                        f'<td class="is-hidden is-whole" colspan="{len(columns)}">{escape(whole[0])}</td></tr>')
+            continue
         tds = []
         for mean, change in cells:
             if mean is None:
