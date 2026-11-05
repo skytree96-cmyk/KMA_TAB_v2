@@ -127,6 +127,20 @@ def next_feasible_start(course: Mapping[str, Any], today: date, live: Mapping[st
     return next((start for start in _session_starts(course, live) if start >= cutoff), None)
 
 
+def course_gap_counts(config: Mapping[str, Any], factor_rows: Iterable[Mapping[str, Any]],
+                      score_key: str = "post_score") -> tuple[int, int]:
+    """(competencies with a score, those far enough below target to call for a course).
+
+    Uses the same target and threshold as recommend_courses, so an empty course list can say why it is
+    empty: no scores, no gap, or a gap with no course to offer.
+    """
+    targets = config.get("target_means") or {}
+    scored = [row for row in factor_rows if row.get(score_key) is not None]
+    below = [row for row in scored
+             if round(float(targets.get(str(row["factor_code"]), 3.5)) - float(row[score_key]), 2) >= MEANINGFUL_DIFFERENCE]
+    return len(scored), len(below)
+
+
 def recommend_courses(config: Mapping[str, Any], factor_rows: Iterable[Mapping[str, Any]], limit: int = 4, *,
                       audience: str = "individual", score_key: str = "post_score",
                       max_competencies: int = 3, today: date | None = None,

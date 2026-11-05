@@ -128,10 +128,11 @@ def aggregate_paired_factor_results(
         disclosed = paired_n >= min_group_n
         paired_pre = [pre_by_person[participant_id] for participant_id in paired_ids]
         paired_post = [post_by_person[participant_id] for participant_id in paired_ids]
-        changes = [post - pre for pre, post in zip(paired_pre, paired_post)]
         pre_mean = round(mean(paired_pre), 2) if disclosed else None
         post_mean = round(mean(paired_post), 2) if disclosed else None
-        observed_change = round(mean(changes), 2) if disclosed else None
+        # Paired means, so the mean change equals post_mean - pre_mean; taking it from the two rounded
+        # means keeps the shown change equal to the difference of the two shown numbers.
+        observed_change = round(post_mean - pre_mean, 2) if disclosed else None
         output.append(
             {
                 "factor_code": code,
