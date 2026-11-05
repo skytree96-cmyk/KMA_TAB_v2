@@ -11,15 +11,21 @@ fi
 image="$REGION-docker.pkg.dev/$PROJECT_ID/$AR_REPO/$SERVICE:$(date +%Y%m%d-%H%M%S)"
 
 echo "== Building $image"
+# The staging folder is named explicitly: with the default bucket gcloud first lists every bucket of the
+# project to check ownership, which the GitHub Actions deployer (bucket-level access only) may not do.
 gcloud builds submit "$REPO_ROOT" --region="$REGION" \
+  --gcs-source-staging-dir="gs://${PROJECT_ID}_cloudbuild/source" \
   --service-account="projects/$PROJECT_ID/serviceAccounts/$BUILD_SA" \
   --config="$GCP_DIR/cloudbuild.yaml" --substitutions="_IMAGE=$image"
 
 secrets="DATABASE_URL=$DB_URL_SECRET:latest"
 # Only needed for an empty database; ignored once any user exists.
 if secret_exists "$ADMIN_HASH_SECRET"; then
-  gcloud secrets add-iam-policy-binding "$ADMIN_HASH_SECRET" \
-    --member="serviceAccount:$RUN_SA" --role=roles/secretmanager.secretAccessor --quiet >/dev/null
+  # The GitHub Actions deployer may not change secret access; the binding exists from the first manual deploy.
+  if [[ "${SKIP_SECRET_BINDING:-0}" != "1" ]]; then
+    gcloud secrets add-iam-policy-binding "$ADMIN_HASH_SECRET" \
+      --member="serviceAccount:$RUN_SA" --role=roles/secretmanager.secretAccessor --quiet >/dev/null
+  fi
   secrets="$secrets,BOOTSTRAP_ADMIN_PASSWORD_HASH=$ADMIN_HASH_SECRET:latest"
 fi
 

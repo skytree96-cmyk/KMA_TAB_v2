@@ -90,3 +90,18 @@ bash deploy/gcp/04_domain.sh
 - `--allow-unauthenticated` 실패: 조직 정책 `iam.allowedPolicyMemberDomains`가 공개 접근을 막는 경우입니다. 회사 GCP 관리자에게 이 서비스 예외를 요청하세요.
 - 로그: `gcloud run services logs read kmatap --region=asia-northeast1 --limit=100`
 - 롤백: Cloud Run 콘솔 → 리비전 → 이전 리비전에 트래픽 100%
+
+## 자동 배포 (main 머지 시)
+
+`.github/workflows/deploy.yml`이 main에 머지된 커밋의 검증(`TAP validation`)이 통과하면 `03_deploy.sh`를 실행하고, 새 리비전이 트래픽 100%를 받는지 확인합니다. 수동 실행은 GitHub Actions 화면의 **Deploy to Cloud Run → Run workflow**입니다.
+
+최초 1회 프로젝트 소유자 계정으로 실행합니다(키 파일 없이 워크로드 아이덴티티 사용, 이 저장소의 main 브랜치만 허용).
+
+```bash
+bash deploy/gcp/05_github_deploy.sh
+```
+
+- 만드는 것: 서비스 계정 `tap-deploy`, 워크로드 아이덴티티 풀 `github`과 공급자 `kma-tab-v2`, 저장소 변수 3개(`GCP_WORKLOAD_IDENTITY_PROVIDER`, `GCP_DEPLOY_SERVICE_ACCOUNT`, `GCP_DEPLOY_CONFIG`).
+- `tap-deploy` 권한: Cloud Run 서비스 `kmatap` 배포, Cloud Build 실행, 빌드 소스 업로드, 빌드·실행 서비스 계정 사용. 비밀값과 DB는 읽지 못합니다.
+- 자동 배포를 멈추려면 저장소 변수 `GCP_WORKLOAD_IDENTITY_PROVIDER`를 지우거나 워크플로를 비활성화합니다.
+- `03_deploy.sh --preview`로 미리보기 배포를 한 뒤에는 트래픽이 고정될 수 있습니다. 그 상태에서는 자동 배포의 마지막 확인 단계가 실패로 알려 줍니다.
