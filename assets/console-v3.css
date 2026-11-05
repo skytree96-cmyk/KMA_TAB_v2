@@ -57,6 +57,19 @@
 .tap-legend i {display: inline-block; width: 12px; height: 12px; border-radius: 3px; margin-right: 6px; vertical-align: -1px; background: var(--c2-teal);}
 .tap-legend i.is-pre {background: #7ac7bd;}
 
+/* Team heatmap: departments × competencies, shaded 1~5; scrolls sideways on narrow screens. */
+.tap-heat-wrap {overflow-x: auto; border: 1px solid var(--c2-line); border-radius: 12px;}
+.tap-heat {border-collapse: separate; border-spacing: 0; width: 100%; font-size: 13px; font-variant-numeric: tabular-nums;}
+.tap-heat th, .tap-heat td {padding: 9px 10px; text-align: center; border-bottom: 1px solid var(--c2-line-2); white-space: nowrap;}
+.tap-heat thead th {font-size: 12px; font-weight: 600; color: var(--c2-ink-3); background: var(--c2-soft-2);}
+.tap-heat tbody th {text-align: left; font-weight: 600; color: var(--c2-ink-2); background: var(--c2-sheet); position: sticky; left: 0;}
+.tap-heat tbody th small {display: block; font-weight: 500; font-size: 11.5px; color: var(--c2-ink-4);}
+.tap-heat td {color: var(--c2-ink); font-weight: 600;}
+.tap-heat td small {display: block; font-weight: 500; font-size: 11px; color: var(--c2-ink-3);}
+.tap-heat td.is-dark, .tap-heat td.is-dark small {color: #fff;}
+.tap-heat td.is-hidden {color: var(--c2-ink-4); font-weight: 500; background: var(--c2-soft);}
+.tap-heat tr:last-child th, .tap-heat tr:last-child td {border-bottom: 0;}
+
 /* Follow-up notes and small print. */
 .tap-notes {display: grid; gap: 6px; margin: 0; padding: 0; list-style: none;}
 .tap-notes li {display: flex; gap: 8px; align-items: flex-start; font-size: 14px; color: var(--c2-ink-2); line-height: 1.55;}
