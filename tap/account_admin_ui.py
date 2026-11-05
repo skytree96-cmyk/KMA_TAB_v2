@@ -228,7 +228,7 @@ def build_project_config(
     available = {row["factor_code"]: row for row in rows if row["active_for_scoring"] and applicable_to_level(row, target_level)}
     optional_factors = list(dict.fromkeys(optional_factors))
     if any(code not in available or available[code]["library_type"] not in {"specialty", "job_function"} for code in optional_factors):
-        raise ValueError("응답 대상에 적용할 수 있는 선택역량을 골라 주세요.")
+        raise ValueError("응답 대상에 적용할 수 있는 심화역량을 골라 주세요.")
     errors = selection_errors(optional_factors, rows)
     if errors:
         raise ValueError(" ".join(errors))
@@ -525,10 +525,10 @@ def _render_project_create(store: Any, token: str, *, show_heading: bool = True)
                                 key=PREFIX + f"base_{target_level}_{row['factor_code']}")
         specialty = _factor_checkboxes(
             [row for row in available if row["library_type"] == "specialty"], PREFIX + f"specialty_{target_level}",
-            MAX_SPECIALTY, title="전문·미래역량", caption=f"교육 목표에 맞는 역량을 최대 {MAX_SPECIALTY}개 고르세요.")
+            MAX_SPECIALTY, title="심화역량 · 전문·미래", caption=f"교육 목표에 맞는 역량을 최대 {MAX_SPECIALTY}개 고르세요.")
         job = _factor_checkboxes(
             [row for row in available if row["library_type"] == "job_function"], PREFIX + f"job_{target_level}",
-            MAX_JOB_FUNCTION, title="직무역량", caption=f"대상 직무를 최대 {MAX_JOB_FUNCTION}개 고르세요.")
+            MAX_JOB_FUNCTION, title="심화역량 · 직무", caption=f"대상 직무를 최대 {MAX_JOB_FUNCTION}개 고르세요.")
         selected = [row["factor_code"] for row in base] + specialty + job
         st.html(f'<div class="tap-pick-total">측정역량 <b>{len(selected)}개</b> · 문항 <b>{len(questions_for_factors(selected))}개</b>'
                 '<span>역량에 마우스를 올리면 정의를 볼 수 있습니다.</span></div>')
