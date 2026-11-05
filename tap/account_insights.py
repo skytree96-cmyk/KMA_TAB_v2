@@ -11,6 +11,7 @@ from typing import Any, Iterable, Mapping
 from zoneinfo import ZoneInfo
 
 from tap.config import MIN_GROUP_N
+from tap.course_schedule import live_session_starts
 from tap.data import load_course_map, load_courses
 from tap.recommendation import TRAINING_GATE, normalize_course_title
 
@@ -106,23 +107,30 @@ def course_topic_words(title: Any) -> set[str]:
     return words
 
 
-def _session_starts(course: Mapping[str, Any]) -> list[str]:
-    """Known session start dates (YYYYMMDD) of a public course; the catalog's next_start when no list is given."""
+def _session_starts(course: Mapping[str, Any], live: Mapping[str, list[str]] | None = None) -> list[str]:
+    """Known session start dates (YYYYMMDD) of a public course.
+
+    With a live answer from the KMA site, that answer is the truth: a course it does not list has no
+    sessions. Without one, the catalog's list is used, or its next_start when no list is given.
+    """
+    if live is not None:
+        return sorted(set(live.get(str(course.get("crscd") or ""), ())))
     starts = [start for start in str(course.get("upcoming_starts") or "").split("|") if len(start) == 8]
     if not starts and len(str(course.get("next_start") or "")) == 8:
         starts = [str(course["next_start"])]
     return sorted(set(starts))
 
 
-def next_feasible_start(course: Mapping[str, Any], today: date) -> str | None:
+def next_feasible_start(course: Mapping[str, Any], today: date, live: Mapping[str, list[str]] | None = None) -> str | None:
     """First session a reader can still register for, or None when every known session starts too soon."""
     cutoff = (today + timedelta(days=MIN_DAYS_BEFORE_START)).strftime("%Y%m%d")
-    return next((start for start in _session_starts(course) if start >= cutoff), None)
+    return next((start for start in _session_starts(course, live) if start >= cutoff), None)
 
 
 def recommend_courses(config: Mapping[str, Any], factor_rows: Iterable[Mapping[str, Any]], limit: int = 4, *,
                       audience: str = "individual", score_key: str = "post_score",
-                      max_competencies: int = 3, today: date | None = None) -> list[dict[str, Any]]:
+                      max_competencies: int = 3, today: date | None = None,
+                      session_starts: Mapping[str, list[str]] | None = None) -> list[dict[str, Any]]:
     """Pick courses for competencies at least 0.2 below the project target.
 
     factor_rows need factor_code, factor_name_ko and the score under ``score_key`` (post_score after
@@ -135,7 +143,8 @@ def recommend_courses(config: Mapping[str, Any], factor_rows: Iterable[Mapping[s
     gap never drops below smaller ones. Within one competency, equally fitting courses are ordered by
     the next session, and a course on a subject the competency already has yields to a new subject.
     The same course — a second location, next year's run or another part of the same series — is never
-    shown twice.
+    shown twice. Session dates come from ``session_starts`` (course code -> start dates) when given, else
+    from the daily live answer of the KMA site when one is available, else from the catalog.
     """
     if TRAINING_GATE.get(str(config.get("training_cause") or "mixed_or_unknown"), 0.0) == 0.0:
         return []
@@ -165,13 +174,14 @@ def recommend_courses(config: Mapping[str, Any], factor_rows: Iterable[Mapping[s
     # A course written for one level (e.g. team leaders) is never offered to another level. A public course
     # is offered with its first session the reader can still join; one whose sessions all start within the
     # next week (or are over, when the monthly catalog has aged) is not offered at all.
+    live = session_starts if session_starts is not None else live_session_starts()
     catalog: dict[str, dict[str, Any]] = {}
     for row in load_courses():
         if not row.get("active", True) or row.get("target_level", "all") not in {"all", level}:
             continue
         course = dict(row)
-        if str(course.get("source", "")) == "public_edu_center" and _session_starts(course):
-            start = next_feasible_start(course, today)
+        if str(course.get("source", "")) == "public_edu_center" and (live is not None or _session_starts(course)):
+            start = next_feasible_start(course, today, live)
             if start is None:
                 continue
             course["next_start"] = start

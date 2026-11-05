@@ -33,7 +33,7 @@ gcloud run deploy "$SERVICE" --image="$image" --region="$REGION" \
   --service-account="$RUN_SA" \
   --add-cloudsql-instances="$SQL_CONNECTION" \
   --set-secrets="$secrets" \
-  --set-env-vars="TAP_APP_MODE=production,GITHUB_DEMO_STORE_ENABLED=false,TAP_POSTGRES_PREFLIGHT=0,BOOTSTRAP_ADMIN_LOGIN=kma.admin" \
+  --set-env-vars="TAP_APP_MODE=production,GITHUB_DEMO_STORE_ENABLED=false,TAP_POSTGRES_PREFLIGHT=0,BOOTSTRAP_ADMIN_LOGIN=kma.admin,TAP_LIVE_SCHEDULE=1" \
   --port=8080 --cpu=1 --memory=1Gi --concurrency=30 \
   --min-instances="${MIN_INSTANCES:-1}" --max-instances="${MAX_INSTANCES:-3}" \
   --session-affinity --timeout=3600 --cpu-boost \
