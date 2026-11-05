@@ -105,11 +105,15 @@ def _checked_record(record: Any, assignment_id: str, phase: str, question_codes:
     return dict(record)
 
 
+class _AnswersSaved(ValueError):
+    """The answers were saved but a later check failed; the message says so itself."""
+
+
 def _error_message(action: str, exc: Exception) -> str:
     # Store validation errors contain useful user-facing messages. Unexpected
     # connection/runtime failures must not expose SQL or infrastructure details.
     detail = str(exc) if isinstance(exc, ValueError) else "잠시 후 다시 시도해 주세요. 계속되면 교육담당자에게 문의해 주세요."
-    return f"{action} {detail}"
+    return " ".join(part for part in (action, detail) if part)
 
 
 def _show_error(action: str, exc: Exception) -> None:
@@ -121,23 +125,29 @@ def _save(store: Any, token: str, assignment_id: str, phase: str, payload: dict[
         receipt = _checked_record(store.save_assessment(token, assignment_id, phase, payload, completed), assignment_id, phase, codes)
         if receipt is None or receipt["completed"] is not completed or dict(receipt["payload"].get("responses", {})) != payload["responses"]:
             raise ValueError("저장 확인 응답이 일치하지 않아 다음 단계로 진행하지 않았습니다.")
+        # From here the answers themselves were saved, so the message must not say they were not.
         if "current_question" in payload and receipt["payload"].get("current_question") != payload["current_question"]:
-            raise ValueError("저장된 진행 위치를 확인하지 못해 현재 문항을 유지했습니다.")
+            raise _AnswersSaved("응답은 저장했지만 진행 위치를 확인하지 못해 이 문항에 머물렀습니다. '다음 문항'을 다시 눌러 주세요.")
         if phase == "post" and dict(receipt["payload"].get("post_transfer_responses", {})) != dict(payload.get("post_transfer_responses", {})):
-            raise ValueError("현업전이 응답이 저장됐는지 확인하지 못했습니다.")
+            raise _AnswersSaved("역량문항 응답은 저장했지만 현업전이 응답이 저장됐는지 확인하지 못했습니다. 버튼을 다시 눌러 주세요.")
     except Exception as exc:
+        action = "" if isinstance(exc, _AnswersSaved) else "응답을 저장하지 못했습니다."
         if callback:
             st.session_state.pop(PREFIX + "saved_record", None)
-            st.session_state[PREFIX + "error"] = _error_message("응답을 저장하지 못했습니다.", exc)
+            st.session_state[PREFIX + "error"] = _error_message(action, exc)
         else:
-            _show_error("응답을 저장하지 못했습니다.", exc)
+            _show_error(action, exc)
         return False
     if callback:
         st.session_state[PREFIX + "saved_record"] = {
             "owner": st.session_state[PREFIX + "owner"], "record": deepcopy(receipt),
         }
     if notify:
-        st.session_state[PREFIX + "notice"] = "최종 제출이 완료되었습니다." if completed else "응답이 저장되었습니다. 다음에 로그인하면 이어서 참여할 수 있습니다."
+        # After a final submit the assessment view itself says it was submitted; a second notice would repeat it.
+        if completed:
+            st.session_state.pop(PREFIX + "notice", None)
+        else:
+            st.session_state[PREFIX + "notice"] = "응답이 저장되었습니다. 다음에 로그인하면 이어서 참여할 수 있습니다."
     return True
 
 
@@ -259,21 +269,29 @@ def _render_results(questions: list[dict[str, Any]], config: Mapping[str, Any], 
 
 def _render_followup_courses(config: Mapping[str, Any], results: list[dict[str, Any]], *, phase: str = "post") -> None:
     from tap.account_course_ui import render_course_cards
-    from tap.account_insights import recommend_courses
+    from tap.account_insights import course_gap_counts, recommend_courses
 
     # Three competencies, each with one public course and one e-learning course.
-    courses = recommend_courses(config, results, limit=6, score_key="post_score" if phase == "post" else "score_1_to_5")
+    score_key = "post_score" if phase == "post" else "score_1_to_5"
+    courses = recommend_courses(config, results, limit=6, score_key=score_key)
     phase_label = "교육 후" if phase == "post" else "교육 전"
     with section("my_courses", "school", "보완 학습 제안" if phase == "post" else "보완할 역량과 KMA 추천 과정",
                  f"{phase_label} 점수가 목표보다 0.2점 이상 낮은 역량과 KMA 과정(공개교육 · 이러닝). 본인 응답에 근거한 제안이니 수강 여부는 교육담당자와 상의",
                  tone="tint"):
         if not courses:
-            st.success("목표보다 0.2점 이상 낮은 역량이 없습니다. 지금처럼 실천하면서 적용 사례를 기록해 두세요.")
+            # An empty list has three causes; only one of them means the scores are fine.
+            scored, below = course_gap_counts(config, results, score_key)
+            if not scored:
+                st.info("비교할 수 있는 점수가 없어 추천 과정을 고르지 않았습니다.")
+            elif not below:
+                st.success("목표보다 0.2점 이상 낮은 역량이 없습니다."
+                           + (" 지금처럼 실천하면서 적용 사례를 기록해 두세요." if phase == "post" else ""))
+            else:
+                st.info("목표보다 낮은 역량은 있지만 지금 추천할 수 있는 KMA 과정이 없습니다. 교육담당자와 상의해 주세요.")
             return
         render_course_cards(courses)
         from tap.course_schedule import schedule_basis
-        st.html(foot("공개교육은 개강이 일주일 넘게 남은 기수가 있는 과정만 보여 주고, 버튼을 누르면 KMA 과정 페이지가 새 창에 열립니다. "
-                     + schedule_basis()))
+        st.html(foot("공개교육은 개강까지 7일 이상 남은 기수가 있는 과정만 보여 줍니다. " + schedule_basis()))
 
 
 def _journey_html(assignment: Mapping[str, Any], config: Mapping[str, Any], pre_complete: bool, post_complete: bool) -> str:

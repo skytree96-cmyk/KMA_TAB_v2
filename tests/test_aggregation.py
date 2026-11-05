@@ -33,6 +33,16 @@ class AggregationTests(unittest.TestCase):
         self.assertEqual(result["n"], 4)
         self.assertIsNone(result["group_mean"])
 
+    def test_shown_change_is_the_difference_of_the_shown_means(self):
+        # Pre mean 2.375 shows as 2.38; the change must read 2.75 - 2.38 = 0.37, not round(0.375) = 0.38.
+        rows = []
+        for index, (pre, post) in enumerate(((2.0, 2.5), (2.5, 3.0), (2.5, 2.75), (2.5, 2.75), (2.375, 2.75)) * 1):
+            for phase, score in (("pre", pre), ("post", post)):
+                rows.append({"participant_id": f"P{index}", "factor_code": "F", "factor_name_ko": "역량",
+                             "assessment_phase": phase, "score_1_to_5": score})
+        result = aggregate_paired_factor_results(rows)[0]
+        self.assertEqual(result["observed_change"], round(result["post_mean"] - result["pre_mean"], 2))
+
     def test_pre_post_uses_paired_participants_only(self):
         rows = []
         for participant_id, pre, post in (

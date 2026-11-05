@@ -6,7 +6,8 @@ from typing import Any, Mapping
 import pandas as pd
 import streamlit as st
 
-from tap.account_insights import (COURSE_INQUIRY_URL, TRANSFER_ATTENTION_MEAN, course_context_note, organization_detail_rows,
+from tap.account_insights import (COURSE_INQUIRY_URL, TRANSFER_ATTENTION_MEAN, course_context_note, course_gap_counts,
+                                  organization_detail_rows,
                                   recommend_courses, summarize_transfer, transfer_notes)
 from tap.account_ui_kit import bar_rows, chip, fmt, foot, notes, pair_bar_rows, section, stat_tiles
 from tap.aggregation import aggregate_paired_factor_results
@@ -75,11 +76,14 @@ def export_report_pdf(store: Any, token: str, project: Mapping[str, Any], assign
                             transfer=summarize_transfer(results), courses=_organization_courses(config, summaries.values()))
 
 
+def _disclosed_scores(summaries: Any) -> list[dict[str, Any]]:
+    return [{**row, "pre_score": row["pre_mean"], "post_score": row["post_mean"]}
+            for row in summaries if row["paired_n"] >= MIN_GROUP_N]
+
+
 def _organization_courses(config: Mapping[str, Any], summaries: Any) -> list[dict[str, Any]]:
-    disclosed = [{**row, "pre_score": row["pre_mean"], "post_score": row["post_mean"]}
-                 for row in summaries if row["paired_n"] >= MIN_GROUP_N]
     # Three competencies × (public course, e-learning, in-house inquiry course).
-    return recommend_courses(config, disclosed, limit=9, audience="organization")
+    return recommend_courses(config, _disclosed_scores(summaries), limit=9, audience="organization")
 
 
 def _percent(value: int, total: int) -> float | None:
@@ -124,18 +128,20 @@ def _render_transfer(results: list[dict[str, Any]]) -> dict[str, Any]:
     return transfer
 
 
-def _render_courses(courses: list[dict[str, Any]], transfer: Mapping[str, Any]) -> None:
+def _render_courses(courses: list[dict[str, Any]], transfer: Mapping[str, Any], *, has_gap: bool = False) -> None:
     from tap.account_course_ui import render_course_cards
     with section("courses", "school", "교육과정 검토 우선순위",
                  "교육 후 평균이 목표보다 0.2점 이상 낮은 역량과, 역량마다 연결된 KMA 과정(공개교육 · 이러닝 · 단체교육 문의)", tone="tint"):
-        if not courses:
+        if not courses and has_gap:
+            st.info("목표보다 낮은 공개 역량은 있지만 지금 추천할 수 있는 KMA 과정이 없습니다. 아래 단체교육 문의를 이용해 주세요.")
+        elif not courses:
             st.success("목표보다 0.2점 이상 낮은 공개 역량이 없어 검토할 후속 과정이 없습니다.")
         else:
             if note := course_context_note(transfer):
                 st.html(notes([(note, "warn")]))
             render_course_cards(courses)
             from tap.course_schedule import schedule_basis
-            st.html(foot("공개교육은 개강이 일주일 넘게 남은 기수가 있는 과정만 보여 주고, 버튼을 누르면 KMA 일정 페이지가 새 창에 열립니다. "
+            st.html(foot("공개교육은 개강까지 7일 이상 남은 기수가 있는 과정만 보여 줍니다. "
                          + schedule_basis() + " 개설 여부와 교육비는 KMA 페이지에서 확인하세요."))
         st.caption("회사 상황에 맞춘 과정은 KMA에 문의하세요.")
         st.link_button("맞춤형 교육 문의", COURSE_INQUIRY_URL, icon=":material/mail:")
@@ -211,7 +217,8 @@ def render_project_report(store: Any, token: str, project: Mapping[str, Any]) ->
     if not disclosed:
         return
     transfer = _render_transfer(results)
-    _render_courses(_organization_courses(project["config"], summaries), transfer)
+    _, below = course_gap_counts(project["config"], _disclosed_scores(summaries))
+    _render_courses(_organization_courses(project["config"], summaries), transfer, has_gap=bool(below))
     detail = pd.DataFrame(organization_detail_rows(summaries, project["config"], transfer))
     # Mixed row types leave blanks; nullable integers keep counts as 8, not 8.0, in the CSV.
     detail = detail.astype({column: "Int64" for column in ("교육 전 응답", "교육 후 응답", "교육 전후 유효 인원", "교육 후 미응답", "응답 수", "비율(%)")

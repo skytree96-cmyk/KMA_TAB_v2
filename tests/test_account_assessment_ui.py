@@ -7,7 +7,8 @@ from unittest.mock import patch
 
 from streamlit.testing.v1 import AppTest
 
-from tap.account_assessment_ui import PREFIX, TRANSFER_ITEMS, _checked_record, _project_questions, _reset_scope
+from tap.account_assessment_ui import (PREFIX, TRANSFER_ITEMS, _AnswersSaved, _checked_record, _error_message,
+                                      _project_questions, _reset_scope)
 from tap.data import questions_for_factors
 import tap.account_assessment_ui as assessment_ui
 
@@ -99,6 +100,14 @@ def answer(app, value):
 
 
 class AccountAssessmentTests(unittest.TestCase):
+    def test_saved_answers_are_not_reported_as_unsaved(self):
+        saved = _error_message("", _AnswersSaved("응답은 저장했지만 진행 위치를 확인하지 못했습니다."))
+        self.assertEqual(saved, "응답은 저장했지만 진행 위치를 확인하지 못했습니다.")
+        self.assertNotIn("저장하지 못했습니다", saved)
+        failed = _error_message("응답을 저장하지 못했습니다.", RuntimeError("db down"))
+        self.assertTrue(failed.startswith("응답을 저장하지 못했습니다. "))
+        self.assertNotIn("db down", failed)
+
     def test_scope_change_drops_old_widgets(self):
         state = {"auth": "keep", PREFIX + "owner": "old", PREFIX + "selector": "a", PREFIX + "pre_response_Q": 4,
                  PREFIX + "saved_record": {"owner": "old", "record": {"payload": {"responses": {"Q": 4}}}}}

@@ -4,7 +4,7 @@ from datetime import date
 import unittest
 from unittest.mock import patch
 
-from tap.account_insights import (course_context_note, course_topic_words, organization_detail_rows, recommend_courses,
+from tap.account_insights import (course_context_note, course_gap_counts, course_topic_words, organization_detail_rows, recommend_courses,
                                   summarize_transfer, transfer_notes)
 from tap.data import load_courses
 
@@ -80,6 +80,14 @@ class CourseRecommendationTests(unittest.TestCase):
     def test_no_courses_when_every_competency_meets_target(self):
         rows = [{"factor_code": "CORE-CO", "factor_name_ko": "소통", "post_score": 3.9}]
         self.assertEqual(recommend_courses(self.config, rows), [])
+
+    def test_gap_counts_tell_why_a_course_list_is_empty(self):
+        config = {"target_means": {"A": 3.5, "B": 3.5}}
+        self.assertEqual(course_gap_counts(config, [{"factor_code": "A", "post_score": None}]), (0, 0))
+        self.assertEqual(course_gap_counts(config, [{"factor_code": "A", "post_score": 3.4}]), (1, 0))
+        self.assertEqual(course_gap_counts(config, [{"factor_code": "A", "post_score": 3.3},
+                                                     {"factor_code": "B", "post_score": 2.0}]), (2, 2))
+        self.assertEqual(course_gap_counts(config, [{"factor_code": "A", "score_1_to_5": 2.0}], "score_1_to_5"), (1, 1))
 
     def test_courses_for_another_level_are_never_offered(self):
         rows = [{"factor_code": "JOB-EX", "factor_name_ko": "실행력", "post_score": 2.0},
