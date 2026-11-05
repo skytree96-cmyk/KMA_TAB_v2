@@ -18,8 +18,11 @@ gcloud builds submit "$REPO_ROOT" --region="$REGION" \
 secrets="DATABASE_URL=$DB_URL_SECRET:latest"
 # Only needed for an empty database; ignored once any user exists.
 if secret_exists "$ADMIN_HASH_SECRET"; then
-  gcloud secrets add-iam-policy-binding "$ADMIN_HASH_SECRET" \
-    --member="serviceAccount:$RUN_SA" --role=roles/secretmanager.secretAccessor --quiet >/dev/null
+  # The GitHub Actions deployer may not change secret access; the binding exists from the first manual deploy.
+  if [[ "${SKIP_SECRET_BINDING:-0}" != "1" ]]; then
+    gcloud secrets add-iam-policy-binding "$ADMIN_HASH_SECRET" \
+      --member="serviceAccount:$RUN_SA" --role=roles/secretmanager.secretAccessor --quiet >/dev/null
+  fi
   secrets="$secrets,BOOTSTRAP_ADMIN_PASSWORD_HASH=$ADMIN_HASH_SECRET:latest"
 fi
 
