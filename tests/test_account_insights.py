@@ -4,7 +4,7 @@ from datetime import date
 import unittest
 from unittest.mock import patch
 
-from tap.account_insights import (course_context_note, course_gap_counts, course_topic_words, organization_detail_rows, recommend_courses,
+from tap.account_insights import (course_context_note, course_gap_counts, course_topic_words, team_heatmap, organization_detail_rows, recommend_courses,
                                   summarize_transfer, transfer_notes)
 from tap.data import load_courses
 
@@ -88,6 +88,22 @@ class CourseRecommendationTests(unittest.TestCase):
         self.assertEqual(course_gap_counts(config, [{"factor_code": "A", "post_score": 3.3},
                                                      {"factor_code": "B", "post_score": 2.0}]), (2, 2))
         self.assertEqual(course_gap_counts(config, [{"factor_code": "A", "score_1_to_5": 2.0}], "score_1_to_5"), (1, 1))
+
+    def test_team_heatmap_hides_small_cells_and_the_cell_that_would_reveal_them(self):
+        def team(name, n, post=3.5):
+            return {"team": name, "paired_n": n, "summaries": [
+                {"factor_code": "A", "factor_name_ko": "고객지향", "paired_n": n,
+                 "post_mean": post if n >= 5 else None, "observed_change": 0.3 if n >= 5 else None}]}
+        grid = team_heatmap([team("영업팀", 9, 4.0), team("개발팀", 6), team("품질팀", 3), team("빈팀", 0)])
+        self.assertEqual([row["team"] for row in grid["rows"]], ["영업팀", "개발팀", "품질팀"])
+        cells = {row["team"]: row["cells"][0] for row in grid["rows"]}
+        self.assertEqual(cells["영업팀"]["post_mean"], 4.0)
+        self.assertFalse(cells["품질팀"]["shown"])
+        # 품질팀 alone hidden would be total minus the others, so the smallest shown team is hidden too.
+        self.assertFalse(cells["개발팀"]["shown"])
+        self.assertIsNone(cells["개발팀"]["post_mean"])
+        both_shown = team_heatmap([team("영업팀", 9), team("개발팀", 6)])
+        self.assertTrue(all(row["cells"][0]["shown"] for row in both_shown["rows"]))
 
     def test_courses_for_another_level_are_never_offered(self):
         rows = [{"factor_code": "JOB-EX", "factor_name_ko": "실행력", "post_score": 2.0},

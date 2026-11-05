@@ -1,5 +1,5 @@
 import unittest
-from tap.account_reports import summarize_project
+from tap.account_reports import UNASSIGNED_TEAM, summarize_by_team, summarize_project
 from tap.data import questions_for_factors
 
 
@@ -27,6 +27,15 @@ class AccountReportTests(unittest.TestCase):
         result=summarize_project(project,rows)
         self.assertEqual(result[0]["paired_n"],4)
         self.assertIsNone(result[0]["observed_change"])
+
+    def test_team_summaries_group_by_department_with_unassigned_last(self):
+        project, rows = self.records(12)
+        for index, row in enumerate(rows):
+            row["department"] = ("영업팀", "개발팀", "")[index % 3] if index < 11 else None
+        teams = summarize_by_team(project, rows)
+        self.assertEqual([team["team"] for team in teams], ["개발팀", "영업팀", UNASSIGNED_TEAM])
+        self.assertEqual([team["paired_n"] for team in teams], [4, 4, 4])
+        self.assertTrue(all(team["summaries"][0]["post_mean"] is None for team in teams))
 
 class IndividualAccountReportTests(unittest.TestCase):
     records = AccountReportTests.records
