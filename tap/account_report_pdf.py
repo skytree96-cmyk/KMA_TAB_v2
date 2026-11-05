@@ -81,6 +81,31 @@ def effect_level(change: float | None) -> str:
     return "유지"
 
 
+DEEP_GROUPS = {"specialty": "전문·미래", "job_function": "직무"}
+
+
+@lru_cache(maxsize=1)
+def _library_types() -> dict[str, str]:
+    from tap.data import load_competencies
+    return {str(row["factor_code"]): str(row.get("library_type") or "") for row in load_competencies()}
+
+
+def _tier(row: Mapping[str, Any]) -> tuple[str, str]:
+    """(tier, card label). Members are told "기본역량" and "심화역량", so the report says the same.
+
+    The competency list decides the tier by library_type: base is 기본역량, the selectable libraries are
+    심화역량. module_group stays the data key it is and only names the sub-group. A competency the list
+    does not know keeps its module_group alone.
+    """
+    library = str(row.get("library_type") or _library_types().get(str(row.get("factor_code")), ""))
+    group = str(row.get("module_group") or "")
+    if library == "base":
+        return "base", f"기본역량 · {group}" if group else "기본역량"
+    if library:
+        return "deep", f"심화역량 · {DEEP_GROUPS.get(library, group)}".removesuffix(" · ")
+    return "", group or "역량"
+
+
 def prepare_rows(rows: list[Mapping[str, Any]], kind: str) -> list[dict[str, Any]]:
     if kind not in {"individual", "organization"}:
         raise ValueError("kind must be individual or organization")
@@ -100,7 +125,7 @@ def prepare_rows(rows: list[Mapping[str, Any]], kind: str) -> list[dict[str, Any
         row.update(pre_score=pre, post_score=post, valid_n=n,
                    change=round(round(post, 2) - round(pre, 2), 2) if pre is not None and post is not None else None)
         row["factor_name_ko"] = str(row.get("factor_name_ko") or row.get("factor_code") or "역량")
-        row["module_group"] = str(row.get("module_group") or "선택 역량")
+        row["tier"], row["module_group"] = _tier(row)
         prepared.append(row)
     return prepared
 
@@ -777,7 +802,7 @@ def build_report_pdf(project: Mapping[str, Any], rows: list[Mapping[str, Any]], 
     first_line, *more_lines = overview.split("\n")
     overview_items = [_p("결과 총평", size=13, bold=True), Spacer(1, 9), _p(first_line, size=10.5, bold=True),
         *[flowable for line in more_lines for flowable in (Spacer(1, 3), _p(line, size=9.6))],
-        Spacer(1, 8), _p(f"비교 가능 {summary['valid_count']} / 선택 {summary['selected_count']}개 역량 · 동일 가중 평균", size=8, color=MUTED)]
+        Spacer(1, 8), _p(f"비교 가능 {summary['valid_count']} / 전체 {summary['selected_count']}개 역량 · 동일 가중 평균", size=8, color=MUTED)]
     story.extend([_level_panels(effect, overview_items, (155, width - 167), fills=(PALE, colors.white)), Spacer(1, 9)])
     tiles = _summary_tiles(prepared, config.get("target_means") or {}, width)
     tiles_at = len(story)
@@ -787,7 +812,9 @@ def build_report_pdf(project: Mapping[str, Any], rows: list[Mapping[str, Any]], 
     for index, group in enumerate(groups):
         if index:
             story.extend([PageBreak(), _p(f"역량 프로파일 {index + 1} / {len(groups)}", size=18, bold=True), Spacer(1, 16)])
-        title = "선택 역량 프로파일" + (f"  {index + 1}/{len(groups)}" if len(groups) > 1 else "")
+        # A chart of only selectable competencies says so; with the required ones in it, it is simply the profile.
+        only_deep = bool(group) and all(row["tier"] == "deep" for row in group)
+        title = ("심화역량 프로파일" if only_deep else "역량 프로파일") + (f"  {index + 1}/{len(groups)}" if len(groups) > 1 else "")
         radar_width = 302
         chart_items = lambda radar_height: [_p(title, size=12, bold=True), Spacer(1, 3), Radar(group, radar_width - 28, radar_height),
             Spacer(1, 5), _p("1~5점 척도 · 미산출 역량은 점·선 생략" + ("\n역량이 3개 미만이면 점으로 표시" if len(group) < 3 else ""), size=7.7, color=MUTED),

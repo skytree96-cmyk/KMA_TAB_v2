@@ -160,6 +160,26 @@ class AccountReportPDFTests(unittest.TestCase):
         single = PdfReader(BytesIO(build_report_pdf(project, rows[:1], kind="individual", subject="참여자"))).pages[0].extract_text()
         self.assertNotIn("향상한 역량", single)
 
+    def test_cards_and_chart_title_use_base_and_deep_tier_names(self):
+        try:
+            from pypdf import PdfReader
+        except ImportError:
+            self.skipTest("pypdf is not installed")
+        base = {**row("CORE-CO", name="고객지향"), "module_group": "공통기반"}
+        deep = [{**row("AI_USE", name="AI 도구 활용"), "module_group": "전문·미래역량"},
+                {**row("SALES_CORE", name="영업 핵심역량"), "module_group": "직무·직급"}]
+        prepared = prepare_rows([base, *deep, row("F9")], "individual")
+        self.assertEqual([item["module_group"] for item in prepared],
+                         ["기본역량 · 공통기반", "심화역량 · 전문·미래", "심화역량 · 직무", "리더십"])
+        mixed = "\n".join(page.extract_text() for page in PdfReader(BytesIO(
+            build_report_pdf(PROJECT, [base, *deep], kind="individual", subject="참여자"))).pages)
+        self.assertIn("역량 프로파일", mixed)
+        self.assertNotIn("심화역량 프로파일", mixed)
+        self.assertNotIn("선택 역량", mixed)
+        self.assertIn("기본역량 · 공통기반", mixed)
+        only_deep = PdfReader(BytesIO(build_report_pdf(PROJECT, deep, kind="individual", subject="참여자"))).pages[0].extract_text()
+        self.assertIn("심화역량 프로파일", only_deep)
+
     def test_zero_change_and_single_competency_read_as_sentences(self):
         try:
             from pypdf import PdfReader
