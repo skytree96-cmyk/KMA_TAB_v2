@@ -134,8 +134,9 @@ def _render_courses(courses: list[dict[str, Any]], transfer: Mapping[str, Any]) 
             if note := course_context_note(transfer):
                 st.html(notes([(note, "warn")]))
             render_course_cards(courses)
+            from tap.course_schedule import schedule_basis
             st.html(foot("공개교육은 개강이 일주일 넘게 남은 기수가 있는 과정만 보여 주고, 버튼을 누르면 KMA 일정 페이지가 새 창에 열립니다. "
-                         "개설 여부와 교육비는 KMA 페이지에서 확인하세요."))
+                         + schedule_basis() + " 개설 여부와 교육비는 KMA 페이지에서 확인하세요."))
         st.caption("회사 상황에 맞춘 과정은 KMA에 문의하세요.")
         st.link_button("맞춤형 교육 문의", COURSE_INQUIRY_URL, icon=":material/mail:")
 

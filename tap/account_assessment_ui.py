@@ -271,7 +271,9 @@ def _render_followup_courses(config: Mapping[str, Any], results: list[dict[str, 
             st.success("목표보다 0.2점 이상 낮은 역량이 없습니다. 지금처럼 실천하면서 적용 사례를 기록해 두세요.")
             return
         render_course_cards(courses)
-        st.html(foot("공개교육은 개강이 일주일 넘게 남은 기수가 있는 과정만 보여 주고, 버튼을 누르면 KMA 과정 페이지가 새 창에 열립니다."))
+        from tap.course_schedule import schedule_basis
+        st.html(foot("공개교육은 개강이 일주일 넘게 남은 기수가 있는 과정만 보여 주고, 버튼을 누르면 KMA 과정 페이지가 새 창에 열립니다. "
+                     + schedule_basis()))
 
 
 def _journey_html(assignment: Mapping[str, Any], config: Mapping[str, Any], pre_complete: bool, post_complete: bool) -> str:
