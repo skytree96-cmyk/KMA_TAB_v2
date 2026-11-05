@@ -58,6 +58,11 @@ SESSION_SECONDS = 8 * 60 * 60
 SESSION_IDLE_SECONDS = 30 * 60
 LOGIN_WINDOW_SECONDS = 15 * 60
 LOGIN_MAX_FAILURES = 5
+# Roles that handle other people's results; their sign-ins and report reads are access records.
+ACCESS_LOGGED_ROLES = frozenset({"kma", "company"})
+REPORT_ACCESS_EVENTS = frozenset({"view_individual_report", "download_individual_pdf", "download_organization_pdf"})
+# Answers (and the scores built from them) are kept one year after the post-training deadline.
+RESPONSE_RETENTION_DAYS = 365
 KST = timezone(timedelta(hours=9))
 _SCRYPT_N, _SCRYPT_R, _SCRYPT_P = 2**15, 8, 3
 _LOGIN_RE = re.compile(r"[a-z0-9][a-z0-9._-]{2,63}\Z")
@@ -155,6 +160,15 @@ def _login_id(value: Any) -> str:
     return value
 
 
+_CLIENT_RE = re.compile(r"[0-9A-Fa-f:.]{2,45}")
+
+
+def _client(value: Any) -> str:
+    """First address of an X-Forwarded-For style value; anything that is not an IP is dropped."""
+    first = str(value or "").split(",")[0].strip()
+    return first if _CLIENT_RE.fullmatch(first) else ""
+
+
 class AccountStore:
     def __init__(self, dsn: str, *, allow_sqlite_for_tests: bool = False, clock=time.time):
         self._clock = clock
@@ -243,6 +257,12 @@ class AccountStore:
                         self._execute(conn, f"ALTER TABLE tap_users ADD COLUMN {field} TEXT NOT NULL DEFAULT ''")
                 else:
                     self._execute(conn, f"ALTER TABLE tap_users ADD COLUMN IF NOT EXISTS {field} TEXT NOT NULL DEFAULT ''")
+            # Access records (IP, project) arrived after the audit table.
+            if self._sqlite:
+                if "detail" not in {row["name"] for row in self._all(conn, "PRAGMA table_info(tap_audit_events)")}:
+                    self._execute(conn, "ALTER TABLE tap_audit_events ADD COLUMN detail TEXT NOT NULL DEFAULT ''")
+            else:
+                self._execute(conn, "ALTER TABLE tap_audit_events ADD COLUMN IF NOT EXISTS detail TEXT NOT NULL DEFAULT ''")
 
     def bootstrap_admin(self, login_id: str, password_hash: str) -> bool:
         """Server-only seed hook. Never expose this method as an end-user form."""
@@ -259,9 +279,10 @@ class AccountStore:
             self._audit(conn, user_id, "bootstrap_admin", user_id)
             return True
 
-    def _audit(self, conn, actor_id, event, target_id):
-        self._execute(conn, "INSERT INTO tap_audit_events(id,actor_id,event,target_id,created_at) VALUES (?,?,?,?,?)",
-                      (str(uuid.uuid4()), actor_id, event, target_id, self._clock()))
+    def _audit(self, conn, actor_id, event, target_id, detail: dict | None = None):
+        self._execute(conn, "INSERT INTO tap_audit_events(id,actor_id,event,target_id,created_at,detail) VALUES (?,?,?,?,?,?)",
+                      (str(uuid.uuid4()), actor_id, event, target_id, self._clock(),
+                       json.dumps({key: value for key, value in (detail or {}).items() if value}, ensure_ascii=False) if detail else ""))
 
     def _new_session(self, conn, user_id) -> str:
         token = secrets.token_urlsafe(32)
@@ -271,7 +292,7 @@ class AccountStore:
                       (hashlib.sha256(token.encode()).hexdigest(), user_id, now, now + SESSION_SECONDS, now))
         return token
 
-    def login(self, login_id: str, password: str) -> str:
+    def login(self, login_id: str, password: str, *, client: str = "") -> str:
         # Unknown IDs follow the same persisted failure path and expensive hash check.
         normalized = str(login_id or "").strip().lower()[:128]
         login_key = hashlib.sha256(normalized.encode()).hexdigest()
@@ -313,6 +334,9 @@ class AccountStore:
                     or (current["company_id"] and (not company or not company["active"]))):
                 raise AuthenticationError("ID 또는 비밀번호를 확인하세요.")
             self._execute(conn, "DELETE FROM tap_login_attempts WHERE login_hash=?", (login_key,))
+            if current["role"] in ACCESS_LOGGED_ROLES:
+                # Staff who can read personal results leave an access record (안전성 확보조치 기준 제8조).
+                self._audit(conn, current["id"], "login", current["id"], {"ip": _client(client)})
             return self._new_session(conn, current["id"])
 
     def _require(self, conn, token, roles=None, *, allow_password_change=False):
@@ -872,3 +896,67 @@ class AccountStore:
                 for phase in ("pre", "post"):
                     row[phase + "_payload"] = payloads.get((row["id"], phase))
             return rows
+
+    def record_report_access(self, token: str, project_id: str, event: str, assignment_id: str | None = None, *,
+                             client: str = "") -> None:
+        """Access record for a report read or download, written before the data leaves the server."""
+        if event not in REPORT_ACCESS_EVENTS or (assignment_id is None) != (event == "download_organization_pdf"):
+            raise ValidationError("기록할 열람 종류를 확인하세요.")
+        with self._transaction() as conn:
+            actor = self._require(conn, token, ACCESS_LOGGED_ROLES)
+            self._project(conn, actor, project_id)
+            target = project_id
+            if assignment_id is not None:
+                row = self._one(conn, "SELECT user_id FROM tap_assignments WHERE id=? AND project_id=?", (str(assignment_id), project_id))
+                if not row:
+                    raise AuthorizationError("이 프로젝트에 배정된 참여자가 아닙니다.")
+                target = row["user_id"]
+            self._audit(conn, actor["id"], event, target, {"project_id": project_id, "ip": _client(client)})
+
+    def access_events(self, token: str, start: float, end: float, limit: int = 5000) -> list[dict]:
+        """KMA review of the audit trail: who did what, to whom, when and from where."""
+        with self._transaction() as conn:
+            self._require(conn, token, {"kma"})
+            rows = self._all(conn, "SELECT e.id,e.event,e.target_id,e.created_at,e.detail,a.login_id AS actor_login,a.display_name AS actor_name,"
+                             "a.role AS actor_role,c.name AS company_name,t.login_id AS target_login,t.display_name AS target_name "
+                             "FROM tap_audit_events e LEFT JOIN tap_users a ON a.id=e.actor_id LEFT JOIN tap_companies c ON c.id=a.company_id "
+                             "LEFT JOIN tap_users t ON t.id=e.target_id WHERE e.created_at>=? AND e.created_at<? "
+                             "ORDER BY e.created_at DESC,e.id LIMIT ?", (float(start), float(end), max(1, min(int(limit), 20000))))
+            projects = {row["id"]: row["name"] for row in self._all(conn, "SELECT id,name FROM tap_projects")}
+        for row in rows:
+            try:
+                detail = json.loads(row.pop("detail") or "{}")
+            except ValueError:
+                detail = {}
+            detail = detail if isinstance(detail, dict) else {}
+            row["ip"] = str(detail.get("ip") or "")
+            row["count"] = str(detail.get("count") or "")
+            row["project_name"] = projects.get(detail.get("project_id")) or projects.get(row["target_id"]) or ""
+        return rows
+
+    def purge_expired_assessments(self) -> int:
+        """Server-only daily job: delete answers once the post-training deadline is a year past.
+
+        Scores are computed from the stored answers, so they go with them. The
+        project keeps ``responses_purged_at`` so reports can say why they are empty.
+        """
+        today = datetime.fromtimestamp(self._clock(), KST).date()
+        purged = 0
+        with self._transaction() as conn:
+            if not self._sqlite:
+                self._execute(conn, "SELECT pg_advisory_xact_lock(847201902)")
+            for project in self._all(conn, "SELECT id,config_json FROM tap_projects"):
+                config = json.loads(project["config_json"])
+                try:
+                    deadline = date.fromisoformat(str(config.get("post_end_date") or ""))
+                except ValueError:
+                    continue
+                if config.get("responses_purged_at") or today <= deadline + timedelta(days=RESPONSE_RETENTION_DAYS):
+                    continue
+                count = self._execute(conn, "DELETE FROM tap_assessments WHERE assignment_id IN (SELECT id FROM tap_assignments WHERE project_id=?)",
+                                      (project["id"],)).rowcount
+                config["responses_purged_at"] = today.isoformat()
+                self._execute(conn, "UPDATE tap_projects SET config_json=? WHERE id=?", (_json(config), project["id"]))
+                self._audit(conn, None, "purge_assessments", project["id"], {"project_id": project["id"], "count": str(max(count, 0))})
+                purged += max(count, 0)
+        return purged

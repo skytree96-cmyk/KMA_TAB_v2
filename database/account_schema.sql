@@ -44,12 +44,14 @@ CREATE TABLE IF NOT EXISTS tap_assessments (
 );
 CREATE TABLE IF NOT EXISTS tap_audit_events (
  id TEXT PRIMARY KEY, actor_id TEXT REFERENCES tap_users(id),
- event TEXT NOT NULL, target_id TEXT NOT NULL, created_at DOUBLE PRECISION NOT NULL
+ event TEXT NOT NULL, target_id TEXT NOT NULL, created_at DOUBLE PRECISION NOT NULL,
+ detail TEXT NOT NULL DEFAULT ''
 );
 CREATE INDEX IF NOT EXISTS tap_sessions_user_idx ON tap_sessions(user_id);
 CREATE INDEX IF NOT EXISTS tap_users_company_idx ON tap_users(company_id);
 CREATE INDEX IF NOT EXISTS tap_projects_company_idx ON tap_projects(company_id);
 CREATE INDEX IF NOT EXISTS tap_assignments_user_idx ON tap_assignments(user_id);
+CREATE INDEX IF NOT EXISTS tap_audit_events_created_idx ON tap_audit_events(created_at);
 
 CREATE TABLE IF NOT EXISTS tap_question_overrides (
  question_code TEXT PRIMARY KEY, item_text TEXT NOT NULL,

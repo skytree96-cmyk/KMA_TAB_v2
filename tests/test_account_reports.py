@@ -50,7 +50,8 @@ class IndividualAccountReportTests(unittest.TestCase):
         rows.append({"id": "incomplete", "user_id": "2", "user_name": "미완료", "login_id": "UserB", "pre_completed": True, "post_completed": False})
         read = Mock(return_value=rows)
         app = AppTest.from_string("import streamlit as st\nfrom tap.account_reports import render_project_report\nrender_project_report(st.session_state['store'], 'token', st.session_state['project'])", default_timeout=30)
-        app.session_state["store"] = SimpleNamespace(project_results=read)
+        access = Mock()
+        app.session_state["store"] = SimpleNamespace(project_results=read, record_report_access=access)
         app.session_state["project"] = project
         app.run()
         self.assertFalse(app.exception)
@@ -58,9 +59,13 @@ class IndividualAccountReportTests(unittest.TestCase):
         self.assertFalse(app.dataframe)
         self.assertEqual(app.selectbox[0].options, ["홍길동 · UserA"])
         self.assertIsNone(app.selectbox[0].value)
+        access.assert_not_called()
         app.selectbox[0].set_value("assignment-a").run()
         self.assertFalse(app.exception)
         self.assertEqual(len(app.dataframe), 1)
+        # Opening a person's report leaves one access record per session, not one per rerun.
+        access.assert_called_once()
+        self.assertEqual(access.call_args.args[1:4], ("project-a", "view_individual_report", "assignment-a"))
         self.assertEqual(float(app.dataframe[0].value.iloc[0]["변화"]), 1.0)
         self.assertTrue(any("5명 이상" in item.value for item in app.info))
         app.text_input[0].set_value("USERA").run()
@@ -109,7 +114,8 @@ class ReportDownloadTests(unittest.TestCase):
             row.update(id=f"assignment-{i}", user_name=f"참여자{i}", login_id=f"user{i}", department="영업팀" if i < 5 else "기획팀")
 
         def text(rows):
-            pdf = export_report_pdf(SimpleNamespace(project_results=lambda token, project_id: rows), "token", project)
+            pdf = export_report_pdf(SimpleNamespace(project_results=lambda token, project_id: rows,
+                                                    record_report_access=lambda *args, **kwargs: None), "token", project)
             return "\n".join(page.extract_text() for page in PdfReader(BytesIO(pdf)).pages)
 
         both = text(results)
@@ -129,14 +135,16 @@ class ReportDownloadTests(unittest.TestCase):
         project.update(id="project-a",name="교육 A")
         for i,row in enumerate(results):
             row.update(id=f"assignment-{i}",user_name=f"참여자{i}",login_id=f"user{i}")
-        store = SimpleNamespace(project_results=Mock(return_value=results))
+        store = SimpleNamespace(project_results=Mock(return_value=results), record_report_access=Mock())
         with patch("tap.account_report_pdf.build_report_pdf", return_value=b"%PDF-test") as build:
             self.assertEqual(export_report_pdf(store, "token", project, "assignment-2"), b"%PDF-test")
             self.assertEqual(build.call_args.kwargs["subject"], "참여자2 · user2")
             self.assertEqual(build.call_args.kwargs["kind"], "individual")
             self.assertNotIn("heatmap", build.call_args.kwargs)
+            self.assertEqual(store.record_report_access.call_args.args[1:4], ("project-a", "download_individual_pdf", "assignment-2"))
             store.project_results.assert_called_with("token", "project-a")
             export_report_pdf(store, "token", project)
+            self.assertEqual(store.record_report_access.call_args.args[1:3], ("project-a", "download_organization_pdf"))
             self.assertEqual(build.call_args.kwargs["kind"], "organization")
             self.assertEqual(build.call_args.args[1][0]["valid_n"], 5)
             # No department entered: one "부서 미지정" row, which the PDF leaves out (fewer than two departments).

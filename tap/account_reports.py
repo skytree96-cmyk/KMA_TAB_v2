@@ -72,6 +72,7 @@ def export_report_pdf(store: Any, token: str, project: Mapping[str, Any], assign
         if not result or not result.get("pre_completed") or not result.get("post_completed"):
             raise ValidationError("교육 전후 검사를 모두 완료한 참여자를 선택해 주세요.")
         subject = " · ".join(str(part) for part in (result.get("user_name") or "참여자", result.get("login_id")) if part)
+        _record_access(store, token, project, "download_individual_pdf", assignment_id)
         return individual_report_pdf(project, questions, (result.get("pre_payload") or {}).get("responses", {}),
                                      (result.get("post_payload") or {}).get("responses", {}), subject)
     summaries = {row["factor_code"]: row for row in summarize_project(project, results)}
@@ -85,10 +86,17 @@ def export_report_pdf(store: Any, token: str, project: Mapping[str, Any], assign
                      "pre_score":row.get("pre_mean"),"post_score":row.get("post_mean"),"change":row.get("observed_change"),
                      "valid_n":row.get("paired_n",0)})
     count = len({row["user_id"] for row in results if row.get("pre_completed") and row.get("post_completed")})
+    _record_access(store, token, project, "download_organization_pdf")
     # The PDF decides whether the department page is worth printing (two departments with a shown cell).
     return build_report_pdf(project, rows, kind="organization", subject="조직 전체", participant_count=count,
                             transfer=summarize_transfer(results), courses=_organization_courses(config, summaries.values()),
                             heatmap=team_heatmap(summarize_by_team(project, results)))
+
+
+def _record_access(store: Any, token: str, project: Mapping[str, Any], event: str, assignment_id: str | None = None) -> None:
+    """Write the access record first; if it cannot be written, the report is not shown."""
+    from tap.account_access_log import client_address
+    store.record_report_access(token, project["id"], event, assignment_id, client=client_address())
 
 
 def _disclosed_scores(summaries: Any) -> list[dict[str, Any]]:
@@ -182,6 +190,11 @@ def _render_individual_report(store: Any, token: str, project: Mapping[str, Any]
                                 key=key + "selected")
         if selected not in eligible:
             return
+        # One record per person per session: Streamlit reruns the page on every click.
+        logged = st.session_state.setdefault(key + "logged", set())
+        if selected not in logged:
+            _record_access(store, token, project, "view_individual_report", selected)
+            logged.add(selected)
         st.download_button("개인 리포트 PDF 다운로드", data=lambda: export_report_pdf(store, token, project, selected),
                            file_name="KMA_TAP_개인리포트.pdf", mime="application/pdf", on_click="ignore", type="primary",
                            icon=":material/download:", key=key + "pdf")
@@ -217,6 +230,9 @@ def _render_team_heatmap(project: Mapping[str, Any], results: list[dict[str, Any
 def render_project_report(store: Any, token: str, project: Mapping[str, Any]) -> None:
     # This read checks the live session role and company/project scope on the server.
     results = store.project_results(token, project["id"])
+    purged = (project.get("config") or {}).get("responses_purged_at")
+    if purged:
+        st.info(f"교육 후 검사 마감일부터 1년이 지나 {purged}에 응답과 점수를 지웠습니다. 그래서 완료 현황과 리포트가 비어 있습니다.")
     _render_participation(results)
     _render_individual_report(store, token, project, results)
     summaries = summarize_project(project, results)
