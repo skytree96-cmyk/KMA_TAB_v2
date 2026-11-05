@@ -79,7 +79,9 @@ def _login(store: AccountStore | None) -> None:
                     st.info("계정 서비스가 아직 연결되지 않아 로그인할 수 없습니다.")
                 if submitted and store is not None:
                     try:
-                        token = store.login(login_id, password)
+                        from tap.account_access_log import client_address
+
+                        token = store.login(login_id, password, client=client_address())
                     except AccountError as exc:
                         st.error(str(exc))
                     except Exception:
@@ -137,6 +139,9 @@ def render_portal(route: str | None = None, *, routed: bool = False) -> None:
         st.title("KMA TAP")
         st.error("계정 서비스에 연결하지 못했습니다. 잠시 후 다시 이용해 주세요.")
         st.stop()
+    from tap.account_retention import schedule_purge
+
+    schedule_purge(store)
     notice = _notice()
     token = st.session_state.get(TOKEN_KEY)
     if not isinstance(token, str) or not token:
@@ -194,6 +199,9 @@ def render_portal(route: str | None = None, *, routed: bool = False) -> None:
             elif section == "question_bank" and role == "kma":
                 from tap.account_question_bank import render_question_bank
                 render_question_bank(store, token, principal)
+            elif section == "access_log" and role == "kma":
+                from tap.account_access_log import render_access_log
+                render_access_log(store, token)
             elif role in {"kma", "company"}:
                 from tap.account_admin_ui import render_admin
                 render_admin(store, token, principal, section=section)

@@ -20,11 +20,13 @@ MENUS = {
         ("accounts", "계정 관리", ":material/group:"),
         ("projects", "프로젝트", ":material/folder_open:"),
         ("question_bank", "문항은행·검수", ":material/library_books:"),
+        ("access_log", "접속 기록", ":material/manage_search:"),
     ),
     "company": (
         # Work order: issue participant accounts, create a project, then assign in it.
         ("dashboard", "대시보드", ":material/dashboard:"),
         ("accounts", "참여자 계정", ":material/group:"),
+        ("departments", "부서 · 직급", ":material/account_tree:"),
         ("create_project", "프로젝트 만들기", ":material/add_circle:"),
         ("projects", "프로젝트", ":material/folder_open:"),
     ),
@@ -54,9 +56,11 @@ ROUTES = {
     "dashboard": ("dashboard", "대시보드"),
     "companies": ("companies", "회원사"),
     "accounts": ("accounts", "계정 관리"),
+    "departments": ("departments", "부서 · 직급"),
     "projects": ("projects", "프로젝트"),
     "create_project": ("new-project", "프로젝트 만들기"),
     "question_bank": ("question-bank", "문항은행·검수"),
+    "access_log": ("access-log", "접속 기록"),
     "assessments": ("my-assessments", "내 교육"),
     PASSWORD_ROUTE: ("password", "비밀번호 변경"),
 }

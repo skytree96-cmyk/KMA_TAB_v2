@@ -29,7 +29,8 @@ class PortalAccessTests(unittest.TestCase):
     def test_successful_login_replaces_login_layout_with_workspace(self):
         from tap import account_portal
         class Store:
-            def login(self, login_id, password):
+            def login(self, login_id, password, *, client=""):
+                self.client = client
                 return "opaque-token"
             def principal(self, token):
                 return dict(id="p1", login_id="user", display_name="참여자", role="participant", company_id="c1", must_change_password=False)
@@ -165,8 +166,9 @@ class PortalNavigationTests(unittest.TestCase):
 
     def test_topbar_only_exposes_authenticated_role_destinations(self):
         expectations = {
-            "kma": {"_tap_nav_dashboard": "대시보드", "_tap_nav_question_bank": "문항은행·검수", "_tap_nav_companies": "회원사", "_tap_nav_accounts": "계정 관리", "_tap_nav_projects": "프로젝트"},
-            "company": {"_tap_nav_dashboard": "대시보드", "_tap_nav_projects": "프로젝트", "_tap_nav_create_project": "프로젝트 만들기", "_tap_nav_accounts": "참여자 계정"},
+            "kma": {"_tap_nav_dashboard": "대시보드", "_tap_nav_question_bank": "문항은행·검수", "_tap_nav_companies": "회원사", "_tap_nav_accounts": "계정 관리", "_tap_nav_projects": "프로젝트", "_tap_nav_access_log": "접속 기록"},
+            "company": {"_tap_nav_dashboard": "대시보드", "_tap_nav_projects": "프로젝트", "_tap_nav_create_project": "프로젝트 만들기", "_tap_nav_accounts": "참여자 계정",
+                        "_tap_nav_departments": "부서 · 직급"},
             "participant": {"_tap_nav_assessments": "내 교육"},
         }
         for role, expected in expectations.items():

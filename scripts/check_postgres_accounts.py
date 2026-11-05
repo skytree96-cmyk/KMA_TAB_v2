@@ -302,6 +302,29 @@ def _exercise(scoped_url: str) -> None:
     company_summary = next(row for row in store.dashboard_summary(admin)["company_participation"] if row["company_id"] == fixture["company_id"])
     _check(company_summary["total"] == 15 and company_summary["participating"] == 5)
 
+    # Access records: staff sign-ins and report reads with the caller's address; only KMA reviews them.
+    window = (now[0] - 3600, now[0] + 3600)
+    other_manager = store.login("manager001", changed, client="203.0.113.20, 10.0.0.1")
+    store.record_report_access(admin, project["id"], "view_individual_report", assignment_id, client="203.0.113.10")
+    store.record_report_access(admin, project["id"], "download_organization_pdf")
+    _denied(AuthorizationError, store.record_report_access, other_manager, project["id"], "download_organization_pdf")
+    _denied(AuthorizationError, store.access_events, other_manager, *window)
+    events = store.access_events(admin, *window)
+    viewed = next(row for row in events if row["event"] == "view_individual_report")
+    _check((viewed["target_login"], viewed["project_name"], viewed["ip"]) == (participant["login_id"], project["name"], "203.0.113.10"))
+    _check(any(row["event"] == "login" and row["actor_login"] == "manager001" and row["ip"] == "203.0.113.20" for row in events))
+
+    # Retention: answers go one year after the post deadline (2026-11-12), the seeded project's later deadline stays.
+    now[0] = datetime(2027, 11, 13, 15, 0, tzinfo=timezone.utc).timestamp()
+    store = AccountStore(scoped_url, clock=lambda: now[0])
+    _check(store.purge_expired_assessments() == 2)
+    _check(store.purge_expired_assessments() == 0)
+    admin = store.login("check-admin", changed)
+    purged = store.project_results(admin, project["id"])
+    _check(purged[0]["pre_payload"] is None and purged[0]["post_payload"] is None)
+    _check(next(p for p in store.list_projects(admin) if p["id"] == project["id"])["config"]["responses_purged_at"] == "2027-11-14")
+    _check(len([row for row in store.project_results(admin, fixture["project_id"]) if row["post_completed"]]) == 5)
+
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Check accounts in a disposable PostgreSQL schema.")
@@ -325,7 +348,7 @@ def main(argv: list[str] | None = None) -> int:
         stage = exc.stage if isinstance(exc, _StageFailure) else "configuration"
         print(f"POSTGRES ACCOUNT CHECK FAILED: {error_type}; stage={stage}", flush=True)
         return 1
-    print("POSTGRES ACCOUNT CHECK PASSED: pre/post persistence, tenant isolation, immutable submissions, question catalog, dashboard scope, synthetic fixture, reset/revocation, isolated schema cleaned", flush=True)
+    print("POSTGRES ACCOUNT CHECK PASSED: pre/post persistence, tenant isolation, immutable submissions, question catalog, dashboard scope, synthetic fixture, reset/revocation, access records, response retention, isolated schema cleaned", flush=True)
     return 0
 
 

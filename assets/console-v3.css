@@ -68,6 +68,7 @@
 .tap-heat td small {display: block; font-weight: 500; font-size: 11px; color: var(--c2-ink-3);}
 .tap-heat td.is-dark, .tap-heat td.is-dark small {color: #fff;}
 .tap-heat td.is-hidden {color: var(--c2-ink-4); font-weight: 500; background: var(--c2-soft);}
+.tap-heat td.is-whole {text-align: left; white-space: normal; color: var(--c2-ink-3);}
 .tap-heat tr:last-child th, .tap-heat tr:last-child td {border-bottom: 0;}
 
 /* Follow-up notes and small print. */

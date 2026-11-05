@@ -663,6 +663,7 @@ class HeatGrid(Flowable):
     """Departments down, competencies across. A cell holds the post mean and, smaller, the change.
 
     A cell that is not shown says so in words and stays grey, so it is never read as a low score.
+    A department with nothing to show keeps its row: one grey bar with the reason (row["note"]).
     """
     LABEL, ROW, GAP = 96, 30, 3
 
@@ -697,6 +698,14 @@ class HeatGrid(Flowable):
             c.setFillColor(MUTED)
             c.setFont("TAPMedium", 6.6)
             c.drawString(0, middle - 8, f"{row['paired_n']}명")
+            if row.get("note"):
+                across = self.cell * len(row["cells"]) - self.GAP
+                c.setFillColor(GREY)
+                c.roundRect(self.LABEL + self.GAP / 2, y + self.GAP / 2, across, self.ROW - self.GAP, 4, stroke=0, fill=1)
+                c.setFillColor(MUTED)
+                c.setFont("TAPMedium", 7.4)
+                c.drawString(self.LABEL + self.GAP / 2 + 10, middle - 2.6, _fit(str(row["note"]), "TAPMedium", 7.4, across - 20))
+                continue
             for index, cell in enumerate(row["cells"]):
                 x, width, height = self.LABEL + index * self.cell + self.GAP / 2, self.cell - self.GAP, self.ROW - self.GAP
                 centre = x + width / 2
@@ -757,12 +766,14 @@ class HeatLegend(Flowable):
 def _heatmap_story(heatmap: Mapping[str, Any] | None, prepared: list[Mapping[str, Any]], width: float) -> list[Any]:
     """The department page of the organization report, from account_insights.team_heatmap.
 
-    Nothing is drawn for fewer than two departments with a shown cell: that grid would repeat the
-    organization result, or give one department's answers away.
+    Drawn when people are split over two or more departments and at least one of them has a number to show.
+    One department would repeat the organization result. A department hidden as a whole stays on the grid
+    with the reason, as on the screen: left out, its members would only wonder where it went.
     """
+    from tap.account_insights import hidden_team_note
     factors = list((heatmap or {}).get("factors") or [])
-    teams = [row for row in (heatmap or {}).get("rows") or [] if any(cell.get("shown") for cell in row["cells"])]
-    if not factors or len(teams) < 2:
+    teams = [{**row, "note": hidden_team_note(row)} for row in (heatmap or {}).get("rows") or [] if row.get("paired_n")]
+    if not factors or len(teams) < 2 or all(team["note"] for team in teams):
         return []
     by_code = {str(row.get("factor_code")): row for row in prepared}
     # Column heads follow the radar: a long name becomes the competency's number on the details page.

@@ -105,6 +105,12 @@ def _checked_record(record: Any, assignment_id: str, phase: str, question_codes:
     return dict(record)
 
 
+# Who sees what, shown where the answering starts. Keep in step with the report access rules.
+PRIVACY_NOTICE = ("결과는 본인만 봅니다. 회사 교육담당자에게는 5명 이상 모인 조직·부서 결과만 보이고 문항별 응답은 가지 않습니다. "
+                  "KMA 운영 담당자는 운영과 문의 처리에 필요할 때만 개인 결과를 열며, 열람 기록이 남습니다. "
+                  "응답은 교육 후 검사 마감일부터 1년이 지나면 지웁니다.")
+
+
 class _AnswersSaved(ValueError):
     """The answers were saved but a later check failed; the message says so itself."""
 
@@ -471,6 +477,9 @@ def render_participant(store: Any, token: str, principal: Mapping[str, Any]) -> 
     if not st.session_state.get(PREFIX + "focus"):
         with st.container(key=PREFIX + "project_card"):
             st.html(_journey_html(assignment, config, pre_complete, post_complete))
+            if config.get("responses_purged_at"):
+                st.info("교육 후 검사 마감일부터 1년이 지나 이 교육의 응답과 결과를 지웠습니다.")
+                return
             if pre_complete and post_complete:
                 st.button("나의 교육 전후 리포트 보기", key=PREFIX + "open_report", on_click=_choose_phase,
                           args=("post",), type="primary", width="stretch")
@@ -541,4 +550,5 @@ def render_participant(store: Any, token: str, principal: Mapping[str, Any]) -> 
         st.info("아직 검사 기간이 시작되지 않았습니다." if today < start else "검사 기간이 종료되었습니다. 교육담당자에게 문의해 주세요.")
         return
     st.caption("최근 8주 동안 실제 업무에서 나타난 행동을 기준으로 응답해 주세요.")
+    st.caption(PRIVACY_NOTICE)
     _render_question(store, token, assignment_id, phase, questions, _current_payload(active_record, phase))

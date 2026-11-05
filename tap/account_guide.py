@@ -209,7 +209,7 @@ def _sidebar(menus: Iterable[str], active: str, role: str, body: str, pins: bool
             f'<div class="tg-side-bot">{guide}{profile}</div></div><div class="tg-main">{body}</div></div>')
 
 
-MANAGER_MENUS = ("대시보드", "참여자 계정", "프로젝트 만들기", "프로젝트")
+MANAGER_MENUS = ("대시보드", "참여자 계정", "부서 · 직급", "프로젝트 만들기", "프로젝트")
 SAMPLE_PROJECT = "고객 서비스 역량 향상 과정"
 
 
@@ -235,7 +235,7 @@ def _manager_steps() -> list[str]:
 
     steps.append(_step(
         "화면 구성", "메뉴 구성",
-        "교육담당자로 로그인하면 왼쪽에 메뉴 4개가 보입니다. 처음에는 참여자 계정, 프로젝트 만들기, "
+        "교육담당자로 로그인하면 왼쪽에 메뉴 5개가 보입니다. 처음에는 참여자 계정, 부서 · 직급, 프로젝트 만들기, "
         "프로젝트(배정) 순서로 쓰고, 이후에는 대시보드에서 현황을 봅니다.",
         _frame("교육담당자 화면", _sidebar(MANAGER_MENUS, "참여자 계정", "교육담당자",
                '<div class="tg-card"><div class="tg-title">참여자 계정</div>'
@@ -243,6 +243,8 @@ def _manager_steps() -> list[str]:
         [
             ("대시보드", "전체 참여 인원, 교육 전후 검사 완료 현황, 일정과 미완료 인원, 월별 완료 추세"),
             ("참여자 계정", "참여자 계정 발급(한 명씩 또는 CSV 일괄), 비밀번호 재발급, 사용 중지"),
+            ("부서 · 직급", "참여자의 부서와 직급 지정·수정(한 명씩, 부서 통째로, CSV 일괄). 리포트의 부서별·직급별 비교는 이 소속으로 묶이며, "
+             "교육 후 검사를 마친 프로젝트는 마친 시점의 소속을 유지"),
             ("프로젝트 만들기", "교육 일정과 측정역량을 정해 새 프로젝트 등록"),
             ("프로젝트", "프로젝트별 일정, 참여자 배정, 참여 현황과 리포트"),
             ("이용 안내", "이 안내 화면 열기. <b>업무 화면으로 돌아가기</b>를 누르면 보던 화면으로 복귀"),
@@ -415,31 +417,27 @@ def _manager_steps() -> list[str]:
             '<div class="tg-metric"><small>배정 인원</small><strong>12 명</strong></div>'
             '<div class="tg-metric"><small>교육 전 검사 완료</small><strong>10 명 · 83%</strong></div>'
             '<div class="tg-metric"><small>교육 후 검사 완료</small><strong>8 명 · 67%</strong></div></div></div>'
-            '<div class="tg-card"><div class="tg-sec"><i>②</i>개인별 교육 전후 리포트</div><div class="tg-row">' +
-            _field("리포트 참여자", "홍길동 · 1234567890-user001", pin=2) + '</div>' + _btn("개인 리포트 PDF 다운로드", pin=3, full=True) + '</div>'
-            '<div class="tg-card"><div class="tg-sec">' + _pin(4) + '<i>③</i>조직 교육 전후 리포트</div>'
-            + _btn("조직 리포트 PDF 다운로드", pin=5, full=True) +
+            '<div class="tg-card"><div class="tg-sec">' + _pin(2) + '<i>②</i>조직 교육 전후 리포트</div>'
+            + _btn("조직 리포트 PDF 다운로드", pin=3, full=True) +
             '<div class="tg-bars"><div>고객지향<p><i style="width:58%"></i><i class="after" style="width:76%"></i></p></div>'
             '<div>협업과 팀워크<p><i style="width:64%"></i><i class="after" style="width:72%"></i></p></div>'
             '<div>사람 육성<p><i style="width:50%"></i><i class="after" style="width:61%"></i></p></div></div></div>'
-            '<div class="tg-card" style="background:#f7f8f9"><div class="tg-sec">' + _pin(6) + '<i>④</i>현업전이 환경</div><div class="tg-row">'
+            '<div class="tg-card" style="background:#f7f8f9"><div class="tg-sec">' + _pin(4) + '<i>③</i>현업전이 환경</div><div class="tg-row">'
             '<div class="tg-metric"><small>적용 기회</small><strong>4.00 / 5</strong></div>'
             '<div class="tg-metric"><small>상사·리더 지원</small><strong>4.00 / 5</strong></div>'
             '<div class="tg-metric"><small>도구·정보·권한</small><strong style="color:#b86e00">2.40 / 5</strong></div>'
             '<div class="tg-metric"><small>시간·프로세스</small><strong>3.60 / 5</strong></div></div>'
             '<div class="tg-bars"><div>도구·정보·권한 부족<p><i class="after" style="width:75%"></i></p></div>'
             '<div>시간·프로세스 제약<p><i class="after" style="width:38%"></i></p></div></div></div>'
-            '<div class="tg-card" style="background:#eef7f6"><div class="tg-sec">' + _pin(7) + '<i>⑤</i>교육과정 검토 우선순위</div>'
+            '<div class="tg-card" style="background:#eef7f6"><div class="tg-sec">' + _pin(5) + '<i>④</i>교육과정 검토 우선순위</div>'
             '<div class="tg-sub">01 사람 육성 · 교육 후 2.90점, 목표 3.50점보다 0.60점 낮음</div>'
             '<div class="tg-mini"><span><i></i><b>[강남] 코칭 리더십</b><em>공개교육 · 최신 일정 보기</em></span>'
             '<span><i></i><b>멘탈관리 수업</b><em>이러닝 · 수강 페이지 보기</em></span>'
             '<span><i></i><b>자기관리와 사람관리</b><em>단체교육 문의 · 과정 안내 보기</em></span></div></div>'
-            '<div class="tg-row">' + _btn("조직 리포트 상세 CSV", "secondary", pin=8) + '</div>'
+            '<div class="tg-row">' + _btn("조직 리포트 상세 CSV", "secondary", pin=6) + '</div>'
         )),
         [
             ("참여 현황", "선택한 프로젝트의 배정 인원, 교육 전후 검사 완료 인원과 비교 가능 인원"),
-            ("리포트 참여자", "교육 전후 검사를 모두 마친 참여자 중 한 명 선택. 이름이나 아이디로 검색 가능"),
-            ("개인 리포트 PDF 다운로드", "선택한 참여자의 개인별 교육 전후 변화 리포트. 개인 결과이므로 본인 면담 등 정해진 용도로만 사용"),
             ("조직 교육 전후 리포트", "같은 참여자가 같은 문항에 답한 역량별 평균(1~5)의 교육 전후 비교. 표와 막대로 표시되며, 역량별 유효응답이 5명 이상일 때만 공개"),
             ("조직 리포트 PDF 다운로드", "레이더 차트, 역량별 변화와 업무 적용 가이드, 현업전이 환경, 추천 과정을 담은 보고용 PDF. 과정마다 KMA 페이지로 가는 버튼이 있음"),
             ("현업전이 환경", "교육 후 검사에서 답한 적용 기회, 상사 지원, 도구·권한, 시간 여건의 평균과 적용 장애요인. 3.0점 미만인 조건은 주황색으로 표시"),
@@ -583,7 +581,7 @@ def _participant_steps() -> list[str]:
             ("내 리포트 PDF 다운로드", "교육 전후 결과, 레이더 차트, 업무 적용 가이드, 추천 과정을 담은 내 리포트를 PDF로 저장. 본인 결과이니 보관·공유에 주의"),
             ("보완 학습 제안", "교육 후 점수가 목표보다 0.2점 이상 낮은 역량마다 KMA 공개교육과 이러닝 카드. 버튼을 누르면 과정 페이지가 새 창에 열리며, 수강 여부는 교육담당자와 상의"),
         ],
-        note="교육담당자는 교육 운영을 위해 개인별 교육 전후 리포트와, 역량별 응답자가 5명 이상일 때의 조직 결과를 볼 수 있습니다.",
+        note="개인 결과는 본인만 봅니다. 교육담당자는 역량별 응답자가 5명 이상일 때의 조직·부서 결과만 볼 수 있고, 문항별 응답은 볼 수 없습니다.",
     ))
     return steps
 

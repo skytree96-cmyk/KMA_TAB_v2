@@ -25,7 +25,7 @@ MAX_BATCH_ROWS = 200
 WORKSPACE_PAGE_SIZE = 12
 WORKSPACE_SECTIONS = {
     "kma": {"companies": "회원사", "accounts": "계정 관리", "projects": "프로젝트"},
-    "company": {"accounts": "참여자 계정", "create_project": "프로젝트 만들기", "projects": "프로젝트"},
+    "company": {"accounts": "참여자 계정", "departments": "부서 · 직급", "create_project": "프로젝트 만들기", "projects": "프로젝트"},
 }
 MAX_CSV_BYTES = 256 * 1024
 PROFILE_FIELDS = {"department": ("부서", 100), "job_title": ("직급", 80), "email": ("이메일", 254), "phone": ("연락처", 40)}
@@ -469,6 +469,20 @@ def _render_user_actions(store: Any, token: str, principal: Mapping[str, Any], u
                 _notice("계정 사용을 중지했습니다." if active else "계정을 다시 활성화했습니다.")
                 st.rerun()
     st.caption("비밀번호 재발급 또는 계정 중지 시 기존 로그인은 종료됩니다. 기존 비밀번호는 조회할 수 없습니다.")
+    if user.get("role") == "participant":
+        # Reports group people by these two, so they can be corrected after the account exists.
+        with st.form(PREFIX + f"profile_{selected}", border=False):
+            left, right = st.columns(2)
+            with left:
+                department = st.text_input("부서", value=str(user.get("department") or ""), max_chars=100, key=PREFIX + f"profile_department_{selected}")
+            with right:
+                job_title = st.text_input("직급", value=str(user.get("job_title") or ""), max_chars=80, key=PREFIX + f"profile_job_title_{selected}")
+            saved = st.form_submit_button("부서 · 직급 저장")
+        if saved:
+            ok, count = _attempt(lambda: store.set_profiles(token, [{"user_id": selected, "department": department, "job_title": job_title}]))
+            if ok:
+                _notice("부서와 직급을 저장했습니다. 교육 후 검사를 이미 마친 프로젝트의 리포트는 바뀌지 않습니다." if count else "바뀐 내용이 없습니다.")
+                st.rerun()
 
 
 def _empty_state(icon: str, title: str, text: str) -> None:
@@ -1175,6 +1189,9 @@ def _render_workspace(
         _render_workspace_projects(store, token, principal, projects, users)
     elif section == "create_project":
         _render_project_create(store, token, show_heading=False)
+    elif section == "departments":
+        from tap.account_teams import render_teams
+        render_teams(store, token, principal, users)
     elif section == "accounts":
         issuance_label = "교육담당자 계정 발급" if role == "kma" else "참여자 계정 발급"
         with st.expander(issuance_label, key=PREFIX + f"workspace_issue_{role}", on_change="rerun"):
@@ -1209,7 +1226,7 @@ def render_admin(store: Any, token: str, principal: Mapping[str, Any], *, sectio
     if not ok:
         return
     users: list[dict[str, Any]] = []
-    if section is None or section == "accounts" or (section == "projects" and role == "company"):
+    if section is None or section in {"accounts", "departments"} or (section == "projects" and role == "company"):
         ok, users = _attempt(lambda: store.list_users(token))
         if not ok:
             return
