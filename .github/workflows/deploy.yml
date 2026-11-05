@@ -1,0 +1,61 @@
+name: Deploy to Cloud Run
+
+# Runs after "TAP validation" passed on a push to main (a merged pull request), or by hand.
+# Authentication is keyless: the workload identity provider only accepts this repository's
+# main branch (see deploy/gcp/05_github_deploy.sh), so pull requests and forks cannot deploy.
+on:
+  workflow_run:
+    workflows: ["TAP validation"]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+
+# One release at a time; a newer merge waits for the running deploy instead of cancelling it.
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  deploy:
+    # Skipped until deploy/gcp/05_github_deploy.sh has set the repository variables.
+    if: >-
+      vars.GCP_WORKLOAD_IDENTITY_PROVIDER != '' &&
+      (github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push'))
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+      - uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ vars.GCP_DEPLOY_SERVICE_ACCOUNT }}
+      - uses: google-github-actions/setup-gcloud@v2
+      - name: Write deploy settings
+        # Non-secret values (project, region, service names), kept as a repository variable.
+        env:
+          DEPLOY_CONFIG: ${{ vars.GCP_DEPLOY_CONFIG }}
+        run: |
+          test -n "$DEPLOY_CONFIG"
+          printf '%s\n' "$DEPLOY_CONFIG" > deploy/gcp/config.env
+      - name: Build and deploy
+        env:
+          # The run service account already reads the secrets; the deployer may not change secret access.
+          SKIP_SECRET_BINDING: "1"
+        run: bash deploy/gcp/03_deploy.sh
+      - name: Confirm the new revision serves all traffic
+        run: |
+          source deploy/gcp/config.env
+          latest=$(gcloud run services describe "$SERVICE" --region="$REGION" --format='value(status.latestReadyRevisionName)')
+          serving=$(gcloud run services describe "$SERVICE" --region="$REGION" \
+            --format='value(status.traffic[0].revisionName,status.traffic[0].percent,status.traffic[0].latestRevision)')
+          echo "latest ready: $latest / serving: $serving"
+          # A pinned revision (for example after a --preview deploy) would leave the release at 0%.
+          gcloud run services describe "$SERVICE" --region="$REGION" --format=json \
+            | python3 -c "import json,sys; t=json.load(sys.stdin)['status']['traffic']; sys.exit(0 if any(x.get('latestRevision') and x.get('percent')==100 for x in t) else 1)"
