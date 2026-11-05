@@ -8,13 +8,13 @@
 <style>
 @import url("https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,300..600,0..1,0&display=block");
 /* KMA TAP 오픈페이지 v2 (운영). tap/account_landing.py가 워드마크와 글꼴을 넣어 /open에서 보여 준다.
-   색: CI 네이비 #192c48, 틸 #087b76, 점 #20c7dc. 나머지는 회색 단계.
+   색: CI 네이비 #161614, 틸 #1769ff, 점 #6fa0ff. 나머지는 회색 단계.
    글꼴: 본문과 제목은 Pretendard, 워드마크만 Paperlogy.
    대비: 흰 바탕 본문 10:1, 작은 글자 5.9:1 이상, 짙은 바탕 위 글자 8:1 이상. 버튼 흰 글자 5.1:1. */
 .tap-landing{
-  --navy:#192c48; --navy-900:#0c1a2c;
-  --teal:#087b76; --teal-strong:#06605c; --teal-tint:#e8f4f2; --teal-on-dark:#72dccf;
-  --ink:#121b26; --ink-2:#36414d; --ink-3:#5b6672; --ink-2-on-dark:#c9d4df; --ink-3-on-dark:#9fb0c1;
+  --navy:#161614; --navy-900:#161614;
+  --teal:#1769ff; --teal-strong:#0b4fcc; --teal-tint:#eef3ff; --teal-on-dark:#7296dc;
+  --ink:#161614; --ink-2:#514f48; --ink-3:#6e6d66; --ink-2-on-dark:#c9d4df; --ink-3-on-dark:#9fb0c1;
   --line:#e2e6ea; --line-2:#eef1f3; --soft:#f3f5f7; --soft-2:#f8f9fa;
   --orange:#a65f00; --orange-tint:#fff5e6;
   --r-sm:12px; --r-md:16px; --r-lg:22px; --r-xl:28px; --max:1200px;
@@ -27,7 +27,7 @@ body{margin:0;background:#fff}
 .tap-landing a{color:inherit}
 .tap-landing :is(h1,h2,h3,p,ul,dl,dd){margin:0}
 .tap-landing section[id]{scroll-margin-top:80px}
-.tap-landing :focus-visible{outline:3px solid #20c7dc;outline-offset:3px;border-radius:8px}
+.tap-landing :focus-visible{outline:3px solid #6fa0ff;outline-offset:3px;border-radius:8px}
 .tap-landing .container{width:min(100% - 48px,var(--max));margin:0 auto}
 .tap-landing .sr-only{position:absolute!important;width:1px!important;height:1px!important;overflow:hidden!important;clip:rect(0,0,0,0)!important;white-space:nowrap!important}
 .tap-landing .skip{position:fixed;left:16px;top:-80px;z-index:200;padding:12px 16px;border-radius:10px;background:var(--teal-strong);color:#fff;font-weight:700;text-decoration:none}
@@ -37,7 +37,7 @@ body{margin:0;background:#fff}
 .tap-landing .brand{text-decoration:none;flex:none}
 .tap-landing .brand .tap-ci,.tap-landing .foot-brand .tap-ci{flex-direction:row;align-items:center;gap:12px;margin:0;flex-wrap:nowrap}
 .tap-landing .brand .tap-ci-wordmark,.tap-landing .foot-brand .tap-ci-wordmark{font-size:28px}
-.tap-landing .brand .tap-ci-description{font-size:12px!important;line-height:1.35!important;color:#51657f}
+.tap-landing .brand .tap-ci-description{font-size:12px!important;line-height:1.35!important;color:#6e6d66}
 .tap-landing .foot-brand .tap-ci-description{font-size:12px!important;line-height:1.35!important;color:var(--ink-3-on-dark)}
 
 /* 버튼 */
@@ -53,9 +53,9 @@ body{margin:0;background:#fff}
 .tap-landing .btn-on-dark{background:rgba(255,255,255,.1);color:#fff;border-color:rgba(255,255,255,.32)}
 .tap-landing .btn-on-dark:hover{background:rgba(255,255,255,.18)}
 .tap-landing .btn-white{background:#fff;color:var(--teal-strong)}
-.tap-landing .btn-white:hover{background:#eef7f6}
+.tap-landing .btn-white:hover{background:#eef3ff}
 .tap-landing .btn-navy{background:var(--navy);color:#fff}
-.tap-landing .btn-navy:hover{background:#0f1f35}
+.tap-landing .btn-navy:hover{background:#161614}
 
 /* 머리글 */
 .tap-landing .site-header{position:sticky;top:0;z-index:50;background:rgba(255,255,255,.97);border-bottom:1px solid var(--line)}
@@ -70,7 +70,7 @@ body{margin:0;background:#fff}
 /* 첫 화면 */
 .tap-landing .hero{position:relative;overflow:hidden;background:var(--navy-900);color:#fff}
 .tap-landing .hero::before{content:"";position:absolute;inset:0;pointer-events:none;background:
-  radial-gradient(60% 70% at 85% 30%,rgba(8,123,118,.45),transparent 70%),radial-gradient(40% 50% at 10% 100%,rgba(32,199,220,.12),transparent 70%)}
+  radial-gradient(60% 70% at 85% 30%,rgba(23,105,255,.45),transparent 70%),radial-gradient(40% 50% at 10% 100%,rgba(111,160,255,.12),transparent 70%)}
 .tap-landing .hero-grid{position:relative;display:grid;grid-template-columns:minmax(0,1.05fr) minmax(0,.95fr);gap:64px;align-items:center;padding:104px 0 112px}
 .tap-landing .eyebrow{display:block;margin-bottom:16px;font-size:15px;font-weight:700;color:var(--teal-strong)}
 .tap-landing .hero .eyebrow{color:var(--teal-on-dark)}
@@ -509,7 +509,7 @@ body{margin:0;background:#fff}
     for (var j = 0; j < n; j++) {
       var end = pt(j, 5), at = pt(j, 5.9);
       svg.appendChild(el("line", {x1: cx, y1: cy, x2: end[0], y2: end[1], stroke: "#e6eaee"}));
-      var text = el("text", {x: at[0], y: at[1] + 4, "text-anchor": "middle", "font-size": 13, "font-weight": 600, fill: "#5b6672"});
+      var text = el("text", {x: at[0], y: at[1] + 4, "text-anchor": "middle", "font-size": 13, "font-weight": 600, fill: "#6e6d66"});
       text.textContent = labels[j]; svg.appendChild(text);
     }
     function poly(values, stroke, fill, dash) {
@@ -519,7 +519,7 @@ body{margin:0;background:#fff}
       svg.appendChild(el("polygon", attrs));
     }
     poly(pre, "#8f9ba7", "rgba(143,155,167,.10)", true);
-    poly(post, "#087b76", "rgba(8,123,118,.16)");
+    poly(post, "#1769ff", "rgba(23,105,255,.16)");
   }
   function bindMenu() {
     var nav = document.getElementById("tapNav"), menu = document.getElementById("tapMenu");

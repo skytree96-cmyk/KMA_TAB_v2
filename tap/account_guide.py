@@ -20,128 +20,128 @@ from tap.brand import brand_css, brand_html
 GUIDE_CSS = """
 <style>
   .tg-intro{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;margin:4px 0 8px}
-  .tg-intro div{background:#fff;border:1px solid #dce9e6;border-radius:14px;padding:16px 18px}
-  .tg-intro b{display:block;color:#087b76;font-size:13px;letter-spacing:.04em;margin-bottom:4px}
-  .tg-intro strong{display:block;color:#102f36;font-size:17px;margin-bottom:6px}
-  .tg-intro p{margin:0;color:#536f75;font-size:14px;line-height:1.6}
-  .tg-flow{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:6px 0 18px;font-size:14px;color:#102f36}
-  .tg-flow span{background:#eaf6f3;color:#087b76;border-radius:999px;padding:6px 12px;font-weight:700}
-  .tg-flow em{font-style:normal;color:#9db1b3}
+  .tg-intro div{background:#fff;border:1px solid #d7dfee;border-radius:14px;padding:16px 18px}
+  .tg-intro b{display:block;color:#1769ff;font-size:13px;letter-spacing:.04em;margin-bottom:4px}
+  .tg-intro strong{display:block;color:#161614;font-size:17px;margin-bottom:6px}
+  .tg-intro p{margin:0;color:#6e6d66;font-size:14px;line-height:1.6}
+  .tg-flow{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:6px 0 18px;font-size:14px;color:#161614}
+  .tg-flow span{background:#eef3ff;color:#1769ff;border-radius:999px;padding:6px 12px;font-weight:700}
+  .tg-flow em{font-style:normal;color:#9da4b3}
   .tg-step{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);gap:26px;align-items:start;
-           padding:24px;border:1px solid #dce9e6;border-radius:18px;background:#fff;margin:0 0 18px;color:#102f36}
+           padding:24px;border:1px solid #d7dfee;border-radius:18px;background:#fff;margin:0 0 18px;color:#161614}
   .tg-head{grid-column:1/-1}
-  .tg-kicker{font-size:13px;font-weight:800;color:#087b76;letter-spacing:.05em}
-  .tg-head h3{margin:4px 0 6px;font-size:22px;line-height:1.35;color:#102f36}
-  .tg-lead{color:#536f75;font-size:15px;line-height:1.65;margin:0}
-  .tg-frame{border:1px solid #d5e2e0;border-radius:14px;overflow:hidden;background:#f4f8f8;box-shadow:0 10px 28px rgba(16,47,54,.08)}
-  .tg-bar{display:flex;align-items:center;gap:6px;padding:8px 12px;background:#e7efee;font-size:11px;color:#7a8f93}
-  .tg-bar i{width:9px;height:9px;border-radius:50%;background:#c5d4d2;display:inline-block}
+  .tg-kicker{font-size:13px;font-weight:800;color:#1769ff;letter-spacing:.05em}
+  .tg-head h3{margin:4px 0 6px;font-size:22px;line-height:1.35;color:#161614}
+  .tg-lead{color:#6e6d66;font-size:15px;line-height:1.65;margin:0}
+  .tg-frame{border:1px solid #d0d8e7;border-radius:14px;overflow:hidden;background:#f2f5fa;box-shadow:0 10px 28px rgba(22,22,20,.08)}
+  .tg-bar{display:flex;align-items:center;gap:6px;padding:8px 12px;background:#e4e9f2;font-size:11px;color:#7a8293}
+  .tg-bar i{width:9px;height:9px;border-radius:50%;background:#c5cad4;display:inline-block}
   .tg-bar span{margin-left:8px}
-  .tg-screen{padding:16px;display:flex;flex-direction:column;gap:10px;font-size:13px;color:#102f36}
+  .tg-screen{padding:16px;display:flex;flex-direction:column;gap:10px;font-size:13px;color:#161614}
   .tg-pin{display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;border-radius:50%;
           background:#e8590c;color:#fff;font-size:11px;font-weight:800;flex:none;box-shadow:0 0 0 3px rgba(232,89,12,.2)}
   .tg-pinned{position:relative;display:inline-flex;margin:6px 8px 0 0}
   .tg-pinned.full{display:flex;width:100%;margin-right:0}
   .tg-pinned > .tg-pin{position:absolute;top:-9px;right:-9px;width:19px;height:19px;font-size:10.5px;z-index:1}
   .tg-btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:7px 12px;border-radius:8px;
-          font-weight:700;font-size:12.5px;border:1px solid #087b76;white-space:nowrap}
-  .tg-btn.primary{background:#087b76;color:#fff}
-  .tg-btn.secondary{background:#fff;color:#087b76}
-  .tg-btn.ghost{border-color:transparent;background:transparent;color:#536f75}
-  .tg-btn.active{background:#087b76;color:#fff}
+          font-weight:700;font-size:12.5px;border:1px solid #1769ff;white-space:nowrap}
+  .tg-btn.primary{background:#1769ff;color:#fff}
+  .tg-btn.secondary{background:#fff;color:#1769ff}
+  .tg-btn.ghost{border-color:transparent;background:transparent;color:#6e6d66}
+  .tg-btn.active{background:#1769ff;color:#fff}
   .tg-btn.full{width:100%;box-sizing:border-box}
   .tg-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
   .tg-row > .tg-field{flex:1}
   .tg-field{display:flex;flex-direction:column;gap:4px;min-width:110px}
-  .tg-field b{font-size:11.5px;color:#536f75;font-weight:600;display:flex;align-items:center;gap:6px}
-  .tg-input{background:#fff;border:1px solid #d5e2e0;border-radius:7px;padding:7px 9px;color:#102f36;min-height:16px}
-  .tg-input.ph{color:#9db1b3}
-  .tg-card{background:#fff;border:1px solid #dce9e6;border-radius:10px;padding:12px;display:flex;flex-direction:column;gap:8px}
+  .tg-field b{font-size:11.5px;color:#6e6d66;font-weight:600;display:flex;align-items:center;gap:6px}
+  .tg-input{background:#fff;border:1px solid #d0d8e7;border-radius:7px;padding:7px 9px;color:#161614;min-height:16px}
+  .tg-input.ph{color:#9da4b3}
+  .tg-card{background:#fff;border:1px solid #d7dfee;border-radius:10px;padding:12px;display:flex;flex-direction:column;gap:8px}
   .tg-title{font-weight:800;font-size:15px}
-  .tg-sub{font-size:11.5px;color:#6b8589}
+  .tg-sub{font-size:11.5px;color:#6b7589}
   .tg-table{width:100%;border-collapse:collapse;background:#fff;font-size:11.5px;border-radius:8px;overflow:hidden}
-  .tg-table th{background:#eef5f4;color:#536f75;text-align:left;padding:6px 8px;font-weight:600}
-  .tg-table td{border-top:1px solid #e6eeed;padding:6px 8px}
-  .tg-tag{display:inline-block;padding:3px 8px;border-radius:999px;background:#eaf6f3;color:#087b76;font-size:11px;font-weight:700}
-  .tg-tag.muted{background:#f1f4f5;color:#7a8f93}
-  .tg-metric{flex:1;min-width:84px;background:#fff;border:1px solid #dce9e6;border-radius:10px;padding:9px 10px}
-  .tg-metric small{display:block;color:#6b8589;font-size:11px}
+  .tg-table th{background:#ebeff8;color:#6e6d66;text-align:left;padding:6px 8px;font-weight:600}
+  .tg-table td{border-top:1px solid #e3e8f1;padding:6px 8px}
+  .tg-tag{display:inline-block;padding:3px 8px;border-radius:999px;background:#eef3ff;color:#1769ff;font-size:11px;font-weight:700}
+  .tg-tag.muted{background:#eff2f7;color:#7a8293}
+  .tg-metric{flex:1;min-width:84px;background:#fff;border:1px solid #d7dfee;border-radius:10px;padding:9px 10px}
+  .tg-metric small{display:block;color:#6b7589;font-size:11px}
   .tg-metric strong{font-size:17px}
-  .tg-progress{height:7px;background:#e3ecea;border-radius:99px;overflow:hidden;flex:1}
-  .tg-progress span{display:block;height:100%;background:#087b76}
+  .tg-progress{height:7px;background:#dfe5f0;border-radius:99px;overflow:hidden;flex:1}
+  .tg-progress span{display:block;height:100%;background:#1769ff}
   .tg-radio{display:flex;flex-wrap:wrap;gap:6px}
-  .tg-radio span{border:1px solid #d5e2e0;background:#fff;border-radius:99px;padding:4px 9px;font-size:11.5px}
-  .tg-radio span.on{border-color:#087b76;background:#eaf6f3;color:#087b76;font-weight:700}
+  .tg-radio span{border:1px solid #d0d8e7;background:#fff;border-radius:99px;padding:4px 9px;font-size:11.5px}
+  .tg-radio span.on{border-color:#1769ff;background:#eef3ff;color:#1769ff;font-weight:700}
   .tg-scale{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));width:100%}
   .tg-scale span{display:flex;align-items:center;justify-content:center;text-align:center;min-height:34px;padding:4px 3px;
-                 margin-left:-1px;border:1px solid #b9cccb;background:#f4f7f7;font-size:11px;font-weight:600;color:#33484f;word-break:keep-all}
+                 margin-left:-1px;border:1px solid #b9bfcc;background:#f3f5f8;font-size:11px;font-weight:600;color:#514f48;word-break:keep-all}
   .tg-scale span:first-child{margin-left:0;border-radius:9px 0 0 9px}
   .tg-scale span:last-child{border-radius:0 9px 9px 0}
-  .tg-scale span.hover{background:#dff2ee;border-color:#7cc4ba;color:#065c58;position:relative;z-index:1}
-  .tg-scale span.on{background:#087b76;border-color:#087b76;color:#fff;font-weight:800;position:relative;z-index:2}
-  .tg-zero{align-self:flex-start;border:1px dashed #b9cccb;border-radius:999px;background:#fff;padding:5px 12px;font-size:11px;font-weight:600;color:#33484f}
+  .tg-scale span.hover{background:#eef3ff;border-color:#7c94c4;color:#0b4fcc;position:relative;z-index:1}
+  .tg-scale span.on{background:#1769ff;border-color:#1769ff;color:#fff;font-weight:800;position:relative;z-index:2}
+  .tg-zero{align-self:flex-start;border:1px dashed #b9bfcc;border-radius:999px;background:#fff;padding:5px 12px;font-size:11px;font-weight:600;color:#514f48}
   .tg-checks{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:11.5px}
   .tg-checks span::before{content:"";display:inline-block;width:11px;height:11px;margin-right:5px;vertical-align:-1px;
-                          border:1.5px solid #9db1b3;border-radius:3px;background:#fff}
-  .tg-checks span.on::before{background:#087b76;border-color:#087b76;box-shadow:inset 0 0 0 2px #fff}
+                          border:1.5px solid #9da4b3;border-radius:3px;background:#fff}
+  .tg-checks span.on::before{background:#1769ff;border-color:#1769ff;box-shadow:inset 0 0 0 2px #fff}
   .tg-tiles{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}
-  .tg-tiles span{border:1px solid #dce9e6;border-radius:8px;background:#fff;padding:6px 8px;font-size:11px}
+  .tg-tiles span{border:1px solid #d7dfee;border-radius:8px;background:#fff;padding:6px 8px;font-size:11px}
   .tg-tiles span::before{content:"";display:inline-block;width:10px;height:10px;margin-right:5px;vertical-align:-1px;
-                         border:1.5px solid #9db1b3;border-radius:3px}
-  .tg-tiles span.on{border-color:#087b76;background:#eaf6f3;font-weight:700}
-  .tg-tiles span.on::before{background:#087b76;border-color:#087b76}
-  .tg-tiles span.fixed{color:#6b8589}
-  .tg-tiles span.fixed::before{background:#c5d4d2;border-color:#c5d4d2}
-  .tg-shell{display:grid;grid-template-columns:136px minmax(0,1fr);gap:8px;background:#e6eaeb;border-radius:10px;padding:6px 6px 6px 0}
+                         border:1.5px solid #9da4b3;border-radius:3px}
+  .tg-tiles span.on{border-color:#1769ff;background:#eef3ff;font-weight:700}
+  .tg-tiles span.on::before{background:#1769ff;border-color:#1769ff}
+  .tg-tiles span.fixed{color:#6b7589}
+  .tg-tiles span.fixed::before{background:#c5cad4;border-color:#c5cad4}
+  .tg-shell{display:grid;grid-template-columns:136px minmax(0,1fr);gap:8px;background:#f7f8f9;border-radius:10px;padding:6px 6px 6px 0}
   .tg-side{display:flex;flex-direction:column;gap:2px;min-height:170px;padding:10px 6px 8px 8px;border-radius:0 10px 10px 0;
-           background:linear-gradient(165deg,#d2e6e3 0%,#e3eceb 45%,#eef1f2 100%)}
-  .tg-logo{font-weight:900;color:#192c48;font-size:14px;padding:0 4px}
-  .tg-logo em{font-style:normal;color:#087f83}
-  .tg-who{margin:6px 0 4px;padding:6px 8px;border-radius:8px;background:rgba(255,255,255,.6);font-size:10.5px;color:#5e6a76;line-height:1.35}
-  .tg-who b{display:block;color:#111a24;font-size:11px}
+           background:linear-gradient(165deg,#c9d9ff 0%,#dfe5f0 45%,#eceff4 100%)}
+  .tg-logo{font-weight:900;color:#161614;font-size:14px;padding:0 4px}
+  .tg-logo em{font-style:normal;color:#1769ff}
+  .tg-who{margin:6px 0 4px;padding:6px 8px;border-radius:8px;background:rgba(255,255,255,.6);font-size:10.5px;color:#6e6d66;line-height:1.35}
+  .tg-who b{display:block;color:#161614;font-size:11px}
   .tg-side .tg-btn{justify-content:flex-start;width:100%;box-sizing:border-box;border-radius:999px;border-color:transparent;
-                   background:transparent;color:#333e4a;font-weight:600;padding:6px 9px}
-  .tg-side .tg-btn.active{background:#fff;color:#111a24;font-weight:800;box-shadow:0 1px 2px rgba(17,26,36,.08),0 2px 6px rgba(17,26,36,.05)}
+                   background:transparent;color:#514f48;font-weight:600;padding:6px 9px}
+  .tg-side .tg-btn.active{background:#fff;color:#161614;font-weight:800;box-shadow:0 1px 2px rgba(22,22,20,.08),0 2px 6px rgba(22,22,20,.05)}
   .tg-side .tg-pinned{display:flex;margin:4px 0 0}
-  .tg-side-bot{margin-top:auto;padding-top:6px;border-top:1px solid rgba(17,26,36,.1);display:flex;flex-direction:column;gap:2px}
+  .tg-side-bot{margin-top:auto;padding-top:6px;border-top:1px solid rgba(22,22,20,.1);display:flex;flex-direction:column;gap:2px}
   .tg-main{background:#fff;border-radius:10px;padding:10px;display:flex;flex-direction:column;gap:8px;min-width:0}
   .tg-checks.col{flex-direction:column;gap:6px}
-  .tg-upload{border:1.5px dashed #b9cfcc;border-radius:9px;padding:12px;text-align:center;color:#6b8589;background:#fff}
-  .tg-exp{border:1px solid #dce9e6;border-radius:10px;background:#fff}
+  .tg-upload{border:1.5px dashed #b9c0cf;border-radius:9px;padding:12px;text-align:center;color:#6b7589;background:#fff}
+  .tg-exp{border:1px solid #d7dfee;border-radius:10px;background:#fff}
   .tg-exp > .tg-exp-head{padding:9px 12px;font-weight:700;display:flex;gap:8px;align-items:center}
-  .tg-exp > .tg-exp-body{border-top:1px solid #e6eeed;padding:12px;display:flex;flex-direction:column;gap:10px}
+  .tg-exp > .tg-exp-body{border-top:1px solid #e3e8f1;padding:12px;display:flex;flex-direction:column;gap:10px}
   .tg-split{display:grid;grid-template-columns:1.2fr 1fr;gap:10px}
-  .tg-list-item{padding:8px 10px;border-radius:8px;border:1px solid #e6eeed;background:#fff}
-  .tg-list-item.on{border-color:#087b76;background:#eaf6f3}
+  .tg-list-item{padding:8px 10px;border-radius:8px;border:1px solid #e3e8f1;background:#fff}
+  .tg-list-item.on{border-color:#1769ff;background:#eef3ff}
   .tg-bars{display:flex;flex-direction:column;gap:6px}
-  .tg-bars div{display:grid;grid-template-columns:76px 1fr;gap:8px;align-items:center;font-size:11px;color:#536f75}
+  .tg-bars div{display:grid;grid-template-columns:76px 1fr;gap:8px;align-items:center;font-size:11px;color:#6e6d66}
   .tg-bars p{margin:0;display:flex;flex-direction:column;gap:2px}
-  .tg-bars i{display:block;height:6px;border-radius:99px;background:#b9d9d4}
-  .tg-bars i.after{background:#087b76}
+  .tg-bars i{display:block;height:6px;border-radius:99px;background:#b9c4d9}
+  .tg-bars i.after{background:#1769ff}
   .tg-ring{width:64px;height:64px;border-radius:50%;flex:none;
-           background:conic-gradient(#087b76 0 62%,#e3ecea 62% 100%);display:flex;align-items:center;justify-content:center}
+           background:conic-gradient(#1769ff 0 62%,#dfe5f0 62% 100%);display:flex;align-items:center;justify-content:center}
   .tg-ring span{width:46px;height:46px;border-radius:50%;background:#fff;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:12px}
   .tg-trend{display:flex;align-items:flex-end;gap:5px;height:46px}
-  .tg-trend i{flex:1;background:#b9d9d4;border-radius:3px 3px 0 0}
-  .tg-trend i.post{background:#087b76}
+  .tg-trend i{flex:1;background:#b9c4d9;border-radius:3px 3px 0 0}
+  .tg-trend i.post{background:#1769ff}
   .tg-callouts{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:14px}
   .tg-callouts li{display:grid;grid-template-columns:24px 1fr;gap:10px;align-items:start}
-  .tg-callouts strong{display:block;color:#102f36;font-size:15px;line-height:1.4}
-  .tg-callouts p{margin:3px 0 0;color:#536f75;font-size:14px;line-height:1.6}
+  .tg-callouts strong{display:block;color:#161614;font-size:15px;line-height:1.4}
+  .tg-callouts p{margin:3px 0 0;color:#6e6d66;font-size:14px;line-height:1.6}
   .tg-note{grid-column:1/-1;border-radius:10px;padding:11px 14px;font-size:14px;line-height:1.6;
-           background:#eef7f6;border:1px solid #cfe6e2;color:#145049}
+           background:#eef3ff;border:1px solid #c6d4ef;color:#161614}
   .tg-note.warn{background:#fff8f1;border-color:#f6d7bd;color:#7a3e0d}
   .tg-sec{display:flex;gap:8px;align-items:center;font-weight:800;font-size:13px}
-  .tg-sec i{width:22px;height:22px;border-radius:7px;background:#eaf6f3;color:#087b76;display:inline-grid;place-items:center;font-style:normal;font-size:12px}
+  .tg-sec i{width:22px;height:22px;border-radius:7px;background:#eef3ff;color:#1769ff;display:inline-grid;place-items:center;font-style:normal;font-size:12px}
   .tg-mini{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}
-  .tg-mini span{border:1px solid #dce9e6;border-radius:8px;background:#fff;padding:0 0 6px;font-size:11px;overflow:hidden}
-  .tg-mini span i{display:block;height:28px;background:linear-gradient(135deg,#e2ecea,#c9dedb);margin-bottom:5px}
+  .tg-mini span{border:1px solid #d7dfee;border-radius:8px;background:#fff;padding:0 0 6px;font-size:11px;overflow:hidden}
+  .tg-mini span i{display:block;height:28px;background:linear-gradient(135deg,#dee4f0,#c9d0de);margin-bottom:5px}
   .tg-mini span b{display:block;padding:0 7px;font-size:11px}
-  .tg-mini span em{display:block;padding:0 7px;font-style:normal;color:#6b8589;font-size:10.5px}
+  .tg-mini span em{display:block;padding:0 7px;font-style:normal;color:#6b7589;font-size:10.5px}
   .tg-faq{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin:0 0 8px}
-  .tg-faq div{background:#fff;border:1px solid #dce9e6;border-radius:14px;padding:14px 16px;color:#102f36}
+  .tg-faq div{background:#fff;border:1px solid #d7dfee;border-radius:14px;padding:14px 16px;color:#161614}
   .tg-faq strong{display:block;font-size:15px;margin-bottom:4px}
-  .tg-faq p{margin:0;color:#536f75;font-size:14px;line-height:1.6}
+  .tg-faq p{margin:0;color:#6e6d66;font-size:14px;line-height:1.6}
   @media(max-width:900px){
     .tg-step{grid-template-columns:1fr;padding:18px;gap:18px}
     .tg-intro,.tg-faq{grid-template-columns:1fr}
@@ -219,11 +219,11 @@ def _intro() -> str:
     return """
 <div class="tg-intro">
   <div><b>STEP 1</b><strong>로그인</strong>
-    <p>담당자에게 전달받은 <b style="display:inline;color:#102f36">로그인 ID 전체</b>와 임시 비밀번호를 입력하세요. 이메일은 쓰지 않습니다.</p></div>
+    <p>담당자에게 전달받은 <b style="display:inline;color:#161614">로그인 ID 전체</b>와 임시 비밀번호를 입력하세요. 이메일은 쓰지 않습니다.</p></div>
   <div><b>STEP 2</b><strong>비밀번호 설정</strong>
     <p>처음 로그인하면 본인만 아는 새 비밀번호(3~128자)를 정해야 다음 화면으로 넘어갈 수 있습니다.</p></div>
   <div><b>STEP 3</b><strong>메뉴로 이동</strong>
-    <p>왼쪽 메뉴로 화면을 이동하세요. 메뉴 아래 <b style="display:inline;color:#102f36">이용 안내</b>로 이 화면을 열 수 있고, 프로필에서 비밀번호 변경과 로그아웃을 합니다.</p></div>
+    <p>왼쪽 메뉴로 화면을 이동하세요. 메뉴 아래 <b style="display:inline;color:#161614">이용 안내</b>로 이 화면을 열 수 있고, 프로필에서 비밀번호 변경과 로그아웃을 합니다.</p></div>
 </div>
 """
 
@@ -425,11 +425,11 @@ def _manager_steps() -> list[str]:
             '<div class="tg-card" style="background:#f7f8f9"><div class="tg-sec">' + _pin(4) + '<i>③</i>현업전이 환경</div><div class="tg-row">'
             '<div class="tg-metric"><small>적용 기회</small><strong>4.00 / 5</strong></div>'
             '<div class="tg-metric"><small>상사·리더 지원</small><strong>4.00 / 5</strong></div>'
-            '<div class="tg-metric"><small>도구·정보·권한</small><strong style="color:#b86e00">2.40 / 5</strong></div>'
+            '<div class="tg-metric"><small>도구·정보·권한</small><strong style="color:#c2410c">2.40 / 5</strong></div>'
             '<div class="tg-metric"><small>시간·프로세스</small><strong>3.60 / 5</strong></div></div>'
             '<div class="tg-bars"><div>도구·정보·권한 부족<p><i class="after" style="width:75%"></i></p></div>'
             '<div>시간·프로세스 제약<p><i class="after" style="width:38%"></i></p></div></div></div>'
-            '<div class="tg-card" style="background:#eef7f6"><div class="tg-sec">' + _pin(5) + '<i>④</i>교육과정 검토 우선순위</div>'
+            '<div class="tg-card" style="background:#eef3ff"><div class="tg-sec">' + _pin(5) + '<i>④</i>교육과정 검토 우선순위</div>'
             '<div class="tg-sub">01 사람 육성 · 교육 후 2.90점, 목표 3.50점보다 0.60점 낮음</div>'
             '<div class="tg-mini"><span><i></i><b>[강남] 코칭 리더십</b><em>공개교육 · 최신 일정 보기</em></span>'
             '<span><i></i><b>멘탈관리 수업</b><em>이러닝 · 수강 페이지 보기</em></span>'
@@ -570,7 +570,7 @@ def _participant_steps() -> list[str]:
                    (("고객지향", "3.2", "3.9", "+0.7"), ("협업과 팀워크", "3.6", "3.8", "+0.2"), ("문제해결력", "2.9", "3.4", "+0.5"))) +
             '<div class="tg-bars"><div>고객지향<p><i style="width:64%"></i><i class="after" style="width:78%"></i></p></div></div>'
             + _btn("⤓ 내 리포트 PDF 다운로드", pin=3) + '</div>'
-            '<div class="tg-card" style="background:#eef7f6"><div class="tg-sec">' + _pin(4) + '<i>★</i>보완 학습 제안</div>'
+            '<div class="tg-card" style="background:#eef3ff"><div class="tg-sec">' + _pin(4) + '<i>★</i>보완 학습 제안</div>'
             '<div class="tg-sub">01 문제해결력 · 교육 후 3.00점, 목표 3.50점보다 0.50점 낮음</div>'
             '<div class="tg-mini"><span><i></i><b>[여의도] 논리적 문제해결</b><em>공개교육 · 최신 일정 보기</em></span>'
             '<span><i></i><b>문제해결 프레임워크</b><em>이러닝 · 수강 페이지 보기</em></span></div></div>'

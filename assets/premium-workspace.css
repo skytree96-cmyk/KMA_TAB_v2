@@ -14,13 +14,13 @@
   z-index: 100;
   border-bottom: 1px solid rgb(255 255 255 / .2);
   background:
-    radial-gradient(ellipse at 12% 0%, rgb(150 222 212 / .22), transparent 48%),
-    linear-gradient(110deg, #0f8c85, var(--brand) 55%, var(--brand-deep));
-  box-shadow: 0 6px 24px rgb(10 63 60 / .14);
+    radial-gradient(ellipse at 12% 0%, rgb(150 174 222 / .22), transparent 48%),
+    linear-gradient(110deg, #1769ff, var(--brand) 55%, var(--brand-deep));
+  box-shadow: 0 6px 24px rgb(11 79 204 / .14);
 }
-.stApp:has(.st-key-tap_workspace_topbar) .st-key-tap_workspace_brand .tap-ci {--ci-kma: #fff; --ci-tap: #c8f1ea; --ci-caption: #d3ebe7;}
+.stApp:has(.st-key-tap_workspace_topbar) .st-key-tap_workspace_brand .tap-ci {--ci-kma: #fff; --ci-tap: #bad1ff; --ci-caption: #c9d9ff;}
 .stApp:has(.st-key-tap_workspace_topbar) .st-key-tap_workspace_nav [data-testid="stButton"] button {
-  color: #d3ebe7;
+  color: #c9d9ff;
   font-weight: 600;
 }
 .stApp:has(.st-key-tap_workspace_topbar) .st-key-tap_workspace_nav [data-testid="stButton"] button p {font-size: var(--fs-base);}
@@ -34,7 +34,7 @@
   background: var(--canvas);
   box-shadow: none;
 }
-.stApp:has(.st-key-tap_workspace_topbar) .st-key-tap_workspace_profile button {color: #eef8f6; border-color: transparent;}
+.stApp:has(.st-key-tap_workspace_topbar) .st-key-tap_workspace_profile button {color: #eef3ff; border-color: transparent;}
 .stApp:has(.st-key-tap_workspace_topbar) .st-key-tap_workspace_profile button:hover,
 .stApp:has(.st-key-tap_workspace_topbar) .st-key-tap_workspace_profile button[aria-expanded="true"] {background: rgb(255 255 255 / .1);}
 .stApp:has(.st-key-tap_workspace_topbar) .st-key-tap_workspace_profile [data-testid="stIconMaterial"] {color: inherit;}
@@ -152,7 +152,7 @@
   box-shadow: var(--shadow-md);
 }
 .stApp:has(.tap-assessment-focus) .st-key-_tap_participant_question_stage h3 {font-size: clamp(20px, 2.2vw, 26px); line-height: 1.45; font-weight: 700;}
-.stApp:has(.tap-assessment-focus) [data-testid="stProgressBarTrack"] {height: 6px; border-radius: 99px; background: #e4ebea; overflow: hidden;}
+.stApp:has(.tap-assessment-focus) [data-testid="stProgressBarTrack"] {height: 6px; border-radius: 99px; background: #e1e5ee; overflow: hidden;}
 .stApp:has(.tap-assessment-focus) [data-testid="stProgressBarTrack"] > div {border-radius: 99px; background: var(--brand);}
 .stApp:has(.tap-assessment-focus) [data-testid="stProgress"] p {font-size: var(--fs-xs); font-weight: 700; color: var(--brand);}
 @media (max-width: 640px) {
@@ -170,7 +170,7 @@
 .stApp :is(.st-key-_tap_participant_likert_scale,.st-key-_tap_participant_transfer_scale) [data-testid="stRadioOption"] {
   position: relative; box-sizing: border-box; display: flex; align-items: center; justify-content: center;
   width: 100%; min-width: 0; min-height: 64px; margin: 0 0 0 -1px; padding: 10px 8px;
-  border: 1px solid var(--line-strong); border-radius: 0; background: #f4f7f7; box-shadow: none;
+  border: 1px solid var(--line-strong); border-radius: 0; background: #f3f5f8; box-shadow: none;
   text-align: center; cursor: pointer; transition: background .12s ease, color .12s ease, border-color .12s ease;
 }
 /* Hide the circle: the whole cell is the target and the fill shows the choice. */
@@ -184,7 +184,7 @@
 .stApp .st-key-_tap_participant_likert_scale [data-testid="stRadioOption"]:nth-child(6),
 .stApp .st-key-_tap_participant_transfer_scale [data-testid="stRadioOption"]:nth-child(5) {border-radius: 0 14px 14px 0;}
 .stApp :is(.st-key-_tap_participant_likert_scale,.st-key-_tap_participant_transfer_scale) [data-testid="stRadioOption"]:hover {
-  z-index: 1; border-color: #7cc4ba; background: #dff2ee;
+  z-index: 1; border-color: #7c94c4; background: #eef3ff;
 }
 .stApp :is(.st-key-_tap_participant_likert_scale,.st-key-_tap_participant_transfer_scale) [data-testid="stRadioOption"]:hover p {color: var(--brand-deep);}
 .stApp :is(.st-key-_tap_participant_likert_scale,.st-key-_tap_participant_transfer_scale) [data-testid="stRadioOption"]:is([data-selected="true"],:has(input:checked)) {
@@ -289,7 +289,7 @@
 .stApp [class*="st-key-tap_company_pick_"] [data-testid="stRadioOption"] [data-testid="stCaptionContainer"] p {
   margin-top: 2px; font-size: var(--fs-xs); color: var(--muted); font-variant-numeric: tabular-nums;
 }
-.stApp [class*="st-key-tap_company_pick_"] [data-testid="stRadioOption"]:hover {border-color: #9fd3cc; background: var(--surface-soft);}
+.stApp [class*="st-key-tap_company_pick_"] [data-testid="stRadioOption"]:hover {border-color: #9fb1d3; background: var(--surface-soft);}
 .stApp [class*="st-key-tap_company_pick_"] [data-testid="stRadioOption"][data-selected="true"] {
   border-color: var(--brand); background: var(--brand-pale); box-shadow: inset 0 0 0 1px var(--brand);
 }

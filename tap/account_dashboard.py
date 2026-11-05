@@ -227,13 +227,13 @@ def _render_trend(summary: dict[str, Any], role: str) -> None:
         base = alt.Chart(frame).encode(
             x=alt.X("월:O", title=None, sort=[row["month"] for row in months], axis=alt.Axis(labelAngle=-35)),
             y=alt.Y("완료 인원:Q", title="완료 인원 (명)", scale=alt.Scale(domainMin=0), axis=alt.Axis(tickMinStep=1)),
-            color=alt.Color("검사:N", scale=alt.Scale(domain=["교육 전 검사", "교육 후 검사"], range=["#087b76", "#45bdb1"]),
+            color=alt.Color("검사:N", scale=alt.Scale(domain=["교육 전 검사", "교육 후 검사"], range=["#1769ff", "#456ebd"]),
                             legend=alt.Legend(title=None, orient="top")),
             tooltip=["월:O", "검사:N", alt.Tooltip("완료 인원:Q", format=",")])
         chart = (base.mark_area(opacity=0.07, line=False).encode(y=alt.Y("완료 인원:Q", stack=None))
                  + base.mark_line(strokeWidth=3, point=alt.OverlayMarkDef(size=44, filled=True)))
         chart = chart.properties(height=270).configure_view(strokeWidth=0).configure_axis(
-            labelFontSize=13, titleFontSize=13, labelColor="#54716f", gridColor="#e7f0ee", domain=False,
+            labelFontSize=13, titleFontSize=13, labelColor="#545e71", gridColor="#e3e9f4", domain=False,
         ).configure_legend(labelFontSize=14).configure(background="transparent")
         st.altair_chart(chart, width="stretch")
         current = months[-1]
@@ -286,8 +286,8 @@ def render_dashboard(store: Any, token: str, principal: Mapping[str, Any]) -> No
         with left, st.container(key=PREFIX + "participation", border=True):
             st.subheader("전체 역량검사 참여 현황" if role == "kma" else "조직 전체 역량검사 참여 현황")
             st.caption("전체 등록 참여자 대비 · 프로젝트 간 동일인 중복 제외")
-            _rings(total, [("검사 참여율", participating, "#087b76"), ("교육 전 검사 완료율", pre, "#16998c"),
-                           ("교육 후 검사 완료율", post, "#52bfb2")])
+            _rings(total, [("검사 참여율", participating, "#1769ff"), ("교육 전 검사 완료율", pre, "#164399"),
+                           ("교육 후 검사 완료율", post, "#5277bf")])
             st.html(f'<div class="tap-dash-insight"><b>아직 참여하지 않은 인원</b><strong>{max(0,total-participating):,}명</strong></div>')
             st.caption("참여: 한 문항 이상 저장한 사람. 모수: 전체 등록 참여자(미배정·사용 중지 포함). 참여 기업: 참여자가 있는 기업.")
         with right, st.container(key=PREFIX + "ranking", border=True):

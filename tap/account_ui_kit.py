@@ -77,6 +77,9 @@ def pair_bar_rows(rows: Sequence[tuple[str, float | None, float | None, str]], *
     return f'<div class="tap-bars is-pair">{body}{legend}</div>'
 
 
+HEAT_LOW, HEAT_HIGH = (242, 246, 255), (11, 79, 204)  # #F2F6FF → #0B4FCC, as in the PDF
+
+
 def heatmap(columns: Sequence[str], rows: Sequence[tuple], *, hidden: str = "비공개") -> str:
     """A table of 1~5 means, shaded by value: rows are (label, note, [(mean, change), ...]); None hides a cell.
 
@@ -94,11 +97,12 @@ def heatmap(columns: Sequence[str], rows: Sequence[tuple], *, hidden: str = "비
             if mean is None:
                 tds.append(f'<td class="is-hidden">{escape(hidden)}</td>')
                 continue
-            # 1 is the palest tint and 5 the full accent; dark cells switch to white text.
-            alpha = 0.1 + 0.8 * max(0.0, min(1.0, (mean - 1) / 4))
-            ink = "is-dark" if alpha > 0.55 else ""
+            # Same scale as the PDF: 1 is the palest blue, 5 the deep blue; dark cells switch to white text.
+            share = max(0.0, min(1.0, (mean - 1) / 4))
+            red, green, blue = (round(low + (high - low) * share) for low, high in zip(HEAT_LOW, HEAT_HIGH))
+            ink = "is-dark" if share > 0.7 else ""
             delta = f"<small>{escape(signed(change))}</small>" if change is not None else ""
-            tds.append(f'<td class="{ink}" style="background:rgb(8 123 118 / {alpha:.2f})">{mean:.2f}{delta}</td>')
+            tds.append(f'<td class="{ink}" style="background:rgb({red} {green} {blue})">{mean:.2f}{delta}</td>')
         body.append(f"<tr><th>{escape(label)}<small>{escape(note)}</small></th>{''.join(tds)}</tr>")
     return f'<div class="tap-heat-wrap"><table class="tap-heat"><thead><tr><th></th>{head}</tr></thead><tbody>{"".join(body)}</tbody></table></div>'
 

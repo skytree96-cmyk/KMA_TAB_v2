@@ -252,7 +252,7 @@ def _render_results(questions: list[dict[str, Any]], config: Mapping[str, Any], 
             ], hide_index=True, width="stretch")
             scored = [r for r in results if r["pre_score"] is not None and r["post_score"] is not None]
             if scored:
-                # Same shape and teal pair as the manager report.
+                # Same shape and colour pair as the manager report.
                 st.html(pair_bar_rows([(r["factor_name_ko"], r["pre_score"], r["post_score"],
                                         f"{fmt(r['pre_score'])} → {fmt(r['post_score'])}") for r in scored]))
             st.html(foot("교육 전후 모두 1~5로 답한 문항만 비교합니다. 0(수행 기회 없음)은 빼고, 공통 유효문항이 부족한 역량은 비웁니다. "

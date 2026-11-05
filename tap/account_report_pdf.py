@@ -21,17 +21,17 @@ from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont as PDFTTFont
 from reportlab.platypus import Flowable, HRFlowable, KeepTogether, PageBreak, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 
-TEAL = colors.HexColor("#087b76")
-INK = colors.HexColor("#103b37")
-MUTED = colors.HexColor("#52716f")
-PALE = colors.HexColor("#e8f5f2")
-LINE = colors.HexColor("#dbe9e6")
-PRE = colors.HexColor("#75beb3")
-WARN = colors.HexColor("#b5532c")       # a drop, or the distance still left to the target
-WARN_PALE = colors.HexColor("#fbece5")
+TEAL = colors.HexColor("#1769ff")
+INK = colors.HexColor("#161614")
+MUTED = colors.HexColor("#6e6d66")
+PALE = colors.HexColor("#eef3ff")
+LINE = colors.HexColor("#e5e7eb")
+PRE = colors.HexColor("#7f8da1")
+WARN = colors.HexColor("#c2410c")       # a drop, or the distance still left to the target
+WARN_PALE = colors.HexColor("#fff1e8")
 WARN_SOFT = colors.HexColor("#e6b29e")  # the same warm hue, light enough to sit under the markers
-FAINT = colors.HexColor("#8ea6a3")
-GREY = colors.HexColor("#eef3f2")
+FAINT = colors.HexColor("#9a9890")
+GREY = colors.HexColor("#f3f4f6")
 EFFECT_COLORS = {"크게 향상": (TEAL, colors.white), "향상": (PALE, TEAL), "유지": (GREY, MUTED), "하락": (WARN_PALE, WARN)}
 RULE_VERSION = "TAP-CHANGE-1.0"
 # One competency block is one unbreakable table: five long-titled courses stay well under one A4 frame.
@@ -479,9 +479,9 @@ def _summary_tiles(rows: list[Mapping[str, Any]], targets: Mapping[str, Any], wi
     inner = tile_width - 2 * padding
     tiles: list[list[Any]] = []
     for label, count, color in counts:
-        ink = "#103b37" if count == 0 else color.hexval().replace("0x", "#")
+        ink = "#161614" if count == 0 else color.hexval().replace("0x", "#")
         tiles.append([_p(label, size=8, color=MUTED), Spacer(1, 2),
-                      _p(f'<font color="{ink}">{count}</font><font name="TAPMedium" size="8.5" color="#52716f"> / {total}개</font>',
+                      _p(f'<font color="{ink}">{count}</font><font name="TAPMedium" size="8.5" color="#6e6d66"> / {total}개</font>',
                          size=18, bold=True, leading=21, markup=True),
                       Spacer(1, 4), RatioBar(count / total, color, inner)])
     if best["change"] > 0:
@@ -568,7 +568,7 @@ class Radar(Flowable):
             pre_missing, post_missing = row.get("pre_score") is None, row.get("post_score") is None
             note = (("비공개" if row.get("_hidden") else "미산출") if pre_missing and post_missing
                     else "교육 전 미산출" if pre_missing else "교육 후 미산출" if post_missing else "")
-            name = _p(escape(axis_name) + (f'<br/><font name="TAPMedium" size="6.8" color="#8ea6a3">({note})</font>' if note else ""),
+            name = _p(escape(axis_name) + (f'<br/><font name="TAPMedium" size="6.8" color="#9a9890">({note})</font>' if note else ""),
                       size=8.2, align=TA_CENTER, bold=True, leading=10.5, color=FAINT if pre_missing and post_missing else INK, markup=True)
             w = min(76, self.width / 3)
             _, h = name.wrap(w, 200)
@@ -653,9 +653,9 @@ HEAT_COLUMNS = 12          # competencies across one grid
 
 
 def _heat_color(score: float):
-    """1 is almost white, 5 is the brand teal: darker means a higher post-training mean."""
+    """1 is almost white, 5 is the brand blue: darker means a higher post-training mean."""
     share = max(0.0, min(1.0, (score - 1) / 4))
-    low, high = (0xee, 0xf6, 0xf4), (0x08, 0x7b, 0x76)
+    low, high = (0xf2, 0xf6, 0xff), (0x0b, 0x4f, 0xcc)
     return colors.Color(*((a + (b - a) * share) / 255 for a, b in zip(low, high))), share
 
 
@@ -814,14 +814,14 @@ SOURCE_LABELS = {"public_edu_center": "공개교육", "studio_elearning": "이�
 BUTTON_LABELS = {"public_edu_center": "최신 일정 보기", "studio_elearning": "수강 페이지 보기", "b2b_inquiry": "과정 안내 보기"}
 
 
-SOURCE_COLORS = {"public_edu_center": "#087b76", "studio_elearning": "#3d5f94", "b2b_inquiry": "#8a5a14"}
+SOURCE_COLORS = {"public_edu_center": "#1769ff", "studio_elearning": "#3d5f94", "b2b_inquiry": "#8a5a14"}
 
 
 def _course_entry(index: int, course: Mapping[str, Any], width: float) -> Table:
     """One course: number badge, title over a coloured source and its schedule, the link button on the right."""
     source = str(course.get("source", ""))
     label = SOURCE_LABELS.get(source) or course.get("delivery_label")
-    meta = [f'<font name="TAPBold" color="{SOURCE_COLORS.get(source, "#52716f")}">{escape(str(label))}</font>'] if label else []
+    meta = [f'<font name="TAPBold" color="{SOURCE_COLORS.get(source, "#6e6d66")}">{escape(str(label))}</font>'] if label else []
     if course.get("schedule"):
         meta.append(escape(str(course["schedule"])))
     body: list[Any] = [_p(unicodedata.normalize("NFKC", str(course["title"])), size=10.2, bold=True)]
@@ -886,7 +886,7 @@ def _competency_card(index: int, row: Mapping[str, Any], width: float, *, is_org
     level = "비공개" if hidden else effect_level(row["change"])
     fill, ink = EFFECT_COLORS.get(level, (GREY, MUTED))
     # The organization's respondent count rides on the label line: a line of its own cost each card a row.
-    counted = f'<font name="TAPMedium" color="#52716f">  ·  유효 인원 {row["valid_n"]}명</font>' if is_org and not hidden else ""
+    counted = f'<font name="TAPMedium" color="#6e6d66">  ·  유효 인원 {row["valid_n"]}명</font>' if is_org and not hidden else ""
     name = [_p(escape(f"{index:02d}  {row['module_group']}") + counted, size=8, bold=True, color=TEAL, markup=True), Spacer(1, 3),
             _p(row["factor_name_ko"], size=13, bold=True)]
     if hidden:
@@ -894,7 +894,7 @@ def _competency_card(index: int, row: Mapping[str, Any], width: float, *, is_org
         widths = [inner * .8, 0, inner * .2]
         advice = "개인 응답이 드러나지 않도록 점수와 평가를 공개하지 않습니다."
     else:
-        result = [_p('<font name="TAPMedium" size="8" color="#52716f">변화 </font>' + _fmt(row["change"], True), size=16, bold=True,
+        result = [_p('<font name="TAPMedium" size="8" color="#6e6d66">변화 </font>' + _fmt(row["change"], True), size=16, bold=True,
                      color=WARN if level == "하락" else INK, align=TA_RIGHT, leading=18, markup=True) if row["change"] is not None
                   else _p("비교 점수 부족", size=8.6, color=MUTED, align=TA_RIGHT), Spacer(1, 4), Chip(level, fill, ink)]
         widths = [inner * .32, inner * .5, inner * .18]
@@ -1086,7 +1086,7 @@ def build_report_pdf(project: Mapping[str, Any], rows: list[Mapping[str, Any]], 
 
     def page(canvas, document):
         canvas.saveState()
-        canvas.setFillColor(colors.HexColor("#f2f7f6"))
+        canvas.setFillColor(colors.HexColor("#f7f8f9"))
         canvas.rect(0, 0, page_w, page_h, fill=1, stroke=0)
         canvas.setStrokeColor(LINE)
         canvas.line(36, 32, page_w - 36, 32)

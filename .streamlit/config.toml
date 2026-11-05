@@ -1,13 +1,13 @@
 [theme]
-# Console v2: one teal key colour on greys.
+# Console v2: one KMA blue key colour on greys (membership site tone).
 base = "light"
 baseFontSize = 16
-primaryColor = "#087B76"
+primaryColor = "#1769FF"
 backgroundColor = "#FFFFFF"
 secondaryBackgroundColor = "#F1F3F5"
-textColor = "#111A24"
-borderColor = "#E3E7EA"
-dataframeBorderColor = "#E3E7EA"
+textColor = "#161614"
+borderColor = "#E5E7EB"
+dataframeBorderColor = "#E5E7EB"
 dataframeHeaderBackgroundColor = "#F7F8F9"
 buttonRadius = "full"
 baseRadius = "large"

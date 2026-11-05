@@ -2,24 +2,25 @@
    workspace-ui.css and premium-workspace.css, so these rules win.
    Form follows the 교육담당자 콘솔 C안: grey canvas, frosted left sidebar, one
    floating white sheet, pill buttons, icon + text states.
-   Colour stays KMA TAP: teal #087b76 is the only key colour, navy #192c48 for
-   the wordmark, greys for everything else, orange/red only for caution/danger.
+   Colour follows the KMA membership site (2026-11 blue·black·white tone): KMA
+   blue #1769ff is the only key colour, ink #161614 for text and the wordmark,
+   greys for everything else, orange/red only for caution/danger.
    The same frame serves every role (KMA 관리자, 교육담당자, 참여자): all three
    render render_workspace_header() and tap_workspace_main. */
 
 /* ---------- Tokens ---------- */
 .stApp {
-  --c2-canvas: #e6eaeb;
-  --c2-side-from: #d2e6e3; --c2-side-mid: #e3eceb; --c2-side-to: #eef1f2;
+  --c2-canvas: #f7f8f9;
+  --c2-side-from: #ffffff; --c2-side-mid: #ffffff; --c2-side-to: #ffffff;
   --c2-sheet: #ffffff;
-  --c2-line: #e3e7ea; --c2-line-2: #eef1f3; --c2-check: #c5ccd3;
+  --c2-line: #e5e7eb; --c2-line-2: #eef1f3; --c2-check: #c5ccd3;
   --c2-soft: #f1f3f5; --c2-soft-2: #f7f8f9; --c2-soft-h: #e7eaed;
-  --c2-ink: #111a24; --c2-ink-2: #333e4a; --c2-ink-3: #5e6a76; --c2-ink-4: #8e98a3;
-  --c2-teal: #087b76; --c2-teal-strong: #06605c; --c2-teal-tint: #e7f4f2; --c2-teal-line: #bfe0db;
-  --c2-navy: #192c48;
-  --c2-orange: #b86e00; --c2-orange-ink: #8f5500; --c2-orange-tint: #fff6e8;
+  --c2-ink: #161614; --c2-ink-2: #514f48; --c2-ink-3: #6e6d66; --c2-ink-4: #8e98a3;
+  --c2-teal: #1769ff; --c2-teal-strong: #0b4fcc; --c2-teal-tint: #eef3ff; --c2-teal-line: #c9d9ff;
+  --c2-navy: #161614;
+  --c2-orange: #c2410c; --c2-orange-ink: #9a3412; --c2-orange-tint: #fff1e8;
   --c2-red: #c42b3d; --c2-red-tint: #fdf1f2;
-  --c2-pill-shadow: 0 1px 2px rgb(17 26 36 / .06), 0 2px 8px rgb(17 26 36 / .05);
+  --c2-pill-shadow: 0 1px 2px rgb(22 22 20 / .06), 0 2px 8px rgb(22 22 20 / .05);
   --c2-side-w: 264px;
   --c2-font: 'Pretendard Variable', Pretendard, -apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo', 'Malgun Gothic', system-ui, sans-serif;
 
@@ -34,8 +35,8 @@
   --amber: var(--c2-orange); --amber-pale: var(--c2-orange-tint);
   --red: var(--c2-red); --red-pale: var(--c2-red-tint);
   --green: var(--c2-teal); --green-pale: var(--c2-teal-tint);
-  --shadow-sm: 0 1px 2px rgb(17 26 36 / .04);
-  --shadow-md: 0 12px 32px rgb(17 26 36 / .12);
+  --shadow-sm: 0 1px 2px rgb(22 22 20 / .04);
+  --shadow-md: 0 12px 32px rgb(22 22 20 / .12);
   --tap-ink: var(--c2-ink); --tap-muted: var(--c2-ink-3); --tap-accent: var(--c2-teal); --tap-accent-deep: var(--c2-teal-strong);
   --tap-workspace-surface: var(--c2-sheet); --tap-workspace-border: var(--c2-line);
   --tap-workspace-soft: var(--c2-soft-2); --tap-workspace-selected: var(--c2-teal-tint);
@@ -52,7 +53,7 @@
 .stApp h1, .stApp h2, .stApp h3, .stApp h4 {color: var(--c2-ink); letter-spacing: -.025em;}
 .stApp [data-testid="stCaptionContainer"] p {color: var(--c2-ink-3);}
 
-/* ---------- Buttons: pills; primary is teal ---------- */
+/* ---------- Buttons: pills; primary is KMA blue ---------- */
 .stApp :is([data-testid="stButton"],[data-testid="stFormSubmitButton"],[data-testid="stDownloadButton"],[data-testid="stPopover"]) button {
   min-height: 40px;
   border-radius: 999px;
@@ -194,12 +195,12 @@
   grid-row: auto !important; grid-column: auto !important; overflow: visible !important;
 }
 .stApp:has(.st-key-tap_workspace_topbar) .st-key-tap_workspace_topbar [data-testid="stColumn"]:has(.st-key-tap_workspace_profile) {
-  margin-top: auto !important; padding-top: 14px; border-top: 1px solid rgb(17 26 36 / .1);
+  margin-top: auto !important; padding-top: 14px; border-top: 1px solid rgb(22 22 20 / .1);
 }
 
 /* Wordmark and who-am-I card. */
 .stApp:has(.st-key-tap_workspace_topbar) .st-key-tap_workspace_brand {align-items: stretch; justify-content: flex-start; gap: 0;}
-.stApp:has(.st-key-tap_workspace_topbar) .st-key-tap_workspace_brand .tap-ci {--ci-kma: #192c48; --ci-tap: #087f83; --ci-caption: #51657f; justify-content: flex-start; min-height: 0; padding: 0 8px; margin: 0;}
+.stApp:has(.st-key-tap_workspace_topbar) .st-key-tap_workspace_brand .tap-ci {--ci-kma: #161614; --ci-tap: #1769ff; --ci-caption: #6e6d66; justify-content: flex-start; min-height: 0; padding: 0 8px; margin: 0;}
 .stApp:has(.st-key-tap_workspace_topbar) .st-key-tap_workspace_brand .tap-ci-wordmark {font-size: 26px;}
 .tap-side-who {display: grid; gap: 2px; margin: 18px 0 14px; padding: 12px 14px; border-radius: 16px; background: rgb(255 255 255 / .55);}
 .tap-side-who b {font-size: 15px; font-weight: 700; color: var(--c2-ink); overflow-wrap: anywhere;}
@@ -358,7 +359,7 @@
 }
 .stApp:has(.tap-assessment-focus) [data-testid="stProgressBarTrack"] {background: var(--c2-soft) !important;}
 .stApp:has(.tap-assessment-focus) [data-testid="stProgress"] p {color: var(--c2-teal-strong) !important;}
-/* Answer choices: soft tiles, the chosen one in teal tint. */
+/* Answer choices: soft tiles, the chosen one in blue tint. */
 .stApp :is(.st-key-_tap_participant_likert_scale,.st-key-_tap_participant_transfer_scale) [data-testid="stRadioOption"] {
   background: var(--c2-soft-2) !important; border-color: var(--c2-line) !important;
 }
