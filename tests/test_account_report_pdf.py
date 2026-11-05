@@ -17,7 +17,7 @@ def row(code="F1", pre=2.8, post=3.5, n=5, name="성장 마인드셋"):
 class AccountReportPDFTests(unittest.TestCase):
     def test_effect_thresholds_and_missing(self):
         for value, expected in [(None,"미산출"), (float("nan"),"미산출"),
-                                (.5,"큰 향상"), (.4999,"향상"), (.2,"향상"),
+                                (.5,"크게 향상"), (.4999,"향상"), (.2,"향상"),
                                 (.1999,"유지"), (-.1999,"유지"), (-.2,"하락"), (-4,"하락")]:
             with self.subTest(value=value):
                 self.assertEqual(effect_level(value), expected)
@@ -53,7 +53,7 @@ class AccountReportPDFTests(unittest.TestCase):
     def test_many_axes_are_partitioned_without_loss(self):
         rows = [row(str(i)) for i in range(23)]
         groups = _chart_groups(rows)
-        self.assertTrue(all(len(g) <= 8 for g in groups))
+        self.assertTrue(all(len(g) <= 12 for g in groups))
         self.assertEqual([r["factor_code"] for g in groups for r in g], [str(i) for i in range(23)])
 
     def test_pdf_builds_for_sparse_and_many_axes_and_long_escaped_text(self):
@@ -112,6 +112,53 @@ class AccountReportPDFTests(unittest.TestCase):
         pdf = build_report_pdf(PROJECT, [row()], kind="organization", subject="조직 전체", participant_count=5,
                                transfer=transfer, courses=courses)
         self.assertTrue(pdf.startswith(b"%PDF-"))
+
+    def test_courses_are_grouped_under_their_competency_in_one_box(self):
+        try:
+            from pypdf import PdfReader
+        except ImportError:
+            self.skipTest("pypdf is not installed")
+        # recommend_courses fills source by source, so a competency's second course arrives after other competencies.
+        def course(title, competency):
+            return {"title": title, "source": "public_edu_center", "factor_name_ko": competency, "advice": "",
+                    "reason": "교육 후 3.00점, 목표 3.50점보다 0.50점 낮음", "score": 3.0, "target": 3.5, "change": 0.0}
+        courses = [course("문제해결 공개과정", "문제해결력"), course("실행력 공개과정", "실행력"), course("문제해결 이러닝", "문제해결력")]
+        pdf = build_report_pdf(PROJECT, [row()], kind="individual", subject="참여자", courses=courses)
+        text = "\n".join(page.extract_text() for page in PdfReader(BytesIO(pdf)).pages)
+        self.assertLess(text.index("문제해결 이러닝"), text.index("실행력 공개과정"))
+        self.assertEqual(text.count("응답 결과"), 2)
+        self.assertEqual(text.count("추천 과정"), 2)
+
+    def test_details_show_scores_for_missing_and_hidden_rows_without_inventing_them(self):
+        try:
+            from pypdf import PdfReader
+        except ImportError:
+            self.skipTest("pypdf is not installed")
+        pdf = build_report_pdf(PROJECT, [row("F1", pre=None, post=3.0), row("F2", pre=2.0, post=4.0, n=4, name="실행력")],
+                               kind="organization", subject="조직 전체", participant_count=5)
+        text = "\n".join(page.extract_text() for page in PdfReader(BytesIO(pdf)).pages)
+        self.assertIn("3.00", text)   # the one score that exists is shown
+        self.assertNotIn("2.00", text)  # the small group's scores are not
+        self.assertNotIn("4.00", text)
+        self.assertIn("비공개", text)
+
+    def test_summary_tiles_count_comparable_competencies_and_name_ties(self):
+        try:
+            from pypdf import PdfReader
+        except ImportError:
+            self.skipTest("pypdf is not installed")
+        project = {**PROJECT, "config": {**PROJECT["config"], "target_means": {"F1": 3.5, "F2": 3.5, "F3": 3.5}}}
+        rows = [row("F1", pre=2.0, post=3.0, name="고객지향"), row("F2", pre=3.0, post=4.0, name="실행력"),
+                row("F3", pre=4.0, post=3.0, name="문제해결력"), row("F4", pre=None, post=4.5, name="전략적 사고")]
+        first = PdfReader(BytesIO(build_report_pdf(project, rows, kind="individual", subject="참여자"))).pages[0].extract_text()
+        # F4 has no pre score, so it is outside the counts; without its target the "reached" tile would still show.
+        for label in ("목표에 도달한 역량", "향상한 역량", "하락한 역량", "가장 많이 오른 역량"):
+            self.assertIn(label, first)
+        self.assertEqual(first.count("/ 3개"), 3)
+        self.assertIn("고객지향 외 1개", first)
+        # One comparable competency: the headline already says it all.
+        single = PdfReader(BytesIO(build_report_pdf(project, rows[:1], kind="individual", subject="참여자"))).pages[0].extract_text()
+        self.assertNotIn("향상한 역량", single)
 
     def test_zero_change_and_single_competency_read_as_sentences(self):
         try:

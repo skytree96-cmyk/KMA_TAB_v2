@@ -10,15 +10,16 @@ from pathlib import Path
 from statistics import mean
 from threading import Lock
 from typing import Any, Mapping
+import unicodedata
 from zoneinfo import ZoneInfo
 
 from reportlab.lib import colors
-from reportlab.lib.enums import TA_CENTER
+from reportlab.lib.enums import TA_CENTER, TA_RIGHT
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import ParagraphStyle
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont as PDFTTFont
-from reportlab.platypus import Flowable, KeepTogether, PageBreak, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
+from reportlab.platypus import Flowable, HRFlowable, KeepTogether, PageBreak, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 
 TEAL = colors.HexColor("#087b76")
 INK = colors.HexColor("#103b37")
@@ -26,9 +27,17 @@ MUTED = colors.HexColor("#52716f")
 PALE = colors.HexColor("#e8f5f2")
 LINE = colors.HexColor("#dbe9e6")
 PRE = colors.HexColor("#75beb3")
+WARN = colors.HexColor("#b5532c")       # a drop, or the distance still left to the target
+WARN_PALE = colors.HexColor("#fbece5")
+WARN_SOFT = colors.HexColor("#e6b29e")  # the same warm hue, light enough to sit under the markers
+FAINT = colors.HexColor("#8ea6a3")
+GREY = colors.HexColor("#eef3f2")
+EFFECT_COLORS = {"크게 향상": (TEAL, colors.white), "향상": (PALE, TEAL), "유지": (GREY, MUTED), "하락": (WARN_PALE, WARN)}
 RULE_VERSION = "TAP-CHANGE-1.0"
-# Four courses with long KMA URLs stay well under one A4 frame; nine in one panel did not.
-COURSES_PER_PANEL = 4
+# One competency block is one unbreakable table: five long-titled courses stay well under one A4 frame.
+COURSES_PER_BLOCK = 5
+# Six required competencies plus optional ones is usually ten: one chart reads better than two halves.
+RADAR_AXES = 12
 _FONT_LOCK = Lock()
 
 
@@ -64,7 +73,7 @@ def effect_level(change: float | None) -> str:
         return "미산출"
     change = round(change, 4)
     if change >= 0.5:
-        return "큰 향상"
+        return "크게 향상"
     if change >= 0.2:
         return "향상"
     if change <= -0.2:
@@ -86,9 +95,10 @@ def prepare_rows(rows: list[Mapping[str, Any]], kind: str) -> list[dict[str, Any
         pre, post = _score(row.get("pre_score")), _score(row.get("post_score"))
         if kind == "organization" and n < 5:
             pre = post = None
-        # Do not trust a caller-supplied difference or carry hidden scores into prose.
+        # Do not trust a caller-supplied difference or carry hidden scores into prose. The change is taken
+        # from the two-decimal scores the report prints, so the three numbers on a card always add up.
         row.update(pre_score=pre, post_score=post, valid_n=n,
-                   change=round(post - pre, 2) if pre is not None and post is not None else None)
+                   change=round(round(post, 2) - round(pre, 2), 2) if pre is not None and post is not None else None)
         row["factor_name_ko"] = str(row.get("factor_name_ko") or row.get("factor_code") or "역량")
         row["module_group"] = str(row.get("module_group") or "선택 역량")
         prepared.append(row)
@@ -99,7 +109,7 @@ def report_summary(rows: list[Mapping[str, Any]]) -> dict[str, Any]:
     common = [r for r in rows if r.get("pre_score") is not None and r.get("post_score") is not None]
     pre = mean(r["pre_score"] for r in common) if common else None
     post = mean(r["post_score"] for r in common) if common else None
-    delta = round(post - pre, 2) if common else None
+    delta = round(round(post, 2) - round(pre, 2), 2) if common else None
     return {"pre": pre, "post": post, "change": delta, "effect": effect_level(delta),
             "valid_count": len(common), "selected_count": len(rows)}
 
@@ -118,7 +128,7 @@ def _guidance(row: Mapping[str, Any]) -> str:
         action = "교육 후 행동 빈도가 낮습니다. 이 행동을 적용할 업무와 시점부터 정하세요."
     else:
         action = "교육 후 행동 빈도가 매우 낮습니다. 작은 실습 과제와 피드백으로 적용 기회를 만드세요."
-    change_tip = {"큰 향상": "늘어난 행동이 유지되는지 지켜보세요.",
+    change_tip = {"크게 향상": "늘어난 행동이 유지되는지 지켜보세요.",
                   "향상": "나아진 행동의 사례를 기록해 두세요.",
                   "유지": "변화 폭이 작습니다. 수행 환경과 실천 목표를 함께 점검하세요.",
                   "하락": "업무 변화나 수행 기회 감소가 있었는지 살펴보세요."}
@@ -133,11 +143,221 @@ def _fmt(value: float | None, signed: bool = False) -> str:
     return f"{value:+.2f}" if signed else f"{value:.2f}"
 
 
-def _p(text: Any, *, size: float = 10, bold: bool = False, color=INK, align=0, leading: float | None = None) -> Paragraph:
-    return Paragraph(escape(str(text)).replace("\n", "<br/>"), ParagraphStyle(
+def _p(text: Any, *, size: float = 10, bold: bool = False, color=INK, align=0, leading: float | None = None,
+       markup: bool = False) -> Paragraph:
+    """``markup`` passes ReportLab tags through; the caller escapes any data it puts between them."""
+    return Paragraph(str(text) if markup else escape(str(text)).replace("\n", "<br/>"), ParagraphStyle(
         "tap", fontName="TAPBold" if bold else "TAPMedium", fontSize=size,
-        leading=leading or size * 1.48, textColor=color, wordWrap="CJK", alignment=align,
+        leading=leading or size * 1.48, textColor=color, alignment=align,
         spaceAfter=0, allowWidows=0, allowOrphans=0))
+
+
+def _sentences(text: str, *, gap: float = 2.5, **style: Any) -> list[Any]:
+    """One sentence per paragraph, so a narrow column reads as short lines and not as one block."""
+    lines: list[Any] = []
+    for sentence in text.replace(". ", ".\n").split("\n"):
+        lines.extend([Spacer(1, gap), _p(sentence, **style)] if lines else [_p(sentence, **style)])
+    return lines
+
+
+_FLAT = [("LEFTPADDING", (0, 0), (-1, -1), 0), ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+         ("TOPPADDING", (0, 0), (-1, -1), 0), ("BOTTOMPADDING", (0, 0), (-1, -1), 0)]
+
+
+def _height(flowable: Flowable, width: float) -> float:
+    return flowable.wrap(width, 100000)[1]
+
+
+def _fit(text: str, font: str, size: float, width: float) -> str:
+    """Cut a drawn label to the width it has."""
+    if pdfmetrics.stringWidth(text, font, size) <= width:
+        return text
+    while text and pdfmetrics.stringWidth(text + "…", font, size) > width:
+        text = text[:-1]
+    return text.rstrip() + "…"
+
+
+class Chip(Flowable):
+    """A small rounded label."""
+
+    def __init__(self, text: str, fill=TEAL, color=colors.white, *, size: float = 7.6, stroke=None):
+        super().__init__()
+        self.text, self.fill, self.color, self.size, self.stroke = text, fill, color, size, stroke
+        self.width = pdfmetrics.stringWidth(text, "TAPBold", size) + 13
+        self.height = size + 7
+
+    def wrap(self, available_width, available_height):
+        return self.width, self.height
+
+    def draw(self):
+        c = self.canv
+        c.saveState()
+        c.setFillColor(self.fill)
+        if self.stroke is not None:
+            c.setStrokeColor(self.stroke)
+            c.setLineWidth(.7)
+        c.roundRect(0, 0, self.width, self.height, self.height / 2, stroke=int(self.stroke is not None), fill=1)
+        c.setFillColor(self.color)
+        c.setFont("TAPBold", self.size)
+        c.drawCentredString(self.width / 2, (self.height - self.size) / 2 + 1.1, self.text)
+        c.restoreState()
+
+
+class NumberBadge(Flowable):
+    """The running number of a course, so it reads as a list item and not as part of the title."""
+
+    def __init__(self, number: int, size: float = 16):
+        super().__init__()
+        self.number, self.width, self.height = number, size, size
+
+    def wrap(self, available_width, available_height):
+        return self.width, self.height
+
+    def draw(self):
+        c = self.canv
+        c.saveState()
+        c.setFillColor(PALE)
+        c.circle(self.width / 2, self.height / 2, self.width / 2, stroke=0, fill=1)
+        c.setFillColor(TEAL)
+        c.setFont("TAPBold", 8)
+        c.drawCentredString(self.width / 2, self.height / 2 - 2.8, str(self.number))
+        c.restoreState()
+
+
+def _inline(first: Flowable, second: Any, width: float, gap: float = 7) -> Table:
+    """A chip or badge with text on the same line."""
+    table = Table([[first, second]], colWidths=[first.width + gap, width - first.width - gap])
+    table.setStyle(TableStyle([("VALIGN", (0, 0), (-1, -1), "MIDDLE"), *_FLAT]))
+    return table
+
+
+class ScoreTrack(Flowable):
+    """Pre and post scores on one 1~5 bar, their numbers beside it: pre on the left, post on the right.
+
+    The stretch between the two markers is filled (teal up, warm down). With ``gap`` the stretch from the
+    post score up to the target is filled instead: how far there is still to go. The target is a tick with
+    its value above the bar. A missing score gets no marker and a dash for its number, never a point at zero.
+    """
+
+    def __init__(self, pre: float | None, post: float | None, target: float | None = None, *,
+                 width: float = 280, height: float = 40, gap: bool = False, base=GREY, notch=colors.white):
+        super().__init__()
+        self.pre, self.post, self.target = pre, post, target
+        self.width, self.height, self.gap, self.base, self.notch = width, height, gap, base, notch
+
+    def wrap(self, available_width, available_height):
+        return self.width, self.height
+
+    def draw(self):
+        c, pre, post, target = self.canv, self.pre, self.post, self.target
+        side, y = 38, 16
+        x0, x1 = side + 13, self.width - side - 13
+        unit = (x1 - x0) / 4
+        at = lambda value: x0 + unit * (value - 1)
+        c.saveState()
+        c.setLineCap(1)
+        c.setLineWidth(7)
+        c.setStrokeColor(self.base)
+        c.line(x0, y, x1, y)
+        if self.gap:
+            if post is not None and target is not None and target > post:
+                c.setStrokeColor(WARN_SOFT)
+                c.line(at(post), y, at(target), y)
+        elif pre is not None and post is not None and pre != post:
+            c.setStrokeColor(PRE if post > pre else WARN_SOFT)
+            c.line(at(pre), y, at(post), y)
+        c.setLineCap(0)
+        c.setStrokeColor(self.notch)
+        c.setLineWidth(.9)
+        for step in (2, 3, 4):
+            c.line(at(step), y - 3.5, at(step), y + 3.5)
+        c.setFont("TAPMedium", 6.2)
+        c.setFillColor(FAINT)
+        for step in range(1, 6):
+            c.drawCentredString(at(step), y - 13.5, str(step))
+        if target is not None:
+            c.setStrokeColor(INK)
+            c.setLineWidth(1.1)
+            c.line(at(target), y - 6, at(target), y + 8.5)
+            c.setFillColor(INK)
+            c.setFont("TAPBold", 6.6)
+            c.drawCentredString(at(target), y + 11.5, f"목표 {target:.2f}")
+        if pre is not None:
+            c.setFillColor(colors.white)
+            c.setStrokeColor(PRE)
+            c.setLineWidth(1.9)
+            c.circle(at(pre), y, 4.1, stroke=1, fill=1)
+        if post is not None:
+            c.setFillColor(TEAL)
+            c.setStrokeColor(colors.white)
+            c.setLineWidth(1.4)
+            c.circle(at(post), y, 5.4, stroke=1, fill=1)
+        # The numbers sit beside the bar, each with the marker it belongs to.
+        for value, label, right_aligned, ink in ((pre, "교육 전", True, MUTED), (post, "교육 후", False, INK)):
+            label_width = pdfmetrics.stringWidth(label, "TAPMedium", 6.6)
+            left = side - label_width - 8 if right_aligned else self.width - side
+            if right_aligned:
+                c.setFillColor(colors.white)
+                c.setStrokeColor(PRE)
+                c.setLineWidth(1.3)
+                c.circle(left + 2.6, y + 7.6, 2.3, stroke=1, fill=1)
+            else:
+                c.setFillColor(TEAL)
+                c.circle(left + 2.6, y + 7.6, 2.8, stroke=0, fill=1)
+            c.setFillColor(MUTED)
+            c.setFont("TAPMedium", 6.6)
+            c.drawString(left + 8, y + 5.3, label)
+            c.setFillColor(ink if value is not None else FAINT)
+            c.setFont("TAPBold", 11.5)
+            number = "-" if value is None else f"{value:.2f}"
+            if right_aligned:
+                c.drawRightString(side, y - 7.5, number)
+            else:
+                c.drawString(self.width - side, y - 7.5, number)
+        c.restoreState()
+
+
+class ChangeBars(Flowable):
+    """Change per competency as bars from a zero line. A competency without a comparable score gets a word, not a bar."""
+
+    def __init__(self, rows: list[Mapping[str, Any]], width: float, height: float, is_org: bool = False):
+        super().__init__()
+        self.rows, self.width, self.height, self.is_org = rows, width, height, is_org
+
+    def wrap(self, available_width, available_height):
+        return self.width, self.height
+
+    def draw(self):
+        c, pitch = self.canv, self.height / len(self.rows)
+        name_width, value_width = self.width * .42, 30
+        left, right = name_width + 6, self.width - value_width - 4
+        changes = [row["change"] for row in self.rows if row.get("change") is not None]
+        up, down = max([.5, *changes]), max([0.0, *(-value for value in changes)])
+        scale = (right - left) / (up + down)
+        zero = left + scale * down
+        c.saveState()
+        c.setStrokeColor(LINE)
+        c.setLineWidth(.8)
+        c.line(zero, 0, zero, self.height)
+        for index, row in enumerate(self.rows):
+            y = self.height - pitch * (index + .5)
+            c.setFillColor(INK)
+            c.setFont("TAPMedium", 7.8)
+            c.drawString(0, y - 2.8, _fit(row["factor_name_ko"], "TAPMedium", 7.8, name_width))
+            change = row.get("change")
+            if change is None:
+                c.setFillColor(MUTED)
+                c.setFont("TAPMedium", 7.4)
+                c.drawRightString(self.width, y - 2.7, "비공개" if self.is_org and row["valid_n"] < 5 else "미산출")
+                continue
+            color = {"하락": WARN, "유지": MUTED}.get(effect_level(change), TEAL)
+            length, thickness = scale * abs(change), min(7, pitch - 4)
+            c.setFillColor(color)
+            if length > .4:
+                c.roundRect(zero if change > 0 else zero - length, y - thickness / 2, length, thickness, min(2, length / 2), stroke=0, fill=1)
+            c.setFont("TAPBold", 7.8)
+            c.drawRightString(self.width, y - 2.8, _fmt(change, True))
+        c.restoreState()
 
 
 class LinkButton(Flowable):
@@ -177,6 +397,96 @@ def _panel(items: list[Any], width: float, fill=colors.white, padding: float = 1
         ("LEFTPADDING", (0, 0), (-1, -1), padding), ("RIGHTPADDING", (0, 0), (-1, -1), padding),
         ("TOPPADDING", (0, 0), (-1, -1), padding), ("BOTTOMPADDING", (0, 0), (-1, -1), padding)]))
     return table
+
+
+def _level_panels(left: list[Any], right: list[Any], widths: tuple[float, float], *, fills=(colors.white, colors.white),
+                  paddings: tuple[float, float] = (16, 16)) -> Table:
+    """Two panels side by side with the same height: the shorter one gets space at the bottom, not a ragged edge."""
+    heights = [_height(_panel(items, width, fill, padding), width)
+               for items, width, fill, padding in zip((left, right), widths, fills, paddings)]
+    panels = [_panel(items + [Spacer(1, max(heights) - height)] if max(heights) - height > .5 else items, width, fill, padding)
+              for items, width, fill, padding, height in zip((left, right), widths, fills, paddings, heights)]
+    return _columns(panels[0], panels[1], widths)
+
+
+class RatioBar(Flowable):
+    """How many of the competencies, as a filled share of a thin bar."""
+
+    def __init__(self, share: float, color, width: float, height: float = 4):
+        super().__init__()
+        self.share, self.color, self.width, self.height = max(0.0, min(1.0, share)), color, width, height
+
+    def wrap(self, available_width, available_height):
+        return self.width, self.height
+
+    def draw(self):
+        c = self.canv
+        c.saveState()
+        c.setFillColor(GREY)
+        c.roundRect(0, 0, self.width, self.height, self.height / 2, stroke=0, fill=1)
+        if self.share > 0:
+            c.setFillColor(self.color)
+            c.roundRect(0, 0, max(self.height, self.width * self.share), self.height, self.height / 2, stroke=0, fill=1)
+        c.restoreState()
+
+
+def _summary_tiles(rows: list[Mapping[str, Any]], targets: Mapping[str, Any], width: float) -> Table | None:
+    """Counts across the comparable competencies: reached the target, improved, dropped, and the largest gain.
+
+    Left out for fewer than two comparable competencies, where the headline already says everything.
+    """
+    valid = [row for row in rows if row.get("change") is not None]
+    if len(valid) < 2:
+        return None
+    total, padding = len(valid), 9
+    levels = [effect_level(row["change"]) for row in valid]
+    row_targets = [_score(targets.get(str(row.get("factor_code")))) for row in valid]
+    counts: list[tuple[str, int, Any]] = []
+    if all(target is not None for target in row_targets):
+        counts.append(("목표에 도달한 역량", sum(row["post_score"] >= target for row, target in zip(valid, row_targets)), TEAL))
+    counts.extend([("향상한 역량", sum(level in ("크게 향상", "향상") for level in levels), TEAL),
+                   ("하락한 역량", levels.count("하락"), WARN)])
+    best = max(valid, key=lambda row: row["change"])
+    tile_count = len(counts) + (best["change"] > 0)
+    gap = 8
+    tile_width = (width - gap * (tile_count - 1)) / tile_count
+    inner = tile_width - 2 * padding
+    tiles: list[list[Any]] = []
+    for label, count, color in counts:
+        ink = "#103b37" if count == 0 else color.hexval().replace("0x", "#")
+        tiles.append([_p(label, size=8, color=MUTED), Spacer(1, 2),
+                      _p(f'<font color="{ink}">{count}</font><font name="TAPMedium" size="8.5" color="#52716f"> / {total}개</font>',
+                         size=18, bold=True, leading=21, markup=True),
+                      Spacer(1, 4), RatioBar(count / total, color, inner)])
+    if best["change"] > 0:
+        # Several competencies can share the largest gain; naming one alone would single it out wrongly.
+        tied = sum(row["change"] == best["change"] for row in valid) - 1
+        others = f" 외 {tied}개" if tied else ""
+        name_room = inner - pdfmetrics.stringWidth(others, "TAPBold", 11.5)
+        tiles.append([_p("가장 많이 오른 역량", size=8, color=MUTED), Spacer(1, 4),
+                      _p(_fit(best["factor_name_ko"], "TAPBold", 11.5, name_room) + others, size=11.5, bold=True, leading=14),
+                      Spacer(1, 2), _p(f"{_fmt(best['change'], True)}점", size=9.5, bold=True, color=TEAL)])
+    heights = [_height(_panel(items, tile_width, padding=padding), tile_width) for items in tiles]
+    cells: list[Any] = []
+    for items, height in zip(tiles, heights):
+        cells.extend([_panel(items + [Spacer(1, max(heights) - height)] if max(heights) - height > .5 else items, tile_width, padding=padding), ""])
+    table = Table([cells[:-1]], colWidths=([tile_width, gap] * tile_count)[:-1])
+    table.setStyle(TableStyle([("VALIGN", (0, 0), (-1, -1), "TOP"), *_FLAT]))
+    return table
+
+
+def _change_legend(width: float) -> Table:
+    """The one reading note on the first page: which change earns which label."""
+    cells: list[Any] = [_p("※ 변화량 구간", size=7.8, bold=True, color=MUTED)]
+    widths = [66.0]
+    for level, span in (("크게 향상", "+0.50 이상"), ("향상", "+0.20~+0.49"), ("유지", "-0.19~+0.19"), ("하락", "-0.20 이하")):
+        chip = Chip(level, *EFFECT_COLORS[level], size=6.8)
+        cells.extend([chip, _p(span, size=7.8, color=MUTED)])
+        widths.extend([chip.width + 5, pdfmetrics.stringWidth(span, "TAPMedium", 7.8) + 16])
+    inner = width - 24
+    row = Table([[*cells, ""]], colWidths=[*widths, max(0, inner - sum(widths))])
+    row.setStyle(TableStyle([("VALIGN", (0, 0), (-1, -1), "MIDDLE"), *_FLAT]))
+    return _panel([row], width, padding=9)
 
 
 def _columns(left: Any, right: Any, widths: tuple[float, float], gap: float = 12) -> Table:
@@ -266,7 +576,7 @@ class Radar(Flowable):
 def _chart_groups(rows: list[Mapping[str, Any]]) -> list[list[Mapping[str, Any]]]:
     if not rows:
         return [[]]
-    group_count = math.ceil(len(rows) / 8)
+    group_count = math.ceil(len(rows) / RADAR_AXES)
     size = math.ceil(len(rows) / group_count)
     return [rows[i:i + size] for i in range(0, len(rows), size)]
 
@@ -275,21 +585,97 @@ SOURCE_LABELS = {"public_edu_center": "공개교육", "studio_elearning": "이�
 BUTTON_LABELS = {"public_edu_center": "최신 일정 보기", "studio_elearning": "수강 페이지 보기", "b2b_inquiry": "과정 안내 보기"}
 
 
+SOURCE_COLORS = {"public_edu_center": "#087b76", "studio_elearning": "#3d5f94", "b2b_inquiry": "#8a5a14"}
+
+
 def _course_entry(index: int, course: Mapping[str, Any], width: float) -> Table:
-    """One course: numbered title and source/schedule on the left, the link button on the right."""
+    """One course: number badge, title over a coloured source and its schedule, the link button on the right."""
     source = str(course.get("source", ""))
-    meta = "  ·  ".join(str(part) for part in (SOURCE_LABELS.get(source) or course.get("delivery_label"), course.get("schedule")) if part)
-    left: list[Any] = [_p(f"{index}. {course['title']}", size=10.5, bold=True)]
+    label = SOURCE_LABELS.get(source) or course.get("delivery_label")
+    meta = [f'<font name="TAPBold" color="{SOURCE_COLORS.get(source, "#52716f")}">{escape(str(label))}</font>'] if label else []
+    if course.get("schedule"):
+        meta.append(escape(str(course["schedule"])))
+    body: list[Any] = [_p(unicodedata.normalize("NFKC", str(course["title"])), size=10.2, bold=True)]
     if meta:
-        left.extend([Spacer(1, 2), _p(meta, size=8.4, color=MUTED)])
+        body.extend([Spacer(1, 2), _p("  ·  ".join(meta), size=8.4, color=MUTED, markup=True)])
     url = str(course.get("url") or "")
     button_width = 118
     right: Any = LinkButton(BUTTON_LABELS.get(source, "KMA에서 과정 찾기"), url, width=button_width) if url.startswith(("https://", "http://")) else ""
-    table = Table([[left, right]], colWidths=[width - button_width - 10, button_width + 10])
-    table.setStyle(TableStyle([("VALIGN", (0, 0), (-1, -1), "MIDDLE"), ("LEFTPADDING", (0, 0), (-1, -1), 0),
-        ("LEFTPADDING", (1, 0), (1, 0), 10), ("RIGHTPADDING", (0, 0), (-1, -1), 0),
-        ("TOPPADDING", (0, 0), (-1, -1), 0), ("BOTTOMPADDING", (0, 0), (-1, -1), 0)]))
+    table = Table([[NumberBadge(index), body, right]], colWidths=[24, width - button_width - 34, button_width + 10])
+    table.setStyle(TableStyle([("VALIGN", (0, 0), (-1, -1), "MIDDLE"), *_FLAT, ("LEFTPADDING", (2, 0), (2, 0), 10)]))
     return table
+
+
+def _competency_blocks(name: str, group: list[Mapping[str, Any]], first_index: int, width: float) -> list[Table]:
+    """One competency as one box: a tinted band with the scores behind the pick, then its courses on white.
+
+    The band says why this competency was picked and the white rows say what to take, so the two never
+    read as one list. A box is a single unbreakable table; a long course list continues in a second box.
+    """
+    inner = width - 32
+    first = group[0]
+    blocks = []
+    for offset in range(0, len(group), COURSES_PER_BLOCK):
+        if offset:
+            band: list[Any] = [_p(f"{name}  ·  추천 과정 이어서", size=10.5, bold=True)]
+        else:
+            advice = next((str(course["advice"]) for course in group if course.get("advice")), "")
+            words: list[Any] = [_inline(Chip("응답 결과"), _p(name, size=12, bold=True), inner),
+                                *([Spacer(1, 5), _p(first["reason"], size=8.6, bold=True, color=TEAL)] if first.get("reason") else []),
+                                *([Spacer(1, 3), _p(advice, size=8.6)] if advice else [])]
+            score, target = _score(first.get("score")), _score(first.get("target"))
+            if score is None or target is None:
+                band = words
+            else:
+                change = first.get("change")
+                track_width = 214
+                words[0] = _inline(Chip("응답 결과"), _p(name, size=12, bold=True), inner - track_width - 12)
+                picture = Table([[words, ScoreTrack(None if change is None else _score(score - float(change)), score, target,
+                                                    width=track_width, gap=True, base=colors.white, notch=PALE)]],
+                                colWidths=[inner - track_width - 12, track_width + 12])
+                picture.setStyle(TableStyle([("VALIGN", (0, 0), (-1, -1), "MIDDLE"), *_FLAT, ("LEFTPADDING", (1, 0), (1, 0), 12)]))
+                band = [picture]
+        rows: list[Any] = [Chip("추천 과정", colors.white, TEAL, stroke=TEAL)]
+        for position, course in enumerate(group[offset:offset + COURSES_PER_BLOCK]):
+            rows.extend([Spacer(1, 7), HRFlowable(width="100%", thickness=.5, color=LINE, spaceBefore=0, spaceAfter=0), Spacer(1, 7)]
+                        if position else [Spacer(1, 8)])
+            rows.append(_course_entry(first_index + offset + position, course, inner))
+        block = Table([[band], [rows]], colWidths=[width], cornerRadii=[12, 12, 12, 12])
+        block.setStyle(TableStyle([("BACKGROUND", (0, 0), (0, 0), PALE), ("BACKGROUND", (0, 1), (0, 1), colors.white),
+            ("BOX", (0, 0), (-1, -1), .6, LINE), ("LINEBELOW", (0, 0), (0, 0), .6, LINE), ("VALIGN", (0, 0), (-1, -1), "TOP"),
+            ("LEFTPADDING", (0, 0), (-1, -1), 16), ("RIGHTPADDING", (0, 0), (-1, -1), 16),
+            ("TOPPADDING", (0, 0), (-1, -1), 10), ("BOTTOMPADDING", (0, 0), (-1, -1), 10)]))
+        blocks.append(block)
+    return blocks
+
+
+def _competency_card(index: int, row: Mapping[str, Any], width: float, *, is_org: bool, target: float | None) -> Table:
+    """One competency on the details page: name, effect chip and change on the left, the 1~5 track on the right."""
+    padding = 12
+    inner = width - 2 * padding
+    hidden = is_org and row["valid_n"] < 5
+    level = "비공개" if hidden else effect_level(row["change"])
+    fill, ink = EFFECT_COLORS.get(level, (GREY, MUTED))
+    # The organization's respondent count rides on the label line: a line of its own cost each card a row.
+    counted = f'<font name="TAPMedium" color="#52716f">  ·  유효 인원 {row["valid_n"]}명</font>' if is_org and not hidden else ""
+    name = [_p(escape(f"{index:02d}  {row['module_group']}") + counted, size=8, bold=True, color=TEAL, markup=True), Spacer(1, 3),
+            _p(row["factor_name_ko"], size=13, bold=True)]
+    if hidden:
+        result: list[Any] = [Chip(level, fill, ink)]
+        widths = [inner * .8, 0, inner * .2]
+        advice = "개인 응답이 드러나지 않도록 점수와 평가를 공개하지 않습니다."
+    else:
+        result = [_p('<font name="TAPMedium" size="8" color="#52716f">변화 </font>' + _fmt(row["change"], True), size=16, bold=True,
+                     color=WARN if level == "하락" else INK, align=TA_RIGHT, leading=18, markup=True) if row["change"] is not None
+                  else _p("비교 점수 부족", size=8.6, color=MUTED, align=TA_RIGHT), Spacer(1, 4), Chip(level, fill, ink)]
+        widths = [inner * .32, inner * .5, inner * .18]
+        advice = _guidance(row)
+    top = Table([[name, "" if hidden else ScoreTrack(row["pre_score"], row["post_score"], target, width=widths[1] - 12), result]],
+                colWidths=widths)
+    top.setStyle(TableStyle([("VALIGN", (0, 0), (-1, -1), "MIDDLE"), *_FLAT, ("LEFTPADDING", (1, 0), (1, 0), 6), ("ALIGN", (2, 0), (2, 0), "RIGHT")]))
+    detail = [top, Spacer(1, 6), HRFlowable(width="100%", thickness=.5, color=LINE, spaceBefore=0, spaceAfter=0), Spacer(1, 6),
+              _p(advice, size=9)]
+    return _panel(detail, width, padding=padding)
 
 
 def _followup_story(transfer: Mapping[str, Any] | None, courses: list[Mapping[str, Any]] | None, width: float) -> list[Any]:
@@ -297,12 +683,13 @@ def _followup_story(transfer: Mapping[str, Any] | None, courses: list[Mapping[st
     from tap.account_insights import COURSE_INQUIRY_URL, course_context_note, transfer_notes
     is_org = transfer is not None
     inner = width - 32  # panel padding
-    inquiry = [Spacer(1, 10), _button_row(LinkButton("맞춤형 교육 문의", COURSE_INQUIRY_URL, width=108),
-                                          "회사 상황에 맞춘 과정은 KMA 교육 문의 페이지(www.kma.or.kr)로 문의하세요.", inner)] if is_org else []
-    heading: list[Any] = [Spacer(1, 10), _p("현업전이 환경과 후속 과정" if is_org else "보완 학습 제안", size=20, bold=True), Spacer(1, 6),
-                        _p("현업 적용 여건과 다음 교육에서 검토할 KMA 과정입니다." if is_org else "본인 응답(자기보고)에 근거한 제안입니다.",
-                           size=9, color=MUTED), Spacer(1, 15)]
-    panels: list[Any] = []
+    inquiry = [_button_row(LinkButton("맞춤형 교육 문의", COURSE_INQUIRY_URL, width=108),
+                           "회사 상황에 맞춘 과정은 KMA 교육 문의 페이지(www.kma.or.kr)로 문의 부탁드립니다.", inner)] if is_org else []
+    # `lead` waits for the next box so a heading never ends a page on its own.
+    lead: list[Any] = [Spacer(1, 6), _p("현업전이 환경과 후속 과정" if is_org else "보완 학습 제안", size=20, bold=True), Spacer(1, 6),
+                       _p("현업 적용 여건과 다음 교육에서 검토할 KMA 과정입니다." if is_org else "본인 응답(자기보고)에 근거한 제안입니다.",
+                          size=9, color=MUTED), Spacer(1, 15 if is_org else 3)]
+    story: list[Any] = []
     if transfer is not None:
         if transfer.get("disclosed"):
             cells = [[_p(row["label"], size=8.5, color=MUTED), _p(f"{row['mean']:.2f}", size=17, bold=True, color=TEAL)]
@@ -319,34 +706,35 @@ def _followup_story(transfer: Mapping[str, Any] | None, courses: list[Mapping[st
         else:
             body = [_p("현업전이 환경", size=12, bold=True), Spacer(1, 7),
                     _p(f"교육 후 현업전이 응답이 5명 미만({transfer.get('n', 0)}명)이라 평균과 장애요인을 공개하지 않습니다.", size=9)]
-        panels.extend([_panel(body, width), Spacer(1, 12)])
+        story.extend([KeepTogether(lead + [_panel(body, width)]), Spacer(1, 12)])
+        lead = []
     if courses:
         note = course_context_note(transfer)
         sources = "공개교육, 이러닝, 단체교육 문의" if is_org else "공개교육과 이러닝"
-        items: list[Any] = [_p("교육과정 검토 우선순위" if is_org else "제안 과정", size=12, bold=True), Spacer(1, 4),
-                            _p(f"교육 후 {'평균이' if is_org else '점수가'} 목표보다 0.2점 이상 낮은 역량을 차이가 큰 순서로 골라, "
-                               f"역량마다 {sources} 과정을 제안합니다. 버튼을 누르면 KMA 과정 페이지가 열립니다.", size=8, color=MUTED),
-                            *([Spacer(1, 8), _p(note, size=8.8, bold=True, color=TEAL)] if note else [])]
-        explained: set[str] = set()
-        for index, course in enumerate(courses, 1):
-            if index > 1 and index % COURSES_PER_PANEL == 1:
-                # A panel is one table cell and cannot break across pages; long lists continue in a new panel.
-                panels.extend([_panel(items, width), Spacer(1, 12)])
-                items = []
-            # The score reason and the advice are the same for every course of one competency, so they head its group.
-            competency = str(course["factor_name_ko"])
-            if competency not in explained:
-                explained.add(competency)
-                items.extend([Spacer(1, 12), _p(f"{competency}  ·  {course['reason']}", size=9, bold=True, color=TEAL),
-                              *([Spacer(1, 2), _p(course["advice"], size=8.4)] if course.get("advice") else [])])
-            items.extend([Spacer(1, 8), _course_entry(index, course, inner)])
-        items.extend([Spacer(1, 12), _p("개설 여부와 교육비는 KMA 교육 페이지(www.kma.or.kr)에서 확인해 주세요.", size=7.8, color=MUTED), *inquiry])
-        panels.append(_panel(items, width))
+        lead.extend([*([_p("교육과정 검토 우선순위", size=12, bold=True), Spacer(1, 4)] if is_org else []),
+                     _p(f"교육 후 {'평균이' if is_org else '점수가'} 목표보다 0.2점 이상 낮은 역량을 차이가 큰 순서로 골랐습니다.\n"
+                        f"역량마다 {sources} 과정을 제안합니다. 버튼을 누르면 KMA 과정 페이지가 열립니다.", size=8.4, color=MUTED),
+                     *([Spacer(1, 6), _p(note, size=8.8, bold=True, color=TEAL)] if note else []), Spacer(1, 10)])
+        # Courses arrive source by source; the reader needs them under their competency, each competency in one box.
+        groups: dict[str, list[Mapping[str, Any]]] = {}
+        for course in courses:
+            groups.setdefault(str(course["factor_name_ko"]), []).append(course)
+        index, blocks = 1, []
+        for name, group in groups.items():
+            blocks.extend(_competency_blocks(name, group, index, width))
+            index += len(group)
+        for block in blocks:
+            story.extend([KeepTogether(lead + [block]), Spacer(1, 9)])
+            lead = []
+        if inquiry:
+            story.append(_panel(inquiry, width, padding=12))
     elif courses is not None:
-        panels.append(_panel([_p("교육과정 검토 우선순위" if is_org else "제안 과정", size=12, bold=True), Spacer(1, 7),
-                              _p("목표보다 0.2점 이상 낮은 역량이 없어 검토할 후속 과정이 없습니다.", size=9), *inquiry], width))
-    # No forced page break: the heading travels with its first panel, so a half-empty page is filled first.
-    return [KeepTogether(heading + panels[:1]), *panels[1:]]
+        story.append(KeepTogether(lead + [_panel([_p("교육과정 검토 우선순위" if is_org else "제안 과정", size=12, bold=True), Spacer(1, 7),
+                                                  _p("목표보다 0.2점 이상 낮은 역량이 없어 검토할 후속 과정이 없습니다.", size=9),
+                                                  *([Spacer(1, 10), *inquiry] if inquiry else [])], width)]))
+        lead = []
+    # No forced page break: the heading travels with its first box, so a half-empty page is filled first.
+    return [*story, *lead]
 
 
 def build_report_pdf(project: Mapping[str, Any], rows: list[Mapping[str, Any]], *, kind: str,
@@ -376,67 +764,89 @@ def build_report_pdf(project: Mapping[str, Any], rows: list[Mapping[str, Any]], 
     else:
         change = summary["change"]
         # Direction in words: "+0.00점 변화했습니다" is not a sentence a reader can use.
-        movement = (f"교육 전후 모두 {_fmt(summary['pre'])}점입니다" if change == 0 else
-                    f"교육 전 {_fmt(summary['pre'])}점에서 교육 후 {_fmt(summary['post'])}점으로 "
-                    f"{abs(change):.2f}점 {'올랐습니다' if change > 0 else '내려갔습니다'}")
-        overview = (f"비교 가능한 {summary['valid_count']}개 역량의 평균은 {movement}. "
-                    f"참고 기준으로 '{summary['effect']}' 구간입니다. 업무 적용 사례와 함께 해석해 주세요.")
-    effect = _panel([_p("교육효과", size=11, bold=True), Spacer(1, 9),
-                     _p(summary["effect"], size=25, bold=True, color=TEAL), Spacer(1, 5),
-                     _p(f"평균 변화 {_fmt(summary['change'], True)}점" if summary["change"] is not None else "비교 점수 부족", size=10),
-                     Spacer(1, 7), _p("자기보고 행동 변화", size=8, color=MUTED)], 155, PALE)
-    overview_panel = _panel([_p("결과 총평", size=13, bold=True), Spacer(1, 9), _p(overview, size=10),
-        Spacer(1, 7), _p(f"비교 가능 {summary['valid_count']} / 선택 {summary['selected_count']}개 역량 · 동일 가중 평균", size=8, color=MUTED)], width - 167)
-    story.extend([_columns(effect, overview_panel, (155, width - 167)), Spacer(1, 13)])
+        single = summary["valid_count"] == 1
+        average = "비교 가능한 역량 1개의 점수" if single else f"비교 가능한 {summary['valid_count']}개 역량의 평균"
+        overview = (f"{average}{'는' if single else '은'} 교육 전후 모두 {_fmt(summary['pre'])}점입니다.\n변화량 구간은 '{summary['effect']}'입니다." if change == 0 else
+                    f"{average}{'가' if single else '이'} {abs(change):.2f}점 {'올랐습니다' if change > 0 else '내려갔습니다'}.\n"
+                    f"교육 전 {_fmt(summary['pre'])}점, 교육 후 {_fmt(summary['post'])}점으로 '{summary['effect']}' 구간입니다.")
+        overview += "\n업무 적용 사례와 함께 해석해 주세요."
+    effect = [_p("교육효과", size=11, bold=True), Spacer(1, 9),
+              _p(summary["effect"], size=25, bold=True, color=TEAL), Spacer(1, 5),
+              _p(f"평균 변화 {_fmt(summary['change'], True)}점" if summary["change"] is not None else "비교 점수 부족", size=10),
+              Spacer(1, 7), _p("자기보고 행동 변화", size=8, color=MUTED)]
+    first_line, *more_lines = overview.split("\n")
+    overview_items = [_p("결과 총평", size=13, bold=True), Spacer(1, 9), _p(first_line, size=10.5, bold=True),
+        *[flowable for line in more_lines for flowable in (Spacer(1, 3), _p(line, size=9.6))],
+        Spacer(1, 8), _p(f"비교 가능 {summary['valid_count']} / 선택 {summary['selected_count']}개 역량 · 동일 가중 평균", size=8, color=MUTED)]
+    story.extend([_level_panels(effect, overview_items, (155, width - 167), fills=(PALE, colors.white)), Spacer(1, 9)])
+    tiles = _summary_tiles(prepared, config.get("target_means") or {}, width)
+    tiles_at = len(story)
+    if tiles is not None:
+        story.extend([tiles, Spacer(1, 9)])
     groups = _chart_groups(prepared)
     for index, group in enumerate(groups):
         if index:
             story.extend([PageBreak(), _p(f"역량 프로파일 {index + 1} / {len(groups)}", size=18, bold=True), Spacer(1, 16)])
         title = "선택 역량 프로파일" + (f"  {index + 1}/{len(groups)}" if len(groups) > 1 else "")
         radar_width = 302
-        chart = _panel([_p(title, size=12, bold=True), Spacer(1, 3), Radar(group, radar_width - 28),
+        chart_items = lambda radar_height: [_p(title, size=12, bold=True), Spacer(1, 3), Radar(group, radar_width - 28, radar_height),
             Spacer(1, 5), _p("1~5점 척도 · 미산출 역량은 점·선 생략" + ("\n역량이 3개 미만이면 점으로 표시" if len(group) < 3 else ""), size=7.7, color=MUTED),
-            *([_p("긴 역량명은 상세 결과의 번호로 표시합니다.", size=7.7, color=MUTED)] if any(len(r["factor_name_ko"]) > 22 for r in group) else [])], radar_width, padding=14)
+            *([_p("긴 역량명은 상세 결과의 번호로 표시합니다.", size=7.7, color=MUTED)] if any(len(r["factor_name_ko"]) > 22 for r in group) else [])]
+        chart = chart_items(245)
         valid = [row for row in group if row.get("change") is not None]
         guide = [_p("업무 적용 가이드", size=12, bold=True), Spacer(1, 9)]
         short_name = lambda r: r["factor_name_ko"] if len(r["factor_name_ko"]) <= 42 else f"역량 {r['_axis_number']:02d} (상세 결과 참조)"
         if len(valid) == 1:
             # One comparable competency cannot be both the one to spread and the one to check first.
             guide.extend([_p("비교 가능한 역량", size=9, color=TEAL, bold=True),
-                _p(short_name(valid[0]), size=11, bold=True), _p(_guidance(valid[0]), size=9)])
+                _p(short_name(valid[0]), size=11, bold=True), Spacer(1, 3), *_sentences(_guidance(valid[0]), size=9)])
         elif valid:
             priority = min(valid, key=lambda r: (r["post_score"], r["change"]))
             strongest = max((r for r in valid if r is not priority), key=lambda r: r["post_score"])
             guide.extend([_p("유지·확산할 역량", size=9, color=TEAL, bold=True),
                 _p(short_name(strongest), size=11, bold=True),
-                _p(f"교육 후 {_fmt(strongest['post_score'])}점입니다. 실천 사례를 다른 업무에도 적용하세요.", size=9),
-                Spacer(1, 14), _p("우선 점검할 역량", size=9, color=TEAL, bold=True),
+                Spacer(1, 3), *_sentences(f"교육 후 {_fmt(strongest['post_score'])}점입니다. 실천 사례를 다른 업무에도 적용하세요.", size=9),
+                Spacer(1, 10), _p("우선 점검할 역량", size=9, color=TEAL, bold=True),
                 _p(short_name(priority), size=11, bold=True),
-                _p(_guidance(priority), size=9)])
+                Spacer(1, 3), *_sentences(_guidance(priority), size=9)])
         else:
             guide.append(_p("비교할 수 있는 교육 전후 점수가 없어 가이드를 표시하지 않습니다.", size=9))
-        story.extend([_columns(chart, _panel(guide, width - radar_width - 12), (radar_width, width - radar_width - 12)), Spacer(1, 12)])
-    story.extend([_p("읽는 방법", size=10, bold=True), Spacer(1, 4),
-        _p("교육효과는 동일 참여자·동일 문항의 자기보고 변화 요약이며 교육의 인과효과나 합격 판정이 아닙니다. "
-           "수행 기회 없음(0)은 점수에서 뺍니다. 평균은 비교 가능한 역량을 같은 비중으로 계산하고, 미산출 역량은 넣지 않습니다.", size=8.2, color=MUTED),
-        Spacer(1, 4), _p("변화량 구간(운영 참고 기준): 큰 향상 +0.50 이상 / 향상 +0.20 이상 +0.50 미만 / 유지 -0.20 초과 +0.20 미만 / 하락 -0.20 이하", size=7.8, color=MUTED)])
+        guide_width = width - radar_width - 12
+        if group:
+            # The guide is shorter than the chart beside it; the change per competency fills the rest of the box.
+            def with_bars(height: float) -> list[Any]:
+                return [*guide, Spacer(1, 9), HRFlowable(width="100%", thickness=.6, color=LINE, spaceBefore=0, spaceAfter=0),
+                        Spacer(1, 8), _p("역량별 변화", size=9, color=TEAL, bold=True), Spacer(1, 5),
+                        ChangeBars(group, guide_width - 32, height, is_org)]
+            tight = len(group) * (11 if len(group) <= 8 else 10)
+            room = _height(_panel(chart, radar_width, padding=14), radar_width) - _height(_panel(with_bars(tight), guide_width), guide_width)
+            guide = with_bars(tight + max(0, min(room, len(group) * 7)))
+        taller = _height(_panel(guide, guide_width), guide_width) - _height(_panel(chart, radar_width, padding=14), radar_width)
+        if taller > .5:
+            chart = chart_items(245 + taller)
+        story.extend([_level_panels(chart, guide, (radar_width, guide_width), paddings=(14, 16)), Spacer(1, 9)])
+        if not index and tiles is not None:
+            # The tiles are the one optional row: with many competencies the first page is full without them.
+            first_page = story + ([_change_legend(width)] if len(groups) == 1 else [])
+            if sum(_height(flowable, width) for flowable in first_page) > page_h - 39 - 42 - 14:
+                del story[tiles_at:tiles_at + 2]
+    story.append(_change_legend(width))
     if prepared:
         story.extend([PageBreak(), _p("역량별 결과와 보완 가이드", size=20, bold=True), Spacer(1, 6),
             _p("역량별 교육 전후 변화와 교육 후 행동 빈도 구간에 따른 안내입니다.", size=9, color=MUTED), Spacer(1, 15)])
-        for index, row in enumerate(prepared):
-            hidden = is_org and row["valid_n"] < 5
-            stats = "유효응답 5명 미만 · 점수 비공개" if hidden else (
-                f"교육 전 {_fmt(row['pre_score'])}  →  교육 후 {_fmt(row['post_score'])}  |  변화 {_fmt(row['change'], True)}  |  {effect_level(row['change'])}")
-            detail = [_p(f"{index + 1:02d}  {row['module_group']}", size=8, bold=True, color=TEAL), Spacer(1, 4),
-                      _p(row["factor_name_ko"], size=13, bold=True), Spacer(1, 7), _p(stats, size=10, bold=True), Spacer(1, 7),
-                      _p("개인 응답이 드러나지 않도록 점수와 평가를 공개하지 않습니다." if hidden else _guidance(row), size=9)]
-            if is_org and not hidden:
-                detail.extend([Spacer(1, 4), _p(f"교육 전후 유효 인원 {row['valid_n']}명", size=8, color=MUTED)])
-            story.extend([_panel(detail, width), Spacer(1, 11)])
+        targets = config.get("target_means") or {}
+        for index, row in enumerate(prepared, 1):
+            story.extend([_competency_card(index, row, width, is_org=is_org, target=_score(targets.get(str(row.get("factor_code"))))),
+                          Spacer(1, 10)])
+    # The frequency bands explain the wording on the competency cards, so they close that section, not the course list.
+    rules = [_p("※ 교육 후 행동 빈도 구간: 높음 4.20 이상 / 비교적 높음 3.40~4.19 / 중간 2.60~3.39 / 낮음 1.80~2.59 / 매우 낮음 1.00~1.79",
+                size=7.5, color=MUTED)]
+    if prepared:
+        story.extend([*rules, Spacer(1, 6)])
     if transfer is not None or courses is not None:
         story.extend(_followup_story(transfer, courses, width))
-    story.extend([Spacer(1, 4), _p(f"평가 규칙 {RULE_VERSION} · 고정 구간 기준", size=7.5, color=MUTED),
-        _p("교육 후 빈도 구간: 4.20 이상 / 3.40~4.19 / 2.60~3.39 / 1.80~2.59 / 1.00~1.79. 규준·합격 기준이 아닌 운영 참고 구간입니다.", size=7.5, color=MUTED)])
+    if not prepared:
+        story.extend([Spacer(1, 4), *rules])
 
     def page(canvas, document):
         canvas.saveState()
