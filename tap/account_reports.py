@@ -7,9 +7,9 @@ import pandas as pd
 import streamlit as st
 
 from tap.account_insights import (COURSE_INQUIRY_URL, TRANSFER_ATTENTION_MEAN, course_context_note, course_gap_counts,
-                                  organization_detail_rows,
+                                  organization_detail_rows, team_heatmap,
                                   recommend_courses, summarize_transfer, transfer_notes)
-from tap.account_ui_kit import bar_rows, chip, fmt, foot, notes, pair_bar_rows, section, stat_tiles
+from tap.account_ui_kit import bar_rows, chip, fmt, foot, heatmap, notes, pair_bar_rows, section, stat_tiles
 from tap.aggregation import aggregate_paired_factor_results
 from tap.config import MIN_GROUP_N
 from tap.data import questions_for_factors
@@ -33,6 +33,19 @@ def summarize_project(project: Mapping[str, Any], results: list[dict[str, Any]])
             row["participant_id"] = result["user_id"]
             paired.append(row)
     return aggregate_paired_factor_results(paired, min_group_n=MIN_GROUP_N)
+
+
+UNASSIGNED_TEAM = "부서 미지정"
+
+
+def summarize_by_team(project: Mapping[str, Any], results: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """The organization summary again per department, for the team heatmap."""
+    groups: dict[str, list[dict[str, Any]]] = {}
+    for result in results:
+        groups.setdefault(str(result.get("department") or "").strip() or UNASSIGNED_TEAM, []).append(result)
+    return [{"team": team, "summaries": summarize_project(project, rows),
+             "paired_n": len({row["user_id"] for row in rows if row.get("pre_completed") and row.get("post_completed")})}
+            for team, rows in sorted(groups.items(), key=lambda item: (item[0] == UNASSIGNED_TEAM, item[0]))]
 
 
 def individual_report_pdf(project: Mapping[str, Any], questions: list[dict[str, Any]], pre_responses: Mapping[str, Any],
@@ -185,6 +198,20 @@ def _render_individual_report(store: Any, token: str, project: Mapping[str, Any]
         st.html(foot(COMPARE_NOTE))
 
 
+def _render_team_heatmap(project: Mapping[str, Any], results: list[dict[str, Any]]) -> None:
+    teams = summarize_by_team(project, results)
+    if len([team for team in teams if team["paired_n"]]) < 2:
+        return  # One department is the organization result again.
+    grid = team_heatmap(teams)
+    with section("teams", "grid_view", "팀(부서)별 교육 후 평균",
+                 "부서별 역량 평균(1~5)과 교육 전후 변화. 부서·역량별 교육 전후 유효응답 5명 이상만 공개"):
+        st.html(heatmap([factor["factor_name_ko"] for factor in grid["factors"]],
+                        [(row["team"], f"전후 비교 {row['paired_n']}명",
+                          [(cell["post_mean"], cell["change"]) for cell in row["cells"]]) for row in grid["rows"]]))
+        st.html(foot("칸의 큰 숫자는 교육 후 평균, 작은 숫자는 교육 전후 변화입니다. 진할수록 평균이 높습니다. "
+                     "부서가 하나만 비공개이면 다른 부서와 조직 평균으로 역산할 수 있어, 인원이 가장 적은 부서도 함께 가립니다."))
+
+
 def render_project_report(store: Any, token: str, project: Mapping[str, Any]) -> None:
     # This read checks the live session role and company/project scope on the server.
     results = store.project_results(token, project["id"])
@@ -216,6 +243,7 @@ def render_project_report(store: Any, token: str, project: Mapping[str, Any]) ->
             st.html(foot("같은 참여자가 같은 문항에 답한 자기보고 변화입니다. 수행 기회 없음(0)은 점수에서 빼며, 교육의 인과효과를 뜻하지 않습니다."))
     if not disclosed:
         return
+    _render_team_heatmap(project, results)
     transfer = _render_transfer(results)
     _, below = course_gap_counts(project["config"], _disclosed_scores(summaries))
     _render_courses(_organization_courses(project["config"], summaries), transfer, has_gap=bool(below))
