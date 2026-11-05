@@ -1,0 +1,991 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>KMA TAP · 교육 전후 역량 평가 플랫폼</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+<style>
+/* KMA TAP 오픈페이지 v3 (운영). tap/account_landing.py가 워드마크와 글꼴을 넣어 /open에서 보여 준다. 블루·블랙·화이트 톤.
+   운영 이식 시 주의: st.html은 인라인 SVG를 지우므로 그래프는 CSS로 그린다. 스크립트 안에 "<"를 쓰지 않는다. */
+.tap-landing{
+  --ink:#161614; --ink-2:#514F48; --ink-3:#6E6D66; --ink-4:#9A9890;
+  --blue:#1769FF; --blue-strong:#0B4FCC; --blue-tint:#EEF3FF; --blue-line:#C9D9FF; --blue-on-dark:#8DB4FF;
+  --bg:#F7F8F9; --sheet:#FFFFFF; --soft:#F3F4F6; --line:#E5E7EB; --line-2:#F0F1F3;
+  --pre:#7F8DA1; --pre-fill:#DCE2EA; --warn:#C2410C; --warn-tint:#FFF1E8;
+  --r:8px; --r-lg:12px; --r-xl:20px; --max:1200px;
+  --font:'Pretendard Variable',Pretendard,-apple-system,BlinkMacSystemFont,'Apple SD Gothic Neo','Malgun Gothic',system-ui,sans-serif;
+  font-family:var(--font); color:var(--ink); background:var(--sheet);
+  font-size:16px; line-height:1.6; word-break:keep-all; overflow-wrap:break-word; -webkit-font-smoothing:antialiased;
+}
+.tap-landing,.tap-landing *{box-sizing:border-box}
+body{margin:0;background:#fff}
+.tap-landing a{color:inherit}
+.tap-landing :is(h1,h2,h3,p,ul,ol,dl,dd){margin:0}
+.tap-landing ul,.tap-landing ol{padding:0;list-style:none}
+.tap-landing section[id]{scroll-margin-top:72px}
+.tap-landing :focus-visible{outline:3px solid var(--blue);outline-offset:3px;border-radius:6px}
+.tap-landing .container{width:min(100% - 32px,var(--max));margin:0 auto}
+.tap-landing .num{font-variant-numeric:tabular-nums}
+.tap-landing .sr-only{position:absolute!important;width:1px!important;height:1px!important;overflow:hidden!important;clip:rect(0,0,0,0)!important;white-space:nowrap!important}
+
+/* 버튼 */
+.tap-landing .btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;height:52px;padding:0 24px;border-radius:var(--r);border:1px solid transparent;font:inherit;font-size:16px;font-weight:700;text-decoration:none;white-space:nowrap;cursor:pointer;transition:background .15s,border-color .15s}
+.tap-landing .btn-sm{height:40px;padding:0 16px;font-size:14px}
+.tap-landing .btn-primary{background:var(--blue);color:#fff}
+.tap-landing .btn-primary:hover{background:var(--blue-strong)}
+.tap-landing .btn-line{background:#fff;color:var(--ink);border-color:var(--line)}
+.tap-landing .btn-line:hover{border-color:var(--ink-4)}
+.tap-landing .btn-white{background:#fff;color:var(--blue-strong)}
+.tap-landing .btn-white:hover{background:var(--blue-tint)}
+.tap-landing .btn-ghost-dark{background:transparent;color:#fff;border-color:rgba(255,255,255,.4)}
+.tap-landing .btn-ghost-dark:hover{background:rgba(255,255,255,.1)}
+.tap-landing .arrow{font-size:18px;line-height:1}
+
+/* 머리글 */
+.tap-landing .site-header{position:sticky;top:0;z-index:50;background:rgba(255,255,255,.96);backdrop-filter:saturate(1.4) blur(8px);border-bottom:1px solid var(--line)}
+.tap-landing .header-in{display:flex;align-items:center;gap:32px;height:68px}
+.tap-landing .brand{text-decoration:none;flex:none}
+.tap-landing .brand .tap-ci,.tap-landing .foot-brand .tap-ci{flex-direction:row;align-items:center;gap:12px;margin:0;flex-wrap:nowrap}
+.tap-landing .brand .tap-ci-wordmark{font-size:26px}
+.tap-landing .brand .tap-ci-description{font-size:11px!important;line-height:1.35!important}
+.tap-landing .gnb{display:flex;gap:4px;margin-right:auto}
+.tap-landing .gnb a{padding:8px 12px;border-radius:6px;font-size:15px;font-weight:600;color:var(--ink-2);text-decoration:none}
+.tap-landing .gnb a:hover{color:var(--ink);background:var(--soft)}
+.tap-landing .header-cta{display:flex;align-items:center;gap:8px}
+.tap-landing .header-cta .text-link{padding:8px 10px;font-size:14px;font-weight:600;color:var(--ink-3);text-decoration:none}
+.tap-landing .header-cta .text-link:hover{color:var(--ink)}
+
+/* 첫 화면 */
+.tap-landing .hero{position:relative;background:linear-gradient(180deg,var(--blue-tint) 0%,#fff 62%);padding:96px 0 0;overflow:hidden}
+.tap-landing .hero-copy{max-width:880px;margin:0 auto;text-align:center}
+.tap-landing .kicker{display:inline-flex;align-items:center;gap:8px;margin-bottom:24px;padding:6px 14px;border-radius:999px;background:#fff;border:1px solid var(--blue-line);font-size:14px;font-weight:700;color:var(--blue-strong)}
+.tap-landing .kicker i{width:6px;height:6px;border-radius:50%;background:var(--blue)}
+.tap-landing .hero h1{font-size:clamp(40px,6.4vw,80px);line-height:1.14;font-weight:800;letter-spacing:-.035em}
+.tap-landing .hero h1 em{font-style:normal;color:var(--blue)}
+.tap-landing .hero-lead{margin:28px auto 0;max-width:620px;font-size:clamp(17px,1.6vw,20px);line-height:1.7;color:var(--ink-2)}
+.tap-landing .hero-actions{display:flex;justify-content:center;flex-wrap:wrap;gap:12px;margin-top:40px}
+.tap-landing .hero-stage{position:relative;margin:72px auto 0;max-width:1080px}
+
+/* 앱 화면 틀 */
+.tap-landing .frame{background:#fff;border:1px solid var(--line);border-radius:var(--r-xl) var(--r-xl) 0 0;box-shadow:0 -2px 0 rgba(255,255,255,.6),0 30px 80px -20px rgba(11,79,204,.28);overflow:hidden}
+.tap-landing .frame-bar{display:flex;align-items:center;gap:8px;height:44px;padding:0 18px;border-bottom:1px solid var(--line);background:var(--bg)}
+.tap-landing .frame-bar b{width:10px;height:10px;border-radius:50%;background:var(--line)}
+.tap-landing .frame-bar span{margin-left:12px;font-size:12px;color:var(--ink-3)}
+.tap-landing .frame-body{padding:28px}
+.tap-landing .rep-head{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap;margin-bottom:20px}
+.tap-landing .rep-head h3{font-size:20px;letter-spacing:-.02em}
+.tap-landing .rep-head p{font-size:13px;color:var(--ink-3)}
+.tap-landing .tag{display:inline-block;padding:3px 10px;border-radius:999px;font-size:12px;font-weight:700;background:var(--soft);color:var(--ink-2)}
+.tap-landing .tag-blue{background:var(--blue-tint);color:var(--blue-strong)}
+.tap-landing .kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-bottom:24px}
+.tap-landing .kpi{padding:16px;border:1px solid var(--line);border-radius:var(--r-lg)}
+.tap-landing .kpi small{display:block;font-size:12px;font-weight:600;color:var(--ink-3)}
+.tap-landing .kpi strong{display:block;margin-top:4px;font-size:28px;line-height:1.2;font-weight:800;letter-spacing:-.02em}
+.tap-landing .kpi.hl{background:var(--blue);border-color:var(--blue);color:#fff}
+.tap-landing .kpi.hl small{color:#DCE7FF}
+
+/* 덤벨 그래프 (CSS) */
+.tap-landing .dumb{display:grid;gap:10px}
+.tap-landing .dumb-legend{display:flex;gap:16px;justify-content:flex-end;font-size:12px;color:var(--ink-3);margin-bottom:6px}
+.tap-landing .dumb-legend span::before{content:"";display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:6px;vertical-align:-1px;background:var(--pre)}
+.tap-landing .dumb-legend span.post::before{background:var(--blue)}
+.tap-landing .dumb-row{display:grid;grid-template-columns:76px minmax(0,1fr) 56px;align-items:center;gap:12px;font-size:14px}
+.tap-landing .dumb-row > b{font-weight:600;color:var(--ink-2)}
+.tap-landing .dumb-row > em{font-style:normal;font-weight:800;color:var(--blue-strong);text-align:right}
+.tap-landing .track{position:relative;height:22px;background:repeating-linear-gradient(90deg,var(--line-2) 0 1px,transparent 1px 25%);border-radius:4px}
+.tap-landing .track .seg{position:absolute;top:9px;height:4px;border-radius:2px;background:var(--blue-line);left:var(--a);width:calc(var(--b) - var(--a))}
+.tap-landing .track .dot{position:absolute;top:4px;width:14px;height:14px;margin-left:-7px;border-radius:50%;border:2px solid #fff;box-shadow:0 0 0 1px rgba(0,0,0,.06)}
+.tap-landing .track .dot.pre{left:var(--a);background:var(--pre)}
+.tap-landing .track .dot.post{left:var(--b);background:var(--blue)}
+.tap-landing .axis{display:grid;grid-template-columns:76px minmax(0,1fr) 56px;gap:12px;font-size:11px;color:var(--ink-4)}
+.tap-landing .axis div{display:flex;justify-content:space-between}
+
+/* 숫자 띠 */
+.tap-landing .facts{border-bottom:1px solid var(--line);background:#fff}
+.tap-landing .facts ul{display:grid;grid-template-columns:repeat(4,minmax(0,1fr))}
+.tap-landing .facts li{padding:48px 24px;text-align:center;border-left:1px solid var(--line)}
+.tap-landing .facts li:first-child{border-left:0}
+.tap-landing .facts strong{display:block;font-size:clamp(36px,4vw,52px);line-height:1.1;font-weight:800;letter-spacing:-.03em;color:var(--blue)}
+.tap-landing .facts strong small{font-size:.45em;font-weight:700;margin-left:2px;color:var(--ink)}
+.tap-landing .facts span{display:block;margin-top:10px;font-size:15px;color:var(--ink-3)}
+
+/* 섹션 공통 */
+.tap-landing .section{padding:140px 0}
+.tap-landing .section.gray{background:var(--bg)}
+.tap-landing .sec-head{max-width:760px;margin-bottom:64px}
+.tap-landing .sec-head.center{margin-left:auto;margin-right:auto;text-align:center}
+.tap-landing .eyebrow{display:block;margin-bottom:16px;font-size:15px;font-weight:800;letter-spacing:.02em;color:var(--blue)}
+.tap-landing .sec-head h2{font-size:clamp(32px,4.2vw,52px);line-height:1.22;font-weight:800;letter-spacing:-.03em}
+.tap-landing .sec-head p{margin-top:20px;font-size:18px;line-height:1.7;color:var(--ink-2)}
+
+/* 문제 제기 (어두운 장면) */
+.tap-landing .question{background:var(--ink);color:#fff;padding:140px 0}
+.tap-landing .q-list{display:grid;gap:0;border-top:1px solid rgba(255,255,255,.14)}
+.tap-landing .q-item{display:grid;grid-template-columns:160px minmax(0,1fr) minmax(0,360px);align-items:center;gap:32px;padding:40px 0;border-bottom:1px solid rgba(255,255,255,.14)}
+.tap-landing .q-item small{font-size:15px;font-weight:700;color:#9A9890}
+.tap-landing .q-item strong{font-size:clamp(24px,3.2vw,40px);line-height:1.3;font-weight:800;letter-spacing:-.03em;color:#6E6D66}
+.tap-landing .q-item p{font-size:16px;color:#9A9890}
+.tap-landing .q-item.on small{color:var(--blue-on-dark)}
+.tap-landing .q-item.on strong{color:#fff}
+.tap-landing .q-item.on p{color:#D6D8DD}
+.tap-landing .question .sec-head h2{color:#fff}
+.tap-landing .question .eyebrow{color:var(--blue-on-dark)}
+
+/* 진행 순서 타임라인 */
+.tap-landing .timeline{position:relative;display:grid;grid-template-columns:1fr 1fr 2.2fr 1fr 1fr;gap:0;margin-top:8px}
+.tap-landing .tl-step{position:relative;padding:0 12px 0 0}
+.tap-landing .tl-bar{position:relative;height:8px;margin-bottom:28px;background:var(--line)}
+.tap-landing .tl-step:first-child .tl-bar{border-radius:4px 0 0 4px}
+.tap-landing .tl-step:last-child .tl-bar{border-radius:0 4px 4px 0}
+.tap-landing .tl-step.test .tl-bar{background:var(--blue)}
+.tap-landing .tl-step.apply .tl-bar{background:repeating-linear-gradient(90deg,var(--blue-line) 0 10px,#DCE7FF 10px 20px)}
+.tap-landing .tl-step .tl-dot{position:absolute;left:0;top:-8px;width:24px;height:24px;border-radius:50%;background:#fff;border:3px solid var(--blue)}
+.tap-landing .tl-step b{display:block;font-size:13px;font-weight:800;color:var(--blue)}
+.tap-landing .tl-step h3{margin-top:6px;font-size:20px;letter-spacing:-.02em}
+.tap-landing .tl-step p{margin-top:8px;font-size:15px;color:var(--ink-3)}
+.tap-landing .tl-note{margin-top:20px;display:inline-flex;gap:8px;align-items:center;padding:8px 12px;border-radius:var(--r);background:var(--blue-tint);color:var(--blue-strong);font-size:13px;font-weight:700}
+
+/* 화면 둘러보기 탭 */
+.tap-landing .tabs{display:inline-flex;gap:4px;padding:4px;border-radius:999px;background:var(--soft);margin-bottom:40px;max-width:100%;overflow-x:auto}
+.tap-landing .tab{flex:none;height:44px;padding:0 20px;border:0;border-radius:999px;background:transparent;font:inherit;font-size:15px;font-weight:700;color:var(--ink-3);cursor:pointer}
+.tap-landing .tab[aria-selected="true"]{background:#fff;color:var(--ink);box-shadow:0 1px 3px rgba(0,0,0,.08)}
+.tap-landing .panel{display:grid;grid-template-columns:minmax(0,.8fr) minmax(0,1.2fr);gap:56px;align-items:start}
+.tap-landing .panel:not(.full) > div:first-child{padding-top:24px}
+.tap-landing .panel[hidden]{display:none}
+.tap-landing .panel h3{font-size:clamp(26px,2.8vw,34px);line-height:1.3;letter-spacing:-.03em}
+.tap-landing .panel > div > p{margin-top:16px;font-size:17px;color:var(--ink-2)}
+.tap-landing .checks{margin-top:28px;display:grid;gap:14px}
+.tap-landing .checks li{position:relative;padding-left:30px;font-size:16px;color:var(--ink-2)}
+.tap-landing .checks li::before{content:"";position:absolute;left:0;top:4px;width:18px;height:18px;border-radius:50%;background:var(--blue-tint) center/10px no-repeat;box-shadow:inset 0 0 0 5px var(--blue-tint),inset 0 0 0 9px var(--blue)}
+.tap-landing .panel .btn{margin-top:32px}
+.tap-landing .shot{background:#fff;border:1px solid var(--line);border-radius:var(--r-xl);padding:24px;box-shadow:0 20px 60px -24px rgba(22,22,20,.18)}
+/* 진행 보드 목업 */
+.tap-landing .board{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.tap-landing .col{background:var(--bg);border-radius:var(--r-lg);padding:12px}
+.tap-landing .col h4{margin:0 0 10px;display:flex;justify-content:space-between;font-size:13px;color:var(--ink-2)}
+.tap-landing .col h4 span{font-weight:800;color:var(--ink)}
+.tap-landing .card-mini{background:#fff;border:1px solid var(--line);border-radius:var(--r);padding:10px 12px;margin-bottom:8px;font-size:13px}
+.tap-landing .card-mini b{display:block;font-size:13px}
+.tap-landing .card-mini small{color:var(--ink-3)}
+.tap-landing .bar{height:6px;border-radius:3px;background:var(--line);margin-top:8px;overflow:hidden}
+.tap-landing .bar i{display:block;height:100%;background:var(--blue)}
+/* 검사 화면 목업 */
+.tap-landing .quiz{max-width:440px;margin:0 auto}
+.tap-landing .quiz-top{display:flex;justify-content:space-between;font-size:13px;color:var(--ink-3)}
+.tap-landing .quiz h4{margin:20px 0 8px;font-size:20px;line-height:1.45;letter-spacing:-.02em}
+.tap-landing .quiz .hint{font-size:13px;color:var(--ink-3)}
+.tap-landing .opts{display:grid;gap:8px;margin-top:20px}
+.tap-landing .opt{display:flex;justify-content:space-between;align-items:center;height:48px;padding:0 16px;border:1px solid var(--line);border-radius:var(--r);font-size:15px;font-weight:600}
+.tap-landing .opt.sel{border-color:var(--blue);background:var(--blue-tint);color:var(--blue-strong)}
+.tap-landing .opt.na{color:var(--ink-3);border-style:dashed}
+/* 개인 리포트 목업 */
+.tap-landing .me-top{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-bottom:20px}
+.tap-landing .lvl{display:inline-block;padding:2px 9px;border-radius:999px;font-size:12px;font-weight:700}
+.tap-landing .lv-big{background:var(--blue);color:#fff}
+.tap-landing .lv-up{background:var(--blue-tint);color:var(--blue-strong)}
+.tap-landing .lv-down{background:var(--warn-tint);color:#9A3412}
+.tap-landing .lv-keep{background:var(--soft);color:var(--ink-2)}
+.tap-landing .me-list{display:grid;gap:0}
+.tap-landing .me-list li{display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:12px;align-items:center;padding:12px 0;border-bottom:1px solid var(--line-2);font-size:14px}
+.tap-landing .me-list li:last-child{border-bottom:0}
+.tap-landing .me-list b{font-weight:600}
+.tap-landing .me-list span.num{color:var(--ink-3)}
+
+/* 교육 추천 카드 */
+.tap-landing .courses{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:20px}
+.tap-landing .course{display:flex;flex-direction:column;background:#fff;border:1px solid var(--line);border-radius:var(--r-xl);overflow:hidden;text-decoration:none;transition:transform .2s,box-shadow .2s}
+.tap-landing .course:hover{transform:translateY(-4px);box-shadow:0 20px 40px -20px rgba(22,22,20,.22)}
+.tap-landing .thumb{position:relative;height:168px;padding:20px;display:flex;flex-direction:column;justify-content:space-between;color:#fff}
+.tap-landing .thumb.t1{background:linear-gradient(135deg,#1769FF,#0B4FCC)}
+.tap-landing .thumb.t2{background:linear-gradient(135deg,#161614,#3a3a36)}
+.tap-landing .thumb.t3{background:linear-gradient(135deg,#86ABFF,#1769FF)}
+.tap-landing .thumb small{font-size:13px;font-weight:700;opacity:.85}
+.tap-landing .thumb strong{font-size:22px;line-height:1.3;letter-spacing:-.02em}
+.tap-landing .course-body{padding:20px;display:grid;gap:10px}
+.tap-landing .course-body .gap{font-size:14px;color:var(--ink-2)}
+.tap-landing .course-body .gap b{color:var(--warn)}
+.tap-landing .course-meta{display:flex;justify-content:space-between;align-items:center;padding-top:12px;border-top:1px solid var(--line-2);font-size:14px;color:var(--ink-3)}
+.tap-landing .course-meta b{color:var(--ink)}
+.tap-landing .rule{margin-top:32px;font-size:15px;color:var(--ink-3)}
+.tap-landing .rule b{color:var(--ink)}
+
+/* 측정 원칙 */
+.tap-landing .principles{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:0;border-top:2px solid var(--ink)}
+.tap-landing .principles li{padding:32px 24px 32px 0}
+.tap-landing .principles li + li{padding-left:24px;border-left:1px solid var(--line)}
+.tap-landing .principles b{display:block;font-size:14px;font-weight:800;color:var(--blue)}
+.tap-landing .principles h3{margin-top:10px;font-size:20px;letter-spacing:-.02em}
+.tap-landing .principles p{margin-top:10px;font-size:15px;line-height:1.7;color:var(--ink-3);white-space:nowrap}
+.tap-landing .caution{display:flex;gap:16px;align-items:flex-start;margin-top:40px;padding:20px 24px;border-radius:var(--r-lg);background:var(--warn-tint)}
+.tap-landing .caution i{flex:none;display:grid;place-items:center;width:28px;height:28px;border-radius:50%;background:var(--warn);color:#fff;font-style:normal;font-weight:800}
+.tap-landing .caution strong{display:block;font-size:16px}
+.tap-landing .caution p{margin-top:4px;font-size:15px;color:var(--ink-2)}
+
+/* FAQ */
+.tap-landing .faq-wrap{display:grid;grid-template-columns:minmax(0,.7fr) minmax(0,1.3fr);gap:64px}
+.tap-landing .faq-wrap .sec-head{margin-bottom:0}
+.tap-landing details{border-bottom:1px solid var(--line)}
+.tap-landing details:first-child{border-top:1px solid var(--line)}
+.tap-landing summary{display:flex;justify-content:space-between;align-items:center;gap:16px;padding:24px 0;font-size:18px;font-weight:700;cursor:pointer;list-style:none}
+.tap-landing summary::-webkit-details-marker{display:none}
+.tap-landing summary::after{content:"+";flex:none;font-size:24px;font-weight:400;color:var(--ink-3);transition:transform .2s}
+.tap-landing details[open] summary::after{transform:rotate(45deg)}
+.tap-landing details p{padding:0 40px 24px 0;font-size:16px;color:var(--ink-2)}
+
+/* 도입 문의 */
+.tap-landing .final{background:var(--blue);color:#fff;padding:120px 0}
+.tap-landing .final-in{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:40px;align-items:end}
+.tap-landing .final h2{font-size:clamp(32px,4.4vw,56px);line-height:1.2;font-weight:800;letter-spacing:-.035em}
+.tap-landing .final p{margin-top:20px;font-size:18px;color:#DCE7FF}
+.tap-landing .final-actions{display:flex;gap:12px;flex-wrap:wrap}
+.tap-landing .contact{display:flex;gap:32px;flex-wrap:wrap;margin-top:48px;padding-top:28px;border-top:1px solid rgba(255,255,255,.28);font-size:15px;color:#DCE7FF}
+.tap-landing .contact b{display:block;font-size:13px;color:#fff;margin-bottom:2px}
+
+/* 바닥글 */
+.tap-landing .site-footer{background:var(--ink);color:#9A9890;padding:48px 0;font-size:14px}
+.tap-landing .foot-in{display:flex;justify-content:space-between;gap:24px;flex-wrap:wrap;align-items:center}
+.tap-landing .foot-brand .tap-ci-wordmark{font-size:24px}
+.tap-landing .foot-brand .tap-ci-description{font-size:11px!important;line-height:1.35!important}
+.tap-landing .foot-links{display:flex;gap:20px}
+.tap-landing .foot-links a{text-decoration:none;color:#D6D8DD}
+.tap-landing .foot-links a.is-privacy{color:#fff;font-weight:800}
+.tap-landing .copy{margin-top:24px;width:100%;font-size:13px}
+
+/* 떠 있는 문의 버튼 */
+.tap-landing .float-cta{position:fixed;right:24px;bottom:24px;z-index:80;display:inline-flex;align-items:center;gap:8px;height:52px;padding:0 20px;border-radius:999px;background:var(--ink);color:#fff;font-weight:700;text-decoration:none;box-shadow:0 12px 30px -10px rgba(22,22,20,.5);transition:opacity .2s,transform .2s}
+.tap-landing .float-cta i{width:8px;height:8px;border-radius:50%;background:var(--blue-on-dark)}
+.tap-landing .float-cta.hide{opacity:0;transform:translateY(12px);pointer-events:none}
+
+/* 나타나기 */
+.tap-landing .reveal{opacity:0;transform:translateY(24px);transition:opacity .7s ease,transform .7s ease}
+.tap-landing .reveal.in{opacity:1;transform:none}
+@media (prefers-reduced-motion:reduce){
+  .tap-landing .reveal{opacity:1;transform:none;transition:none}
+  .tap-landing .course,.tap-landing .float-cta{transition:none}
+}
+
+/* 리포트 상세 */
+.tap-landing .report{background:#fff;border:1px solid var(--line);border-radius:24px;padding:32px;box-shadow:0 40px 100px -40px rgba(11,79,204,.35)}
+.tap-landing .report-top{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap;padding-bottom:24px;margin-bottom:24px;border-bottom:1px solid var(--line)}
+.tap-landing .report-top small{display:block;font-size:13px;color:var(--ink-3)}
+.tap-landing .report-top h3{margin-top:4px;font-size:24px;letter-spacing:-.02em}
+.tap-landing .report-top p{margin-top:4px;font-size:14px;color:var(--ink-3)}
+.tap-landing .fake-btns{display:flex;gap:8px}
+.tap-landing .fake-btn{display:inline-flex;align-items:center;height:38px;padding:0 14px;border-radius:var(--r);border:1px solid var(--line);font-size:13px;font-weight:700;color:var(--ink)}
+.tap-landing .fake-btn.primary{background:var(--blue);border-color:var(--blue);color:#fff}
+.tap-landing .kpis-5{grid-template-columns:repeat(5,minmax(0,1fr))}
+.tap-landing .kpi em{display:block;margin-top:2px;font-style:normal;font-size:12px;color:var(--ink-3)}
+.tap-landing .kpi.hl em{color:#DCE7FF}
+.tap-landing .rgrid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:16px;margin-top:16px}
+.tap-landing .rcard{border:1px solid var(--line);border-radius:16px;padding:24px}
+.tap-landing .rcard.wide{margin-top:16px}
+.tap-landing .rcard-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap;margin-bottom:20px}
+.tap-landing .rcard h4{margin:0;font-size:17px;letter-spacing:-.01em}
+.tap-landing .rcard .sub{margin-top:2px;font-size:13px;color:var(--ink-3)}
+.tap-landing .radar{display:block;width:100%;max-width:460px;height:auto;margin:0 auto}
+.tap-landing .radar .ring{fill:none;stroke:var(--line)}
+.tap-landing .radar .spoke{stroke:var(--line)}
+.tap-landing .radar .lab{font-size:14px;font-weight:600;fill:var(--ink-2)}
+.tap-landing .radar .tick{font-size:10px;fill:var(--ink-4)}
+.tap-landing .radar .pre{fill:rgba(127,141,161,.12);stroke:var(--pre);stroke-width:2;stroke-dasharray:5 4}
+.tap-landing .radar .post{fill:rgba(23,105,255,.18);stroke:var(--blue);stroke-width:2.5;transform-box:view-box;transform-origin:220px 205px;transform:scale(.15);opacity:0;transition:transform 1s cubic-bezier(.2,.8,.2,1) .2s,opacity .4s .2s}
+.tap-landing .radar .pt{fill:var(--blue);stroke:#fff;stroke-width:2;opacity:0;transition:opacity .4s 1s}
+.tap-landing .report.in .radar .post{transform:none;opacity:1}
+.tap-landing .report.in .radar .pt{opacity:1}
+.tap-landing .legend{display:flex;gap:16px;flex-wrap:wrap;font-size:12px;color:var(--ink-3)}
+.tap-landing .legend span{display:inline-flex;align-items:center;gap:6px}
+.tap-landing .legend i{width:12px;height:12px;border-radius:3px}
+/* 변화 막대 */
+.tap-landing .hbars{display:grid;gap:12px}
+.tap-landing .hbar{display:grid;grid-template-columns:72px minmax(0,1fr) 128px;align-items:center;gap:12px;font-size:14px}
+.tap-landing .hbar > b{font-weight:600;color:var(--ink-2)}
+.tap-landing .hbar .rail{position:relative;height:14px;border-radius:7px;background:var(--line-2);overflow:hidden}
+.tap-landing .hbar .fill{position:absolute;left:0;top:0;bottom:0;width:0;border-radius:7px;background:var(--c,var(--blue));transition:width .9s cubic-bezier(.2,.8,.2,1)}
+.tap-landing .report.in .hbar .fill{width:var(--w)}
+.tap-landing .hbar .val{display:flex;justify-content:flex-end;align-items:center;gap:6px;font-weight:800}
+.tap-landing .hbar .val .lvl{font-size:11px;padding:1px 7px;white-space:nowrap}
+.tap-landing .rail .mark{position:absolute;top:-4px;bottom:-4px;width:2px;background:var(--ink);opacity:.5;z-index:1}
+.tap-landing .level-mix{display:flex;height:12px;border-radius:6px;overflow:hidden;margin:8px 0 6px}
+.tap-landing .level-mix i{display:block}
+.tap-landing .level-cap{display:flex;justify-content:space-between;font-size:12px;color:var(--ink-3)}
+/* 히트맵 */
+.tap-landing .seg-ctl{display:inline-flex;padding:3px;border-radius:999px;background:var(--soft)}
+.tap-landing .seg-ctl button{height:34px;padding:0 14px;border:0;border-radius:999px;background:transparent;font:inherit;font-size:13px;font-weight:700;color:var(--ink-3);cursor:pointer}
+.tap-landing .seg-ctl button[aria-pressed="true"]{background:#fff;color:var(--ink);box-shadow:0 1px 3px rgba(0,0,0,.08)}
+.tap-landing .heat-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
+.tap-landing .swipe-hint{display:none;margin-bottom:8px;font-size:12px;color:var(--ink-3)}
+.tap-landing table.heat{width:100%;min-width:720px;border-collapse:separate;border-spacing:4px;font-size:13px}
+.tap-landing table.heat th{font-weight:600;color:var(--ink-3);padding:6px 4px;text-align:center;white-space:nowrap}
+.tap-landing table.heat th[scope="row"]{text-align:left;color:var(--ink);padding-left:0}
+.tap-landing table.heat th[scope="row"] small{display:block;font-size:11px;font-weight:500;color:var(--ink-4)}
+.tap-landing table.heat td{height:46px;border-radius:6px;text-align:center;font-weight:700;font-variant-numeric:tabular-nums;transition:background-color .35s,color .35s,transform .15s}
+.tap-landing table.heat td:hover{transform:scale(1.06);box-shadow:0 6px 16px -6px rgba(11,79,204,.45)}
+.tap-landing table.heat td.hide{background:repeating-linear-gradient(135deg,#F3F4F6 0 6px,#E9EBEE 6px 12px);color:var(--ink-4);font-weight:600;font-size:12px}
+.tap-landing table.heat tr.total th,.tap-landing table.heat tr.total td{border-top:0}
+.tap-landing table.heat tr.total th[scope="row"]{font-weight:800}
+.tap-landing table.heat tr.total td{box-shadow:inset 0 0 0 2px var(--ink)}
+.tap-landing .heat-foot{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap;align-items:center;margin-top:16px;font-size:12px;color:var(--ink-3)}
+.tap-landing .scale{display:flex;border-radius:6px;overflow:hidden;border:1px solid var(--line)}
+.tap-landing .scale span{min-width:56px;padding:5px 6px;text-align:center;font-size:11px;font-weight:700}
+/* 적용환경 */
+.tap-landing .env .hbar{grid-template-columns:84px minmax(0,1fr) 116px}
+.tap-landing .barrier .hbar{grid-template-columns:112px minmax(0,1fr) 48px}
+.tap-landing .note-warn{display:inline-flex;gap:6px;align-items:center;margin-top:16px;font-size:12px;color:var(--ink-3)}
+.tap-landing .note-warn i{width:12px;height:12px;border-radius:3px;background:var(--warn)}
+@media (prefers-reduced-motion:reduce){
+  .tap-landing .radar .post,.tap-landing .radar .pt,.tap-landing .hbar .fill,.tap-landing table.heat td{transition:none}
+}
+
+
+/* 탭 안 전체 폭 패널 */
+.tap-landing .panel.full{grid-template-columns:1fr;gap:28px;align-items:stretch}
+.tap-landing .panel-intro{display:flex;justify-content:space-between;align-items:flex-end;gap:24px;flex-wrap:wrap}
+.tap-landing .panel-intro h3{margin-top:14px}
+.tap-landing .panel .panel-intro > p{margin-top:0;font-size:16px;line-height:1.7;color:var(--ink-2);text-align:right}
+.tap-landing .panel.full .report{box-shadow:0 30px 80px -40px rgba(11,79,204,.3)}
+.tap-landing .panel.full .report > .rcard:first-child{margin-top:0}
+/* 추천 기준 */
+.tap-landing .rules{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:0;margin-top:40px;border-top:1px solid var(--line)}
+.tap-landing .rules li{padding:20px 24px 0 0;font-size:15px;line-height:1.6;color:var(--ink-2)}
+.tap-landing .rules li + li{padding-left:24px;border-left:1px solid var(--line)}
+.tap-landing .rules b{display:block;margin-bottom:6px;font-size:13px;font-weight:800;color:var(--blue)}
+
+/* 반응형 */
+@media (max-width:1080px){
+  .tap-landing .kpis-5{grid-template-columns:repeat(3,minmax(0,1fr))}
+  .tap-landing .rgrid{grid-template-columns:1fr}
+  .tap-landing .gnb{display:none}
+  .tap-landing .header-cta{margin-left:auto}
+  .tap-landing .q-item{grid-template-columns:120px minmax(0,1fr)}
+  .tap-landing .q-item p{grid-column:2}
+  .tap-landing .panel{grid-template-columns:1fr;gap:40px}
+  .tap-landing .principles{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .tap-landing .panel:not(.full) > div:first-child{padding-top:0}
+  .tap-landing .principles li:nth-child(3){padding-left:0;border-left:0}
+  .tap-landing .principles li:nth-child(n+3){border-top:1px solid var(--line)}
+  .tap-landing .faq-wrap{grid-template-columns:1fr;gap:32px}
+}
+@media (max-width:760px){
+  .tap-landing .header-in{height:60px;gap:12px}
+  .tap-landing .brand .tap-ci-description,.tap-landing .header-cta .text-link{display:none}
+  .tap-landing .hero{padding-top:64px}
+  .tap-landing .hero-actions .btn{width:100%}
+  .tap-landing .hero-stage{margin-top:48px}
+  .tap-landing .frame-body{padding:16px}
+  .tap-landing .kpis{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .tap-landing .kpi strong{font-size:22px}
+  .tap-landing .dumb-row,.tap-landing .axis{grid-template-columns:60px minmax(0,1fr) 46px;gap:8px;font-size:13px}
+  .tap-landing .facts ul{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .tap-landing .facts li{padding:32px 12px}
+  .tap-landing .facts li:nth-child(3){border-left:0}
+  .tap-landing .facts li:nth-child(n+3){border-top:1px solid var(--line)}
+  .tap-landing .section,.tap-landing .question{padding:88px 0}
+  .tap-landing .sec-head{margin-bottom:40px}
+  .tap-landing .sec-head p{font-size:16px}
+  .tap-landing .q-item{grid-template-columns:1fr;gap:8px;padding:28px 0}
+  .tap-landing .q-item p{grid-column:auto}
+  .tap-landing .timeline{grid-template-columns:1fr;gap:0;padding-left:8px}
+  .tap-landing .tl-step{display:grid;grid-template-columns:28px minmax(0,1fr);column-gap:16px;padding:0 0 28px}
+  .tap-landing .tl-bar{grid-row:1/span 3;width:6px;height:auto;margin:0 0 0 9px;border-radius:3px!important}
+  .tap-landing .tl-step.apply .tl-bar{background:repeating-linear-gradient(180deg,var(--blue-line) 0 10px,#DCE7FF 10px 20px)}
+  .tap-landing .tl-step .tl-dot{left:-9px;top:0}
+  .tap-landing .tl-step h3{margin-top:2px}
+  .tap-landing .tabs{display:flex;border-radius:var(--r-lg)}
+  .tap-landing .tab{padding:0 14px;font-size:14px}
+  .tap-landing .shot{padding:16px}
+  .tap-landing .board{grid-template-columns:1fr}
+  .tap-landing .courses{grid-template-columns:1fr}
+  .tap-landing .principles{grid-template-columns:1fr}
+  .tap-landing .principles li,.tap-landing .principles li + li{padding:24px 0;border-left:0}
+  .tap-landing .principles li + li{border-top:1px solid var(--line)}
+  .tap-landing summary{font-size:16px}
+  .tap-landing details p{padding-right:0}
+  .tap-landing .final{padding:88px 0}
+  .tap-landing .final-in{grid-template-columns:1fr}
+  .tap-landing .final-actions .btn{flex:1}
+  .tap-landing .panel-intro{flex-direction:column;align-items:flex-start;gap:12px}
+  .tap-landing .panel .panel-intro > p{text-align:left;font-size:15px}
+  .tap-landing .rules{grid-template-columns:1fr}
+  .tap-landing .rules li,.tap-landing .rules li + li{padding:16px 0;border-left:0}
+  .tap-landing .rules li + li{border-top:1px solid var(--line)}
+  .tap-landing .float-cta{display:none}
+  .tap-landing .report{padding:16px;border-radius:16px}
+  .tap-landing .kpis-5{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .tap-landing .kpis-5 .kpi:last-child{grid-column:1/-1}
+  .tap-landing .rcard{padding:16px}
+  .tap-landing .fake-btns{width:100%}
+  .tap-landing .fake-btn{flex:1;justify-content:center}
+  .tap-landing .hbar,.tap-landing .env .hbar{grid-template-columns:64px minmax(0,1fr) 112px;gap:8px;font-size:13px}
+  .tap-landing .barrier .hbar{grid-template-columns:96px minmax(0,1fr) 40px}
+  .tap-landing .heat-foot .scale{width:100%}
+  .tap-landing .scale span{flex:1;min-width:0;padding:5px 2px;font-size:10px}
+  .tap-landing table.heat th[scope="row"]{position:sticky;left:0;z-index:1;background:#fff;padding-right:6px;box-shadow:-8px 0 0 #fff,4px 0 0 #fff}
+  .tap-landing .swipe-hint{display:block}
+}
+</style>
+</head>
+<body>
+<div class="tap-landing">
+
+<header class="site-header">
+  <div class="container header-in">
+    <a class="brand" href="#top" aria-label="KMA TAP 처음으로"><!-- TAP:BRAND_HEADER --><!-- /TAP:BRAND_HEADER --></a>
+    <nav class="gnb" aria-label="주요 메뉴">
+      <a href="#why">소개</a>
+      <a href="#flow">진행 순서</a>
+      <a href="#screens">주요 화면</a>
+      <a href="#courses">교육 추천</a>
+      <a href="#principles">측정 원리</a>
+      <a href="#faq">FAQ</a>
+    </nav>
+    <div class="header-cta">
+      <a class="text-link" href="/guide">사용설명서</a>
+      <a class="btn btn-sm btn-line" href="/login" data-app-link>로그인</a>
+      <a class="btn btn-sm btn-primary" href="https://www.kma.or.kr/kr/usrs/eduRegMgnt/eduRegMgntForm.do?cateNm=customerInquiry" target="_blank" rel="noopener">도입 문의</a>
+    </div>
+  </div>
+</header>
+
+<main id="top">
+
+<!-- 1. 첫 화면 -->
+<section class="hero" aria-labelledby="hero-title">
+  <div class="container">
+    <div class="hero-copy">
+      <span class="kicker"><i></i>교육 전후 역량 평가 플랫폼</span>
+      <h1 id="hero-title">교육 전후,<br>달라진 <em>업무행동</em></h1>
+      <p class="hero-lead">교육 전과 후, 두 번의 역량 평가<br>역량 변화, 현업 적용환경, 추천 KMA 과정까지 리포트 하나로</p>
+      <div class="hero-actions">
+        <a class="btn btn-primary" href="https://www.kma.or.kr/kr/usrs/eduRegMgnt/eduRegMgntForm.do?cateNm=customerInquiry" target="_blank" rel="noopener">도입 문의 <span class="arrow" aria-hidden="true">→</span></a>
+        <a class="btn btn-line" href="#screens">리포트 예시</a>
+      </div>
+    </div>
+    <div class="hero-stage reveal">
+      <div class="frame" role="img" aria-label="조직 리포트 예시. 교육 전 평균 3.06점, 교육 후 평균 3.56점, 평균 변화 +0.50점.">
+        <div class="frame-bar" aria-hidden="true"><b></b><b></b><b></b><span>tap.kma.or.kr · 조직 교육 전후 리포트</span></div>
+        <div class="frame-body" aria-hidden="true">
+          <div class="rep-head">
+            <div><h3>2026 하반기 공통역량 과정</h3><p>교육 전후 완료 33명 · 측정 역량 8개</p></div>
+            <span class="tag tag-blue">예시</span>
+          </div>
+          <div class="kpis">
+            <div class="kpi"><small>교육 전 평균</small><strong class="num">3.06</strong></div>
+            <div class="kpi"><small>교육 후 평균</small><strong class="num">3.56</strong></div>
+            <div class="kpi hl"><small>평균 변화</small><strong class="num">+0.50</strong></div>
+            <div class="kpi"><small>상승 폭 1위</small><strong>문제해결</strong></div>
+          </div>
+          <div class="dumb-legend"><span>교육 전</span><span class="post">교육 후</span></div>
+          <div class="dumb" id="heroDumb"></div>
+          <div class="axis"><span></span><div><span>1</span><span>2</span><span>3</span><span>4</span><span>5</span></div><span></span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 2. 숫자 띠 -->
+<section class="facts" aria-label="측정 기준">
+  <div class="container">
+    <ul>
+      <li class="reveal"><strong class="num">2<small>회</small></strong><span>교육 전후 역량 평가</span></li>
+      <li class="reveal"><strong class="num">8<small>주</small></strong><span>최근 업무 조사 기간</span></li>
+      <li class="reveal"><strong class="num">8<small>개</small></strong><span>프로젝트당 측정 역량</span></li>
+      <li class="reveal"><strong class="num">5<small>명 이상</small></strong><span>응답 시 조직 리포트 제공</span></li>
+    </ul>
+  </div>
+</section>
+
+<!-- 3. 만족도 다음 -->
+<section class="question" id="why" aria-labelledby="why-title">
+  <div class="container">
+    <div class="sec-head reveal">
+      <span class="eyebrow">TAP · Training Assessment Platform</span>
+      <h2 id="why-title">만족도 다음,<br>현업 행동의 변화</h2>
+    </div>
+    <div class="q-list">
+      <div class="q-item reveal"><small>기존 조사</small><strong>교육은 만족스러웠나요?</strong><p>교육 직후 반응과 만족도</p></div>
+      <div class="q-item on reveal"><small>TAP</small><strong>현업 행동은 어떻게 달라졌나요?</strong><p>교육 전후 업무행동과 현업 적용환경</p></div>
+      <div class="q-item reveal"><small>다음 교육</small><strong>무엇을 더 배워야 하나요?</strong><p>목표보다 낮은 역량과 신청 가능한 KMA 과정</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- 4. 진행 순서 -->
+<section class="section" id="flow" aria-labelledby="flow-title">
+  <div class="container">
+    <div class="sec-head reveal">
+      <span class="eyebrow">진행 순서</span>
+      <h2 id="flow-title">교육 전 한 번,<br>교육 후 한 번</h2>
+      <p>교육담당자: 프로젝트 생성, 참여자 배정<br>참여자: 같은 계정으로 교육 전후 응답</p>
+    </div>
+    <ol class="timeline reveal">
+      <li class="tl-step"><div class="tl-bar"><span class="tl-dot"></span></div><b>STEP 1</b><h3>프로젝트 만들기</h3><p>교육명, 검사 일정, 측정 역량</p></li>
+      <li class="tl-step test"><div class="tl-bar"><span class="tl-dot"></span></div><b>STEP 2</b><h3>교육 전 역량 평가</h3><p>평소 업무행동 기준</p></li>
+      <li class="tl-step apply"><div class="tl-bar"><span class="tl-dot"></span></div><b>STEP 3 · 8~10주</b><h3>교육과 현업 적용</h3><p>배운 내용을 업무에 쓰는 기간<br>교육 후 평가의 조사 기간</p></li>
+      <li class="tl-step test"><div class="tl-bar"><span class="tl-dot"></span></div><b>STEP 4</b><h3>교육 후 역량 평가</h3><p>교육 후 업무행동 기준</p></li>
+      <li class="tl-step"><div class="tl-bar"><span class="tl-dot"></span></div><b>STEP 5</b><h3>변화 리포트</h3><p>조직 리포트, 개인 리포트</p></li>
+    </ol>
+    <span class="tl-note reveal">교육 후 역량 평가 권장 시점: 교육 종료 8~10주 뒤</span>
+  </div>
+</section>
+
+<!-- 5. 주요 화면 (탭) -->
+<section class="section gray" id="screens" aria-labelledby="screens-title">
+  <div class="container">
+    <div class="sec-head reveal">
+      <span class="eyebrow">주요 화면</span>
+      <h2 id="screens-title">리포트부터 검사까지</h2>
+    </div>
+    <div class="tabs" role="tablist" aria-label="주요 화면">
+      <button class="tab" role="tab" id="tab-org" aria-controls="panel-org" aria-selected="true">조직 리포트</button>
+      <button class="tab" role="tab" id="tab-heat" aria-controls="panel-heat" aria-selected="false" tabindex="-1">부서별 히트맵</button>
+      <button class="tab" role="tab" id="tab-me" aria-controls="panel-me" aria-selected="false" tabindex="-1">개인 리포트</button>
+      <button class="tab" role="tab" id="tab-board" aria-controls="panel-board" aria-selected="false" tabindex="-1">진행 보드</button>
+      <button class="tab" role="tab" id="tab-quiz" aria-controls="panel-quiz" aria-selected="false" tabindex="-1">검사 화면</button>
+    </div>
+
+    <!-- 조직 리포트 -->
+    <div class="panel full" role="tabpanel" id="panel-org" aria-labelledby="tab-org">
+      <div class="panel-intro">
+        <div><span class="tag">교육담당자</span><h3>조직 리포트</h3></div>
+        <p>역량별 교육 전후 점수와 변화 구간<br>상승 폭 순위와 구간별 역량 수</p>
+      </div>
+      <div class="report reveal">
+        <div class="report-top">
+          <div>
+            <small>프로젝트 › 2026 하반기 공통역량 과정</small>
+            <h3>조직 교육 전후 리포트</h3>
+            <p>교육일 2026.10.15 · 교육 전후 완료 33명 / 배정 36명</p>
+          </div>
+          <span class="tag tag-blue">예시</span>
+        </div>
+        <div class="kpis kpis-5">
+          <div class="kpi"><small>교육 전후 완료</small><strong class="num">33명</strong><em>배정 36명 중 92%</em></div>
+          <div class="kpi hl"><small>평균 변화</small><strong class="num">+0.50</strong><em>3.06 → 3.56</em></div>
+          <div class="kpi"><small>향상한 역량</small><strong class="num">7 / 8</strong><em>+0.20 이상</em></div>
+          <div class="kpi"><small>하락한 역량</small><strong class="num">0 / 8</strong><em>−0.20 이하</em></div>
+          <div class="kpi"><small>상승 폭 1위</small><strong>문제해결</strong><em class="num">+0.92</em></div>
+        </div>
+        <div class="rgrid">
+          <div class="rcard">
+            <div class="rcard-head">
+              <div><h4>역량별 교육 전후</h4><p class="sub">행동 빈도 평균 (1~5점)</p></div>
+              <div class="legend"><span><i style="background:var(--pre)"></i>교육 전</span><span><i style="background:var(--blue)"></i>교육 후</span></div>
+            </div>
+            <div id="radar" role="img" aria-label="8개 역량의 교육 전후 레이더 그래프. 모든 역량에서 교육 후 값이 더 높음."></div>
+          </div>
+          <div class="rcard">
+            <div class="rcard-head">
+              <div><h4>역량 변화</h4><p class="sub">교육 후 평균 − 교육 전 평균</p></div>
+            </div>
+            <div class="hbars" id="deltaBars"></div>
+            <div style="margin-top:24px">
+              <div class="level-cap"><span>변화 구간별 역량 수</span><span class="num">8개</span></div>
+              <div class="level-mix" aria-hidden="true">
+                <i style="flex:4;background:var(--blue)"></i><i style="flex:3;background:#86ABFF"></i><i style="flex:1;background:var(--pre-fill)"></i>
+              </div>
+              <div class="legend"><span><i style="background:var(--blue)"></i>크게 향상 4</span><span><i style="background:#86ABFF"></i>향상 3</span><span><i style="background:var(--pre-fill)"></i>유지 1</span><span><i style="background:var(--warn)"></i>하락 0</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 부서별 히트맵 -->
+    <div class="panel full" role="tabpanel" id="panel-heat" aria-labelledby="tab-heat" hidden>
+      <div class="panel-intro">
+        <div><span class="tag">교육담당자</span><h3>부서별 히트맵</h3></div>
+        <p>부서·역량별 교육 후 평균과 변화<br>응답자 5명 미만 부서는 비공개</p>
+      </div>
+      <div class="report reveal">
+        <div class="rcard">
+          <div class="rcard-head">
+            <div><h4>부서별 역량 히트맵 <span class="tag tag-blue">예시</span></h4><p class="sub" id="heatSub">부서별 교육 후 평균 (1~5점)</p></div>
+            <div class="seg-ctl" role="group" aria-label="히트맵 값">
+              <button type="button" data-mode="post" aria-pressed="true">교육 후 평균</button>
+              <button type="button" data-mode="delta" aria-pressed="false">변화</button>
+            </div>
+          </div>
+          <span class="swipe-hint">옆으로 밀어서 보기 →</span>
+          <div class="heat-wrap"><table class="heat" id="heat"><caption class="sr-only">부서별, 역량별 값</caption></table></div>
+          <div class="heat-foot">
+            <div class="scale" id="heatScale" aria-hidden="true"></div>
+            <span>응답자 5명 미만 부서는 비공개</span>
+          </div>
+        </div>
+        <div class="rgrid">
+          <div class="rcard env">
+            <div class="rcard-head"><div><h4>현업 적용환경</h4><p class="sub">교육 후 검사 · 5점 척도</p></div></div>
+            <div class="hbars" id="envBars"></div>
+            <span class="note-warn"><i></i>3.0 미만: 현업 지원 필요 항목</span>
+          </div>
+          <div class="rcard barrier">
+            <div class="rcard-head"><div><h4>적용 장애요인</h4><p class="sub">교육 후 검사 · 복수 응답, 응답자 대비 %</p></div></div>
+            <div class="hbars" id="barrierBars"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 개인 리포트 -->
+    <div class="panel" role="tabpanel" id="panel-me" aria-labelledby="tab-me" hidden>
+      <div>
+        <span class="tag">참여자</span>
+        <h3 style="margin-top:14px">개인 리포트</h3>
+        <p>본인 결과만 공개<br>교육 전 평가 후 추천 과정 제공</p>
+        <ul class="checks">
+          <li>역량별 교육 전후 점수와 변화 구간</li>
+          <li>목표보다 낮은 역량의 추천 KMA 과정</li>
+          <li>개인 리포트 PDF</li>
+        </ul>
+        <a class="btn btn-line" href="/login" data-app-link>로그인하고 검사 참여</a>
+      </div>
+      <div class="shot" aria-hidden="true">
+        <div class="me-top">
+          <div class="kpi"><small>향상한 역량</small><strong class="num">5 / 6</strong></div>
+          <div class="kpi"><small>평균 변화</small><strong class="num">+0.41</strong></div>
+          <div class="kpi hl"><small>추천 과정</small><strong class="num">3</strong></div>
+        </div>
+        <ul class="me-list">
+          <li><b>협업과 팀워크</b><span class="num">3.0 → 3.8</span><span class="lvl lv-big">크게 향상</span></li>
+          <li><b>문제해결력</b><span class="num">2.9 → 3.4</span><span class="lvl lv-up">향상</span></li>
+          <li><b>고객지향</b><span class="num">3.3 → 3.6</span><span class="lvl lv-up">향상</span></li>
+          <li><b>전략적 사고</b><span class="num">2.7 → 2.8</span><span class="lvl lv-keep">유지</span></li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- 진행 보드 -->
+    <div class="panel" role="tabpanel" id="panel-board" aria-labelledby="tab-board" hidden>
+      <div>
+        <span class="tag">교육담당자</span>
+        <h3 style="margin-top:14px">부서별 진행 보드</h3>
+        <p>CSV 파일로 참여자 일괄 등록<br>부서 단위 배정</p>
+        <ul class="checks">
+          <li>상태별 인원과 미완료자 명단</li>
+          <li>참여율, 완료율, 월별 완료 추세</li>
+          <li>마감이 가까운 일정</li>
+        </ul>
+        <a class="btn btn-line" href="/login" data-app-link>담당자 로그인</a>
+      </div>
+      <div class="shot" aria-hidden="true">
+        <div class="board">
+          <div class="col"><h4>미시작 <span>6</span></h4>
+            <div class="card-mini"><b>영업1팀</b><small>4명 남음</small><div class="bar"><i style="width:20%"></i></div></div>
+            <div class="card-mini"><b>품질팀</b><small>2명 남음</small><div class="bar"><i style="width:60%"></i></div></div>
+          </div>
+          <div class="col"><h4>교육 전 완료 <span>18</span></h4>
+            <div class="card-mini"><b>인사팀</b><small>교육 후 검사 대기</small><div class="bar"><i style="width:50%"></i></div></div>
+            <div class="card-mini"><b>마케팅팀</b><small>교육 후 검사 대기</small><div class="bar"><i style="width:50%"></i></div></div>
+          </div>
+          <div class="col"><h4>전후 완료 <span>12</span></h4>
+            <div class="card-mini"><b>재무팀</b><small>리포트 열람 가능</small><div class="bar"><i style="width:100%"></i></div></div>
+            <div class="card-mini"><b>개발팀</b><small>리포트 열람 가능</small><div class="bar"><i style="width:100%"></i></div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 검사 화면 -->
+    <div class="panel" role="tabpanel" id="panel-quiz" aria-labelledby="tab-quiz" hidden>
+      <div>
+        <span class="tag">참여자</span>
+        <h3 style="margin-top:14px">검사 화면</h3>
+        <p>업무 장면을 그대로 옮긴 행동 문항<br>최근 8주 동안 얼마나 자주 했는지 응답<br>해당 업무가 없었으면 ‘수행 기회 없음’</p>
+        <ul class="checks">
+          <li>중간에 나가도 이어서 응답</li>
+          <li>응답 자동 저장</li>
+          <li>휴대폰 응답 가능</li>
+        </ul>
+        <a class="btn btn-line" href="/login" data-app-link>로그인하고 검사 참여</a>
+      </div>
+      <div class="shot" aria-hidden="true">
+        <div class="quiz">
+          <div class="quiz-top"><span>협업과 팀워크</span><span class="num">7 / 32</span></div>
+          <div class="bar"><i style="width:22%"></i></div>
+          <h4>다른 팀과 일정이 겹칠 때, 우선순위를 먼저 맞추자고 제안했다.</h4>
+          <p class="hint">최근 8주 동안 얼마나 자주 했나요?</p>
+          <div class="opts">
+            <div class="opt">거의 하지 않았다<span>1</span></div>
+            <div class="opt">가끔 했다<span>2</span></div>
+            <div class="opt sel">자주 했다<span>3</span></div>
+            <div class="opt">대부분 했다<span>4</span></div>
+            <div class="opt na">수행 기회 없음</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 6. 교육 추천 -->
+<section class="section" id="courses" aria-labelledby="courses-title">
+  <div class="container">
+    <div class="sec-head reveal">
+      <span class="eyebrow">교육 추천</span>
+      <h2 id="courses-title">역량별 추천 KMA 과정</h2>
+      <p>목표보다 낮은 역량 기준<br>지금 신청 가능한 공개교육과 이러닝</p>
+    </div>
+    <div class="courses">
+      <div class="course reveal">
+        <div class="thumb t1"><small>공개교육 · 2일 · 예시</small><strong>문제해결과<br>의사결정</strong></div>
+        <div class="course-body">
+          <span class="gap">문제해결 · 목표 대비 <b class="num">−0.48</b></span>
+          <div class="course-meta"><span>다음 개강</span><b class="num">2026.12.03</b></div>
+        </div>
+      </div>
+      <div class="course reveal">
+        <div class="thumb t2"><small>이러닝 · 6차시 · 예시</small><strong>업무에 바로 쓰는<br>디지털 협업 도구</strong></div>
+        <div class="course-body">
+          <span class="gap">디지털 · 목표 대비 <b class="num">−0.62</b></span>
+          <div class="course-meta"><span>수강</span><b>상시</b></div>
+        </div>
+      </div>
+      <a class="course reveal" href="https://www.kma.or.kr/kr/usrs/eduRegMgnt/eduRegMgntForm.do?cateNm=customerInquiry" target="_blank" rel="noopener">
+        <div class="thumb t3"><small>단체교육 문의</small><strong>회사 맞춤<br>협업 리더십</strong></div>
+        <div class="course-body">
+          <span class="gap">협업 · 조직 리포트 전용</span>
+          <div class="course-meta"><span>일정</span><b>협의</b></div>
+        </div>
+      </a>
+    </div>
+    <ul class="rules reveal">
+      <li><b>대상 역량</b>목표보다 낮은 역량 (최대 3개)</li>
+      <li><b>추천 과정</b>역량별 공개교육 1개, 이러닝 1개</li>
+      <li><b>공개교육</b>개강 일주일 전까지 신청 가능한 기수</li>
+    </ul>
+  </div>
+</section>
+
+<!-- 7. 측정 원칙 -->
+<section class="section gray" id="principles" aria-labelledby="principles-title">
+  <div class="container">
+    <div class="sec-head reveal">
+      <span class="eyebrow">측정 원리</span>
+      <h2 id="principles-title">역량 변화<br>측정 방식</h2>
+    </div>
+    <ul class="principles reveal">
+      <li><b>01</b><h3>교육 전후 역량 평가</h3><p>교육 전 출발점과 교육 후 업무행동<br>두 시점의 차이로 변화 측정</p></li>
+      <li><b>02</b><h3>행동으로 보는 변화</h3><p>Kirkpatrick 행동 수준 참고<br>최근 8주 업무행동 조사</p></li>
+      <li><b>03</b><h3>개인과 환경을 함께</h3><p>적용 기회, 상사 지원<br>도구·권한, 시간 여건</p></li>
+      <li><b>04</b><h3>실무 기준 해석</h3><p>‘수행 기회 없음’은 점수 제외<br>역량별 5명 이상만 조직 결과</p></li>
+    </ul>
+    <div class="caution reveal"><i aria-hidden="true">!</i><div><strong>관찰 변화와 교육의 인과효과는 별개</strong><p>비교집단 없는 자기보고 결과<br>교육 전후에 관찰된 변화로 해석</p></div></div>
+  </div>
+</section>
+
+<!-- 8. FAQ -->
+<section class="section" id="faq" aria-labelledby="faq-title">
+  <div class="container faq-wrap">
+    <div class="sec-head reveal">
+      <span class="eyebrow">FAQ</span>
+      <h2 id="faq-title">자주 묻는 질문</h2>
+    </div>
+    <div class="reveal">
+      <details><summary>교육 후 검사는 언제 하나요?</summary><p>교육 종료 8~10주 뒤 권장<br>문항이 ‘최근 8주’ 행동을 묻기 때문</p></details>
+      <details><summary>교육 전후에 같은 계정을 써야 하나요?</summary><p>네, 같은 계정이어야 교육 전후 결과가 연결됨<br>교육담당자가 발급한 아이디로 로그인 후, 본인에게 배정된 프로젝트에서 응답</p></details>
+      <details><summary>결과는 누가 볼 수 있나요?</summary><p>참여자: 본인 결과만<br>교육담당자: 담당 회사의 진행 현황과 공개 기준을 넘은 조직 리포트</p></details>
+      <details><summary>조직 리포트는 언제 공개되나요?</summary><p>역량별로 교육 전후 모두 응답한 사람이 5명 이상일 때<br>5명은 개인정보 보호를 위한 최소 기준이며, 조직 전체를 대표한다는 뜻은 아님</p></details>
+    </div>
+  </div>
+</section>
+
+<!-- 9. 도입 문의 -->
+<section class="final" id="contact" aria-labelledby="contact-title">
+  <div class="container">
+    <div class="final-in">
+      <div class="reveal">
+        <h2 id="contact-title">TAP 도입 문의</h2>
+        <p>KMA 문의하기 페이지로 연결<br>문의를 남기면 담당자가 연락</p>
+      </div>
+      <div class="final-actions reveal">
+        <a class="btn btn-white" href="https://www.kma.or.kr/kr/usrs/eduRegMgnt/eduRegMgntForm.do?cateNm=customerInquiry" target="_blank" rel="noopener">문의하기 <span class="arrow" aria-hidden="true">→</span></a>
+        <a class="btn btn-ghost-dark" href="/guide">사용설명서</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<footer class="site-footer">
+  <div class="container foot-in">
+    <div class="foot-brand"><!-- TAP:BRAND_FOOTER --><!-- /TAP:BRAND_FOOTER --></div>
+    <nav class="foot-links" aria-label="바닥글 링크"><a class="is-privacy" href="https://membership.kma.or.kr/privacy.html" target="_blank" rel="noopener">개인정보 처리방침</a><a href="/guide">사용설명서</a><a href="/login" data-app-link>로그인</a><a href="https://www.kma.or.kr/kr/usrs/eduRegMgnt/eduRegMgntForm.do?cateNm=customerInquiry" target="_blank" rel="noopener">문의하기</a><a href="https://www.kma.or.kr/kr/main.do" target="_blank" rel="noopener">KMA 홈페이지</a></nav>
+    <p class="copy">© KMA TAP. 교육 전후 역량 평가 플랫폼.</p>
+  </div>
+</footer>
+
+<a class="float-cta hide" id="floatCta" href="https://www.kma.or.kr/kr/usrs/eduRegMgnt/eduRegMgntForm.do?cateNm=customerInquiry" target="_blank" rel="noopener"><i aria-hidden="true"></i>도입 문의</a>
+</div>
+
+<script>
+(function () {
+  var SVGNS = "http://www.w3.org/2000/svg";
+  var COMP = ["문제해결", "협업", "실행력", "소통", "고객지향", "디지털", "학습민첩", "자기관리"];
+  var PRE = [2.70, 3.10, 3.00, 3.40, 3.20, 2.60, 3.00, 3.50];
+  var POST = [3.62, 3.81, 3.66, 3.92, 3.56, 3.08, 3.24, 3.61];
+
+  function pct(v) { return ((v - 1) / 4 * 100).toFixed(2) + "%"; }
+  function el(tag, cls, text) { var e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
+  function sign(v) { return (v >= 0 ? "+" : "−") + Math.abs(v).toFixed(2); }
+  function level(d) {
+    if (d >= 0.5) return ["크게 향상", "lv-big", "var(--blue)"];
+    if (d >= 0.2) return ["향상", "lv-up", "#86ABFF"];
+    if (d > -0.2) return ["유지", "lv-keep", "var(--pre-fill)"];
+    return ["하락", "lv-down", "var(--warn)"];
+  }
+
+  /* 첫 화면 점 그래프 */
+  var hero = document.getElementById("heroDumb");
+  COMP.forEach(function (name, i) {
+    var row = el("div", "dumb-row"), track = el("div", "track");
+    track.style.setProperty("--a", pct(PRE[i])); track.style.setProperty("--b", pct(POST[i]));
+    ["seg", "dot pre", "dot post"].forEach(function (c) { track.appendChild(el("span", c)); });
+    row.appendChild(el("b", null, name)); row.appendChild(track); row.appendChild(el("em", "num", sign(POST[i] - PRE[i])));
+    hero.appendChild(row);
+  });
+
+  /* 레이더 */
+  (function () {
+    var box = document.getElementById("radar"), W = 440, H = 410, cx = 220, cy = 205, R = 158, n = COMP.length;
+    var svg = document.createElementNS(SVGNS, "svg");
+    svg.setAttribute("viewBox", "0 0 " + W + " " + H); svg.setAttribute("class", "radar"); svg.setAttribute("aria-hidden", "true");
+    function s(tag, attrs) { var e = document.createElementNS(SVGNS, tag); for (var k in attrs) e.setAttribute(k, attrs[k]); svg.appendChild(e); return e; }
+    function pt(i, v) { var a = -Math.PI / 2 + i * 2 * Math.PI / n, r = R * (v - 1) / 4; return [cx + r * Math.cos(a), cy + r * Math.sin(a)]; }
+    for (var k = 2; k !== 6; k++) {
+      var ring = []; for (var i = 0; i !== n; i++) ring.push(pt(i, k).join(","));
+      s("polygon", {points: ring.join(" "), "class": "ring"});
+      var t = s("text", {x: cx + 4, y: cy - R * (k - 1) / 4 + 12, "class": "tick"}); t.textContent = k;
+    }
+    for (var j = 0; j !== n; j++) {
+      var end = pt(j, 5), at = pt(j, 5.75);
+      s("line", {x1: cx, y1: cy, x2: end[0], y2: end[1], "class": "spoke"});
+      var lab = s("text", {x: at[0], y: at[1] + 5, "text-anchor": "middle", "class": "lab"}); lab.textContent = COMP[j];
+    }
+    s("polygon", {points: PRE.map(function (v, i) { return pt(i, v).join(","); }).join(" "), "class": "pre"});
+    s("polygon", {points: POST.map(function (v, i) { return pt(i, v).join(","); }).join(" "), "class": "post"});
+    POST.forEach(function (v, i) { var p = pt(i, v); s("circle", {cx: p[0], cy: p[1], r: 4.5, "class": "pt"}); });
+    box.appendChild(svg);
+  })();
+
+  /* 가로 막대 */
+  function bars(id, rows) {
+    var box = document.getElementById(id);
+    rows.forEach(function (r) {
+      var row = el("div", "hbar"), rail = el("div", "rail"), fill = el("span", "fill"), val = el("span", "val");
+      fill.style.setProperty("--w", r.w); fill.style.setProperty("--c", r.c);
+      if (r.mark) { var m = el("span", "mark"); m.style.left = r.mark; rail.appendChild(m); }
+      rail.appendChild(fill);
+      val.appendChild(el("span", "num", r.v));
+      if (r.tag) val.appendChild(el("span", "lvl " + r.tag[1], r.tag[0]));
+      row.appendChild(el("b", null, r.name)); row.appendChild(rail); row.appendChild(val);
+      box.appendChild(row);
+    });
+  }
+  var order = COMP.map(function (n, i) { return i; }).sort(function (a, b) { return (POST[b] - PRE[b]) - (POST[a] - PRE[a]); });
+  bars("deltaBars", order.map(function (i) {
+    var d = POST[i] - PRE[i], lv = level(d);
+    return {name: COMP[i], w: (d / 1 * 100).toFixed(1) + "%", c: lv[2], v: sign(d), tag: [lv[0], lv[1]]};
+  }));
+  bars("envBars", [["적용 기회", 3.8], ["상사 지원", 3.4], ["도구·권한", 3.1], ["시간 여건", 2.6]].map(function (r) {
+    var low = !(r[1] >= 3.0);
+    return {name: r[0], w: pct(r[1]), c: low ? "var(--warn)" : "var(--blue)", v: r[1].toFixed(1), mark: pct(3.0), tag: low ? ["지원 필요", "lv-down"] : null};
+  }));
+  bars("barrierBars", [["시간·프로세스", 42], ["적용 기회", 30], ["방해요인 없음", 24], ["상사·동료 지원", 21], ["도구·정보·권한", 15]].map(function (r) {
+    return {name: r[0], w: r[1] + "%", c: r[0] === "방해요인 없음" ? "var(--pre)" : "var(--ink)", v: r[1] + "%"};
+  }));
+
+  /* 히트맵 */
+  var DEPTS = [["영업1팀", 8, 0.12, 0.10], ["영업2팀", 6, -0.10, -0.30], ["마케팅팀", 5, 0.22, 0.20], ["인사팀", 5, 0.04, -0.12], ["개발팀", 6, -0.18, -0.42], ["품질팀", 3, 0, 0]];
+  var POST_SCALE = {cut: [2.6, 3.0, 3.4, 3.8, 4.2], bg: ["#F2F6FF", "#DCE7FF", "#B9CEFF", "#86ABFF", "#1769FF", "#0B4FCC"], fg: ["#161614", "#161614", "#161614", "#161614", "#fff", "#fff"],
+    labels: ["~2.59", "2.60~", "3.00~", "3.40~", "3.80~", "4.20~"]};
+  var DELTA_SCALE = {cut: [-0.2, 0.2, 0.4, 0.6, 0.8], bg: ["#FFF1E8", "#F3F4F6", "#DCE7FF", "#B9CEFF", "#86ABFF", "#1769FF"], fg: ["#9A3412", "#514F48", "#161614", "#161614", "#161614", "#fff"],
+    labels: ["하락", "유지", "+0.20~", "+0.40~", "+0.60~", "+0.80~"]};
+  function step(v, cut) { var k = 0; cut.forEach(function (c) { if (v >= c) k++; }); return k; }
+  function jitter(i, j) { return ((i * 7 + j * 13) % 9 - 4) * 0.04; }
+  function cellValue(mode, d, j) {
+    if (mode === "post") return Math.min(4.6, Math.max(1.8, POST[j] + d[2] + jitter(d[1], j)));
+    return POST[j] - PRE[j] + d[3] + jitter(j, d[1]) * 2.5;
+  }
+  var table = document.getElementById("heat"), thead = el("thead"), hr = el("tr"), tbody = el("tbody");
+  hr.appendChild(el("th", null, "부서"));
+  COMP.forEach(function (c) { var th = el("th", null, c); th.scope = "col"; hr.appendChild(th); });
+  thead.appendChild(hr); table.appendChild(thead); table.appendChild(tbody);
+  var cells = [];
+  DEPTS.concat([["전체", 33, null, null]]).forEach(function (d) {
+    var tr = el("tr", d[2] === null ? "total" : null), th = el("th"); th.scope = "row";
+    th.appendChild(document.createTextNode(d[0])); th.appendChild(el("small", "num", d[1] + "명"));
+    tr.appendChild(th);
+    COMP.forEach(function (c, j) { var td = el("td"); tr.appendChild(td); cells.push({td: td, d: d, j: j}); });
+    tbody.appendChild(tr);
+  });
+  function paint(mode) {
+    var sc = mode === "post" ? POST_SCALE : DELTA_SCALE;
+    cells.forEach(function (o) {
+      var td = o.td, d = o.d, j = o.j;
+      if (d[1] !== 33 && !(d[1] >= 5)) { td.className = "hide"; td.textContent = "비공개"; td.style.background = ""; td.style.color = ""; td.title = d[0] + " · 응답자 5명 미만"; return; }
+      var v = d[2] === null ? (mode === "post" ? POST[j] : POST[j] - PRE[j]) : cellValue(mode, d, j);
+      var k = step(v, sc.cut);
+      td.className = ""; td.style.background = sc.bg[k]; td.style.color = sc.fg[k];
+      td.textContent = mode === "post" ? v.toFixed(2) : sign(v);
+      td.title = d[0] + " · " + COMP[j] + " " + td.textContent;
+    });
+    var scale = document.getElementById("heatScale"); scale.textContent = "";
+    sc.bg.forEach(function (b, k) { var s = el("span", null, sc.labels[k]); s.style.background = b; s.style.color = sc.fg[k]; scale.appendChild(s); });
+    document.getElementById("heatSub").textContent = mode === "post" ? "부서별 교육 후 평균 (1~5점)" : "부서별 변화 (교육 후 − 교육 전)";
+  }
+  document.querySelectorAll(".seg-ctl button").forEach(function (b) {
+    b.addEventListener("click", function () {
+      document.querySelectorAll(".seg-ctl button").forEach(function (x) { x.setAttribute("aria-pressed", x === b ? "true" : "false"); });
+      paint(b.getAttribute("data-mode"));
+    });
+  });
+  paint("post");
+
+  /* 탭 */
+  var tabs = Array.prototype.slice.call(document.querySelectorAll(".tap-landing .tab"));
+  function select(tab) {
+    tabs.forEach(function (t) {
+      var on = t === tab;
+      t.setAttribute("aria-selected", on ? "true" : "false");
+      t.tabIndex = on ? 0 : -1;
+      document.getElementById(t.getAttribute("aria-controls")).hidden = !on;
+    });
+  }
+  tabs.forEach(function (t, i) {
+    t.addEventListener("click", function () { select(t); });
+    t.addEventListener("keydown", function (e) {
+      var k = e.key === "ArrowRight" ? 1 : e.key === "ArrowLeft" ? -1 : 0;
+      if (!k) return;
+      var next = tabs[(i + k + tabs.length) % tabs.length];
+      select(next); next.focus(); e.preventDefault();
+    });
+  });
+
+  /* 나타나기 */
+  var items = document.querySelectorAll(".tap-landing .reveal");
+  if ("IntersectionObserver" in window) {
+    var io = new IntersectionObserver(function (es) {
+      es.forEach(function (e) { if (e.isIntersecting) { e.target.classList.add("in"); io.unobserve(e.target); } });
+    }, {rootMargin: "0px 0px -8% 0px"});
+    items.forEach(function (x) { io.observe(x); });
+  } else {
+    items.forEach(function (x) { x.classList.add("in"); });
+  }
+
+  /* 떠 있는 문의 버튼 */
+  var fab = document.getElementById("floatCta"), heroSec = document.querySelector(".tap-landing .hero"), last = document.getElementById("contact");
+  function toggleFab() {
+    var pastHero = 200 >= heroSec.getBoundingClientRect().bottom;
+    var nearEnd = window.innerHeight - 120 >= last.getBoundingClientRect().top;
+    fab.classList.toggle("hide", !pastHero || nearEnd);
+  }
+  document.addEventListener("scroll", toggleFab, {passive: true, capture: true}); toggleFab();
+})();
+</script>
+</body>
+
+
+</html>

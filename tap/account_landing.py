@@ -1,4 +1,4 @@
-"""Account-based public landing page (/open): the v2 service introduction."""
+"""Account-based public landing page (/open): the v3 service introduction."""
 from __future__ import annotations
 
 from functools import lru_cache
@@ -11,9 +11,9 @@ from tap.brand import brand_css, brand_html
 from tap.open_page import PUBLIC_PAGE_CSS
 
 
-# Production copy lives in its own file. The legacy demo page
+# Production copy lives in its own file (v3: tabs for reports, heatmap and assessment). The legacy demo page
 # (tap.open_page.OPEN_PAGE_PATH) stays as it is for demo mode and Cloudflare.
-LANDING_PATH = Path(__file__).resolve().parents[1] / "docs" / "TAP_오픈페이지_v2.html"
+LANDING_PATH = Path(__file__).resolve().parents[1] / "docs" / "TAP_오픈페이지_v3.html"
 
 LANDING_SHELL_CSS = """
 <style>

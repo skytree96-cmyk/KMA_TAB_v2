@@ -68,7 +68,7 @@ def _login(store: AccountStore | None) -> None:
         with st.container(key="tap_login_shell"):
             # Single centered card with the wordmark on top, as in the PAI sign-in screen.
             with st.container(border=True, key="tap_login_card"):
-                st.html('<div class="tap-login-brand">' + brand_html(compact=True) + '<span>교육 전후<br>변화 평가 플랫폼</span></div>')
+                st.html('<div class="tap-login-brand">' + brand_html(compact=True) + '<span>교육 전후<br>역량 평가 플랫폼</span></div>')
                 st.title("로그인")
                 st.caption("발급받은 ID로 로그인하면 내 교육과 관리 화면이 열립니다.")
                 with st.form("_tap_login_form", clear_on_submit=True, border=False):
