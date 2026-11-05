@@ -307,6 +307,40 @@ def _course_reason(need: Mapping[str, Any]) -> dict[str, Any]:
     return {"reason": reason, "advice": advice}
 
 
+def team_heatmap(team_summaries: Iterable[Mapping[str, Any]], min_n: int = MIN_GROUP_N) -> dict[str, Any]:
+    """Departments × competencies for the organization report, each cell under the same N>=min_n rule.
+
+    team_summaries: [{"team": name, "paired_n": people, "summaries": aggregate_paired_factor_results rows}].
+    A cell shows the post mean and the observed change, or nothing. When exactly one department is hidden in
+    a column, the shown departments and the organization total would give its value away, so the smallest
+    shown cell of that column is hidden as well.
+    """
+    teams = [team for team in team_summaries if team.get("paired_n")]
+    factors: dict[str, str] = {}
+    for team in teams:
+        for row in team["summaries"]:
+            factors.setdefault(str(row["factor_code"]), str(row["factor_name_ko"]))
+    rows = []
+    for team in teams:
+        by_code = {str(row["factor_code"]): row for row in team["summaries"]}
+        cells = []
+        for code in factors:
+            row = by_code.get(code) or {}
+            n = int(row.get("paired_n") or 0)
+            shown = n >= min_n and row.get("post_mean") is not None
+            cells.append({"factor_code": code, "paired_n": n, "shown": shown,
+                          "post_mean": row.get("post_mean") if shown else None,
+                          "change": row.get("observed_change") if shown else None})
+        rows.append({"team": str(team["team"]), "paired_n": int(team["paired_n"]), "cells": cells})
+    for index in range(len(factors)):
+        hidden = [row for row in rows if row["cells"][index]["paired_n"] and not row["cells"][index]["shown"]]
+        shown = [row for row in rows if row["cells"][index]["shown"]]
+        if len(hidden) == 1 and shown:
+            smallest = min(shown, key=lambda row: (row["cells"][index]["paired_n"], row["team"]))
+            smallest["cells"][index].update(shown=False, post_mean=None, change=None)
+    return {"factors": [{"factor_code": code, "factor_name_ko": name} for code, name in factors.items()], "rows": rows}
+
+
 def course_context_note(transfer: Mapping[str, Any] | None) -> str | None:
     """Put weak transfer conditions ahead of the course list: more training rarely fixes the work environment."""
     if not transfer or not transfer.get("disclosed"):

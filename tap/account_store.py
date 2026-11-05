@@ -717,7 +717,7 @@ class AccountStore:
         return added
 
     def _assignments(self, conn, where, params):
-        rows = self._all(conn, "SELECT a.*,u.display_name AS user_name,u.login_id,p.name AS project_name,p.company_id,p.config_json,COALESCE(pre.completed,0) AS pre_completed,COALESCE(post.completed,0) AS post_completed FROM tap_assignments a JOIN tap_users u ON u.id=a.user_id JOIN tap_projects p ON p.id=a.project_id LEFT JOIN tap_assessments pre ON pre.assignment_id=a.id AND pre.phase='pre' LEFT JOIN tap_assessments post ON post.assignment_id=a.id AND post.phase='post' WHERE " + where + " ORDER BY a.created_at,a.id", params)
+        rows = self._all(conn, "SELECT a.*,u.display_name AS user_name,u.login_id,u.department,p.name AS project_name,p.company_id,p.config_json,COALESCE(pre.completed,0) AS pre_completed,COALESCE(post.completed,0) AS post_completed FROM tap_assignments a JOIN tap_users u ON u.id=a.user_id JOIN tap_projects p ON p.id=a.project_id LEFT JOIN tap_assessments pre ON pre.assignment_id=a.id AND pre.phase='pre' LEFT JOIN tap_assessments post ON post.assignment_id=a.id AND post.phase='post' WHERE " + where + " ORDER BY a.created_at,a.id", params)
         for row in rows:
             row["config"] = json.loads(row.pop("config_json"))
             for key in ("active", "pre_completed", "post_completed"):
