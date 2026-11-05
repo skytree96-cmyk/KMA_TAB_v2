@@ -4,6 +4,7 @@ from html.parser import HTMLParser
 import re
 import unittest
 
+from tap.account_insights import COURSE_INQUIRY_URL
 from tap.account_landing import LANDING_PATH, account_landing_html
 from tap.brand import BRAND_VARIANTS, brand_html
 from tap.open_page import GUIDE_PDF_PATH, OPEN_PAGE_PATH
@@ -47,20 +48,24 @@ class AccountLandingTests(unittest.TestCase):
         self.assertEqual(set(parser.app_links), {"/login"})
         copy = " ".join(parser.visible_copy)
         self.assertNotIn("KMA 관리자", copy)
-        self.assertEqual(len(re.findall(r'class="role-card\b', page)), 2)
         for phrase in ("데모", "기획검증", "MVP", "합성", "개인정보를 입력하지", "프로젝트 코드", "tap_role", "원문 ID 미저장"):
             self.assertNotIn(phrase, copy)
         self.assertIn("로그인하고 검사 참여", copy)
         self.assertIn("본인에게 배정된 프로젝트", copy)
         self.assertIn("리포트 예시", copy)
-        self.assertIn("KMA 교육과정 추천", copy)
-        self.assertIn('href="#features"', page)
+        self.assertIn("역량 평가", copy)
+        self.assertIn("추천 KMA 과정", copy)
         self.assertIn("인과효과", copy)
-        self.assertIn('href="#recommend"', page)
+        for anchor in ("#screens", "#courses", "#principles", "#faq"):
+            self.assertIn(f'href="{anchor}"', page)
         for phrase in ("인사평가", "채용", "승진", "교육 전/후", "교육 전·후", "사전·사후"):
             self.assertNotIn(phrase, copy)
-        self.assertIn('id="heroRadar"', page)
-        self.assertIn('id="reportRadar"', page)
+        # The report tabs: radar, change bars and the department heatmap are drawn by script.
+        for element_id in ("heroDumb", "radar", "deltaBars", "heat", "envBars", "barrierBars"):
+            self.assertIn(f'id="{element_id}"', page)
+        self.assertEqual(len(re.findall(r'role="tab"', page)), 5)
+        # Every inquiry button goes to KMA's customer inquiry form.
+        self.assertGreaterEqual(page.count(f'href="{COURSE_INQUIRY_URL}"'), 4)
         self.assertNotIn('class="brand-mark"', page)
         self.assertIn("tap-ci--reverse", page)
         self.assertNotIn("TAP:BRAND", page)
