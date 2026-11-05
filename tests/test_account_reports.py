@@ -37,6 +37,17 @@ class AccountReportTests(unittest.TestCase):
         self.assertEqual([team["paired_n"] for team in teams], [4, 4, 4])
         self.assertTrue(all(team["summaries"][0]["post_mean"] is None for team in teams))
 
+    def test_teams_follow_the_membership_kept_at_the_post_assessment_and_can_group_by_job_title(self):
+        project, rows = self.records(4)
+        for index, row in enumerate(rows):
+            # The account says 기획팀 now; two of them were in 영업팀 when they submitted the post assessment.
+            row.update(department="기획팀", report_department="영업팀" if index < 2 else "기획팀",
+                       job_title="대리" if index % 2 else "", report_job_title="대리" if index % 2 else "")
+        self.assertEqual([(team["team"], team["paired_n"]) for team in summarize_by_team(project, rows)],
+                         [("기획팀", 2), ("영업팀", 2)])
+        self.assertEqual([(team["team"], team["paired_n"]) for team in summarize_by_team(project, rows, "job_title")],
+                         [("대리", 2), ("직급 미지정", 2)])
+
 class IndividualAccountReportTests(unittest.TestCase):
     records = AccountReportTests.records
 
@@ -51,7 +62,8 @@ class IndividualAccountReportTests(unittest.TestCase):
         read = Mock(return_value=rows)
         app = AppTest.from_string("import streamlit as st\nfrom tap.account_reports import render_project_report\nrender_project_report(st.session_state['store'], 'token', st.session_state['project'])", default_timeout=30)
         access = Mock()
-        app.session_state["store"] = SimpleNamespace(project_results=read, record_report_access=access)
+        app.session_state["store"] = SimpleNamespace(project_results=read, principal=lambda token: {"role": "kma"},
+                                                     record_report_access=access)
         app.session_state["project"] = project
         app.run()
         self.assertFalse(app.exception)
@@ -76,6 +88,34 @@ class IndividualAccountReportTests(unittest.TestCase):
         app.text_input[0].set_value("").run()
         self.assertIsNone(app.selectbox[0].value)
         self.assertFalse(app.dataframe)
+
+
+    def test_a_training_manager_gets_no_individual_report_on_screen_or_by_download(self):
+        from streamlit.testing.v1 import AppTest
+        from types import SimpleNamespace
+        from unittest.mock import Mock
+        from tap.account_reports import export_report_pdf
+        from tap.account_store import AuthorizationError
+        project, rows = self.records(1)
+        project["id"] = "project-a"
+        rows[0].update(id="assignment-a", user_name="홍길동", login_id="UserA")
+        script = ("import streamlit as st\nfrom tap.account_reports import render_project_report\n"
+                  "render_project_report(st.session_state['store'], 'token', st.session_state['project'])")
+        # A store that cannot say who is asking is treated like a manager: closed.
+        for store in (SimpleNamespace(project_results=Mock(return_value=rows), principal=lambda token: {"role": "company"}),
+                      SimpleNamespace(project_results=Mock(return_value=rows))):
+            app = AppTest.from_string(script, default_timeout=30)
+            app.session_state["store"] = store
+            app.session_state["project"] = project
+            app.run()
+            self.assertFalse(app.exception)
+            self.assertFalse(app.selectbox)
+            self.assertFalse(app.text_input)
+            self.assertFalse(app.dataframe)
+            store.project_results.reset_mock()
+            with self.assertRaises(AuthorizationError):
+                export_report_pdf(store, "token", project, "assignment-a")
+            store.project_results.assert_not_called()  # refused before any answer is read
 
 
 class IndividualReportCourseTests(unittest.TestCase):
@@ -135,7 +175,8 @@ class ReportDownloadTests(unittest.TestCase):
         project.update(id="project-a",name="교육 A")
         for i,row in enumerate(results):
             row.update(id=f"assignment-{i}",user_name=f"참여자{i}",login_id=f"user{i}")
-        store = SimpleNamespace(project_results=Mock(return_value=results), record_report_access=Mock())
+        store = SimpleNamespace(project_results=Mock(return_value=results), principal=Mock(return_value={"role": "kma"}),
+                                record_report_access=Mock())
         with patch("tap.account_report_pdf.build_report_pdf", return_value=b"%PDF-test") as build:
             self.assertEqual(export_report_pdf(store, "token", project, "assignment-2"), b"%PDF-test")
             self.assertEqual(build.call_args.kwargs["subject"], "참여자2 · user2")
@@ -147,6 +188,7 @@ class ReportDownloadTests(unittest.TestCase):
             self.assertEqual(store.record_report_access.call_args.args[1:3], ("project-a", "download_organization_pdf"))
             self.assertEqual(build.call_args.kwargs["kind"], "organization")
             self.assertEqual(build.call_args.args[1][0]["valid_n"], 5)
+            store.principal.assert_called_with("token")
             # No department entered: one "부서 미지정" row, which the PDF leaves out (fewer than two departments).
             grid = build.call_args.kwargs["heatmap"]
             self.assertEqual([row["team"] for row in grid["rows"]], ["부서 미지정"])

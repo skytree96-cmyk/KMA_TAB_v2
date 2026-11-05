@@ -104,6 +104,14 @@ class CourseRecommendationTests(unittest.TestCase):
         self.assertIsNone(cells["개발팀"]["post_mean"])
         both_shown = team_heatmap([team("영업팀", 9), team("개발팀", 6)])
         self.assertTrue(all(row["cells"][0]["shown"] for row in both_shown["rows"]))
+        # Each hidden cell says why, and a department with nothing to show gets one line for its row.
+        from tap.account_insights import hidden_team_note
+        self.assertEqual([cells[name]["why"] for name in ("영업팀", "개발팀", "품질팀")], [None, "protect", "small"])
+        self.assertEqual(cells["개발팀"]["protects"], "품질팀")
+        notes = {row["team"]: hidden_team_note(row) for row in grid["rows"]}
+        self.assertIsNone(notes["영업팀"])
+        self.assertEqual(notes["개발팀"], "비공개 · 품질팀 값이 계산되지 않도록 함께 가렸습니다.")
+        self.assertEqual(notes["품질팀"], "비공개 · 교육 전후 유효응답이 5명 미만입니다.")
 
     def test_courses_for_another_level_are_never_offered(self):
         rows = [{"factor_code": "JOB-EX", "factor_name_ko": "실행력", "post_score": 2.0},

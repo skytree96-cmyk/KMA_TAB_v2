@@ -314,6 +314,9 @@ def team_heatmap(team_summaries: Iterable[Mapping[str, Any]], min_n: int = MIN_G
     A cell shows the post mean and the observed change, or nothing. When exactly one department is hidden in
     a column, the shown departments and the organization total would give its value away, so the smallest
     shown cell of that column is hidden as well.
+
+    A hidden cell says why: "small" (under min_n), "protect" (hidden to keep another department's value from
+    being worked out; "protects" names that department) or "none" (nobody answered).
     """
     teams = [team for team in team_summaries if team.get("paired_n")]
     factors: dict[str, str] = {}
@@ -329,6 +332,7 @@ def team_heatmap(team_summaries: Iterable[Mapping[str, Any]], min_n: int = MIN_G
             n = int(row.get("paired_n") or 0)
             shown = n >= min_n and row.get("post_mean") is not None
             cells.append({"factor_code": code, "paired_n": n, "shown": shown,
+                          "why": None if shown else "small" if n else "none",
                           "post_mean": row.get("post_mean") if shown else None,
                           "change": row.get("observed_change") if shown else None})
         rows.append({"team": str(team["team"]), "paired_n": int(team["paired_n"]), "cells": cells})
@@ -337,8 +341,22 @@ def team_heatmap(team_summaries: Iterable[Mapping[str, Any]], min_n: int = MIN_G
         shown = [row for row in rows if row["cells"][index]["shown"]]
         if len(hidden) == 1 and shown:
             smallest = min(shown, key=lambda row: (row["cells"][index]["paired_n"], row["team"]))
-            smallest["cells"][index].update(shown=False, post_mean=None, change=None)
+            smallest["cells"][index].update(shown=False, post_mean=None, change=None, why="protect", protects=hidden[0]["team"])
     return {"factors": [{"factor_code": code, "factor_name_ko": name} for code, name in factors.items()], "rows": rows}
+
+
+def hidden_team_note(row: Mapping[str, Any], min_n: int = MIN_GROUP_N) -> str | None:
+    """One line for a department that shows no number at all; None when it shows any.
+
+    A department left off the table makes its members ask where it went, so it stays, with the reason.
+    """
+    cells = row["cells"]
+    if any(cell.get("shown") for cell in cells):
+        return None
+    protects = sorted({str(cell["protects"]) for cell in cells if cell.get("why") == "protect"})
+    if int(row.get("paired_n") or 0) >= min_n and protects:
+        return f"비공개 · {', '.join(protects)} 값이 계산되지 않도록 함께 가렸습니다."
+    return f"비공개 · 교육 전후 유효응답이 {min_n}명 미만입니다."
 
 
 def course_context_note(transfer: Mapping[str, Any] | None) -> str | None:

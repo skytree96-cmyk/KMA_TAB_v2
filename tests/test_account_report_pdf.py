@@ -226,8 +226,12 @@ class AccountReportPDFTests(unittest.TestCase):
         shown = text()
         for expected in ("팀(부서)별 교육 후 평균", "조직 전체", "영업1팀", "생산관리팀", "4.21", "2.63", "-0.25", "비공개"):
             self.assertIn(expected, shown)
-        # A department with nothing to show is left out rather than listed as a row of grey cells.
-        self.assertNotIn("부서 미지정", shown)
+        # A department with nothing to show keeps its row and says why.
+        self.assertIn("부서 미지정", shown)
+        self.assertIn("교육 전후 유효응답이 5명 미만입니다", shown)
+        hidden_all = {**grid, "rows": [{**row, "cells": [cell(c["factor_code"], None, None, n=3, shown=False) for c in row["cells"]]}
+                                       for row in grid["rows"]]}
+        self.assertNotIn("팀(부서)별", text(heatmap=hidden_all))
         self.assertNotIn("팀(부서)별", text(heatmap=None))
         self.assertNotIn("팀(부서)별", text(kind="individual"))
         self.assertNotIn("팀(부서)별", text(heatmap={**grid, "rows": grid["rows"][:1]}))
