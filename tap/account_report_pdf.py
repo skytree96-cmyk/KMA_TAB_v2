@@ -814,7 +814,9 @@ SOURCE_LABELS = {"public_edu_center": "공개교육", "studio_elearning": "이�
 BUTTON_LABELS = {"public_edu_center": "최신 일정 보기", "studio_elearning": "수강 페이지 보기", "b2b_inquiry": "과정 안내 보기"}
 
 
-SOURCE_COLORS = {"public_edu_center": "#1769ff", "studio_elearning": "#3d5f94", "b2b_inquiry": "#8a5a14"}
+# One colour per course source so a mixed list scans at a glance: brand blue, ink and amber. A second blue
+# for e-learning read as the same thing as the public courses once the brand colour became blue.
+SOURCE_COLORS = {"public_edu_center": "#1769ff", "studio_elearning": "#161614", "b2b_inquiry": "#8a5a14"}
 
 
 def _course_entry(index: int, course: Mapping[str, Any], width: float) -> Table:
