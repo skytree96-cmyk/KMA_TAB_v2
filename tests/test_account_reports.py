@@ -95,6 +95,31 @@ class IndividualReportCourseTests(unittest.TestCase):
 class ReportDownloadTests(unittest.TestCase):
     records = AccountReportTests.records
 
+    def test_organization_pdf_prints_the_department_page_only_with_two_shown_departments(self):
+        try:
+            from pypdf import PdfReader
+        except ImportError:
+            self.skipTest("pypdf is not installed")
+        from io import BytesIO
+        from types import SimpleNamespace
+        from tap.account_reports import export_report_pdf
+        project, results = self.records(10)
+        project.update(id="project-a", name="교육 A")
+        for i, row in enumerate(results):
+            row.update(id=f"assignment-{i}", user_name=f"참여자{i}", login_id=f"user{i}", department="영업팀" if i < 5 else "기획팀")
+
+        def text(rows):
+            pdf = export_report_pdf(SimpleNamespace(project_results=lambda token, project_id: rows), "token", project)
+            return "\n".join(page.extract_text() for page in PdfReader(BytesIO(pdf)).pages)
+
+        both = text(results)
+        self.assertIn("팀(부서)별 교육 후 평균", both)
+        self.assertIn("영업팀", both)
+        self.assertIn("기획팀", both)
+        for row in results[5:]:
+            row["department"] = "영업팀"
+        self.assertNotIn("팀(부서)별 교육 후 평균", text(results))
+
     def test_exports_recheck_authorization_and_match_the_selected_person_project(self):
         from tap.account_reports import export_report_pdf
         from tap.account_store import AuthorizationError, ValidationError
@@ -109,10 +134,15 @@ class ReportDownloadTests(unittest.TestCase):
             self.assertEqual(export_report_pdf(store, "token", project, "assignment-2"), b"%PDF-test")
             self.assertEqual(build.call_args.kwargs["subject"], "참여자2 · user2")
             self.assertEqual(build.call_args.kwargs["kind"], "individual")
+            self.assertNotIn("heatmap", build.call_args.kwargs)
             store.project_results.assert_called_with("token", "project-a")
             export_report_pdf(store, "token", project)
             self.assertEqual(build.call_args.kwargs["kind"], "organization")
             self.assertEqual(build.call_args.args[1][0]["valid_n"], 5)
+            # No department entered: one "부서 미지정" row, which the PDF leaves out (fewer than two departments).
+            grid = build.call_args.kwargs["heatmap"]
+            self.assertEqual([row["team"] for row in grid["rows"]], ["부서 미지정"])
+            self.assertEqual(grid["rows"][0]["paired_n"], 5)
             with self.assertRaises(ValidationError): export_report_pdf(store, "token", project, "foreign-id")
             store.project_results.return_value = results[:4]
             with self.assertRaises(ValidationError): export_report_pdf(store, "token", project)

@@ -85,8 +85,10 @@ def export_report_pdf(store: Any, token: str, project: Mapping[str, Any], assign
                      "pre_score":row.get("pre_mean"),"post_score":row.get("post_mean"),"change":row.get("observed_change"),
                      "valid_n":row.get("paired_n",0)})
     count = len({row["user_id"] for row in results if row.get("pre_completed") and row.get("post_completed")})
+    # The PDF decides whether the department page is worth printing (two departments with a shown cell).
     return build_report_pdf(project, rows, kind="organization", subject="조직 전체", participant_count=count,
-                            transfer=summarize_transfer(results), courses=_organization_courses(config, summaries.values()))
+                            transfer=summarize_transfer(results), courses=_organization_courses(config, summaries.values()),
+                            heatmap=team_heatmap(summarize_by_team(project, results)))
 
 
 def _disclosed_scores(summaries: Any) -> list[dict[str, Any]]:
