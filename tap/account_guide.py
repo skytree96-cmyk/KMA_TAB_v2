@@ -92,9 +92,20 @@ GUIDE_CSS = """
   .tg-tiles span.on::before{background:#087b76;border-color:#087b76}
   .tg-tiles span.fixed{color:#6b8589}
   .tg-tiles span.fixed::before{background:#c5d4d2;border-color:#c5d4d2}
-  .tg-nav{display:flex;align-items:center;gap:4px;background:#fff;border:1px solid #dce9e6;border-radius:10px;padding:8px 10px;flex-wrap:wrap}
-  .tg-logo{font-weight:900;color:#087b76;margin-right:4px;font-size:14px}
-  .tg-spacer{flex:1}
+  .tg-shell{display:grid;grid-template-columns:136px minmax(0,1fr);gap:8px;background:#e6eaeb;border-radius:10px;padding:6px 6px 6px 0}
+  .tg-side{display:flex;flex-direction:column;gap:2px;min-height:170px;padding:10px 6px 8px 8px;border-radius:0 10px 10px 0;
+           background:linear-gradient(165deg,#d2e6e3 0%,#e3eceb 45%,#eef1f2 100%)}
+  .tg-logo{font-weight:900;color:#192c48;font-size:14px;padding:0 4px}
+  .tg-logo em{font-style:normal;color:#087f83}
+  .tg-who{margin:6px 0 4px;padding:6px 8px;border-radius:8px;background:rgba(255,255,255,.6);font-size:10.5px;color:#5e6a76;line-height:1.35}
+  .tg-who b{display:block;color:#111a24;font-size:11px}
+  .tg-side .tg-btn{justify-content:flex-start;width:100%;box-sizing:border-box;border-radius:999px;border-color:transparent;
+                   background:transparent;color:#333e4a;font-weight:600;padding:6px 9px}
+  .tg-side .tg-btn.active{background:#fff;color:#111a24;font-weight:800;box-shadow:0 1px 2px rgba(17,26,36,.08),0 2px 6px rgba(17,26,36,.05)}
+  .tg-side .tg-pinned{display:flex;margin:4px 0 0}
+  .tg-side-bot{margin-top:auto;padding-top:6px;border-top:1px solid rgba(17,26,36,.1);display:flex;flex-direction:column;gap:2px}
+  .tg-main{background:#fff;border-radius:10px;padding:10px;display:flex;flex-direction:column;gap:8px;min-width:0}
+  .tg-checks.col{flex-direction:column;gap:6px}
   .tg-upload{border:1.5px dashed #b9cfcc;border-radius:9px;padding:12px;text-align:center;color:#6b8589;background:#fff}
   .tg-exp{border:1px solid #dce9e6;border-radius:10px;background:#fff}
   .tg-exp > .tg-exp-head{padding:9px 12px;font-weight:700;display:flex;gap:8px;align-items:center}
@@ -135,6 +146,8 @@ GUIDE_CSS = """
     .tg-step{grid-template-columns:1fr;padding:18px;gap:18px}
     .tg-intro,.tg-faq{grid-template-columns:1fr}
     .tg-split{grid-template-columns:1fr}
+    .tg-shell{grid-template-columns:1fr;padding:6px}
+    .tg-side{min-height:0;border-radius:10px}
   }
 </style>
 """
@@ -182,7 +195,8 @@ def _step(kicker: str, title: str, lead: str, mock: str,
             f'{mock}<ol class="tg-callouts">{items}</ol>{note_html}</section>')
 
 
-def _topbar(menus: Iterable[str], active: str, role: str, pins: bool = True) -> str:
+def _sidebar(menus: Iterable[str], active: str, role: str, body: str, pins: bool = True) -> str:
+    """The signed-in frame: left menu (as in assets/console-v2.css) beside the work sheet."""
     menus = list(menus)
     buttons = "".join(
         _btn(menu, "active" if menu == active else "ghost", pin=index if pins else None)
@@ -190,8 +204,9 @@ def _topbar(menus: Iterable[str], active: str, role: str, pins: bool = True) -> 
     )
     guide = _btn("? 이용 안내", "ghost", pin=len(menus) + 1 if pins else None)
     profile = _btn(f"👤 {role} ▾", "ghost", pin=len(menus) + 2 if pins else None)
-    return (f'<div class="tg-nav"><span class="tg-logo">KMA TAP</span>{buttons}'
-            f'<span class="tg-spacer"></span>{guide}{profile}</div>')
+    return (f'<div class="tg-shell"><div class="tg-side"><span class="tg-logo">KMA <em>TAP</em></span>'
+            f'<div class="tg-who"><b>㈜샘플기업</b>{role}</div>{buttons}'
+            f'<div class="tg-side-bot">{guide}{profile}</div></div><div class="tg-main">{body}</div></div>')
 
 
 MANAGER_MENUS = ("대시보드", "참여자 계정", "프로젝트 만들기", "프로젝트")
@@ -222,9 +237,9 @@ def _manager_steps() -> list[str]:
         "화면 구성", "메뉴 구성",
         "교육담당자로 로그인하면 왼쪽에 메뉴 4개가 보입니다. 처음에는 참여자 계정, 프로젝트 만들기, "
         "프로젝트(배정) 순서로 쓰고, 이후에는 대시보드에서 현황을 봅니다.",
-        _frame("교육담당자 화면", _topbar(MANAGER_MENUS, "참여자 계정", "교육담당자") +
+        _frame("교육담당자 화면", _sidebar(MANAGER_MENUS, "참여자 계정", "교육담당자",
                '<div class="tg-card"><div class="tg-title">참여자 계정</div>'
-               '<div class="tg-sub">선택한 메뉴의 업무 화면이 이 영역에 표시됩니다.</div></div>'),
+               '<div class="tg-sub">선택한 메뉴의 업무 화면이 이 영역에 표시됩니다.</div></div>')),
         [
             ("대시보드", "전체 참여 인원, 교육 전후 검사 완료 현황, 일정과 미완료 인원, 월별 완료 추세"),
             ("참여자 계정", "참여자 계정 발급(한 명씩 또는 CSV 일괄), 비밀번호 재발급, 사용 중지"),
@@ -269,8 +284,10 @@ def _manager_steps() -> list[str]:
                    (("1234567890-user001", "홍길동", "••••"), ("1234567890-user002", "김하나", "••••"))) +
             '<div class="tg-row">' + _btn("로그인 정보 CSV 내려받기", "secondary", pin=1) +
             _btn("전달 완료 · 발급 정보 닫기", "ghost", pin=2) + '</div></div>'
-            '<div class="tg-split"><div class="tg-card"><div class="tg-sub">계정 목록</div>'
-            '<div class="tg-list-item on">홍길동 · user001</div><div class="tg-list-item">김하나 · user002</div></div>'
+            '<div class="tg-split"><div class="tg-card"><div class="tg-row">' + _pin(5) + '<span class="tg-sub">계정 목록 · 가나다순</span></div>'
+            '<div class="tg-radio"><span class="on">전체 42</span><span>ㄱ~ㅁ 14</span><span>ㅂ~ㅇ 15</span><span>ㅈ~ㅎ 13</span></div>'
+            '<div class="tg-list-item">김하나 · user002</div><div class="tg-list-item on">홍길동 · user001</div>'
+            '<div class="tg-sub">42명 중 1~10 · 1 / 5 페이지</div></div>'
             '<div class="tg-card"><div class="tg-sub">계정 상세</div><div class="tg-title">홍길동</div>' +
             _btn("임시 비밀번호 재발급", "secondary", pin=3) + _btn("계정 사용 중지", "ghost", pin=4) + '</div></div>'
         )),
@@ -279,6 +296,8 @@ def _manager_steps() -> list[str]:
             ("전달 완료 · 발급 정보 닫기", "전달을 마친 뒤 눌러서 화면에서 지움. 닫으면 임시 비밀번호를 다시 볼 수 없음"),
             ("임시 비밀번호 재발급", "비밀번호를 잊은 참여자에게 새 임시 비밀번호 발급. 기존 로그인은 종료됨"),
             ("계정 사용 중지", "퇴사·대상 제외 등으로 로그인을 막아야 하는 계정에 사용. 다시 활성화할 수 있고, 기존 검사 결과는 남음"),
+            ("계정 목록", "가나다순으로 10명씩 보임. 10명이 넘으면 <b>전체</b>와 초성 구간(예: ㄱ~ㅁ)으로 나뉘고, 이름, 아이디, 부서로 검색 가능. "
+             "여러 명은 아래 <b>여러 계정 한 번에 처리</b>에서 체크해 한꺼번에 재발급하거나 사용 중지"),
         ],
         note="임시 비밀번호는 <b>발급 직후 이 화면에서만</b> 볼 수 있습니다. CSV로 내려받거나 따로 기록한 뒤 닫으세요.",
         warn=True,
@@ -327,7 +346,8 @@ def _manager_steps() -> list[str]:
             '<div class="tg-row">' + _pin(2) + '<div class="tg-radio"><span class="on">전체 15</span><span>미시작 3</span>'
             '<span>진행 중 2</span><span>교육 전 완료 10</span><span>교육 후 완료 0</span></div></div>'
             '<div class="tg-row">' + _btn("교육 전 미완료자 명단 CSV (5명)", "secondary", pin=3) + '</div>'
-            '<div class="tg-exp"><div class="tg-exp-head">▾ 고객서비스팀 · 교육 전 완료 6/8명</div><div class="tg-exp-body">' +
+            '<div class="tg-exp"><div class="tg-exp-head">▾ 고객서비스팀 · 교육 전 완료 9/14명</div><div class="tg-exp-body">'
+            '<div class="tg-radio"><span class="on">전체 14</span><span>ㄱ~ㅇ 8</span><span>ㅈ~ㅎ 6</span></div>' +
             _table(("이름", "부서", "상태", "진행"),
                    (("홍길동", "고객서비스팀", "교육 전 완료", ""), ("김하나", "고객서비스팀", "진행 중", "교육 전 12/24"))) +
             '</div></div>'
@@ -336,17 +356,24 @@ def _manager_steps() -> list[str]:
             '<div class="tg-field"><b>' + _pin(5) + '부서 전체 선택</b><div class="tg-radio">'
             '<span class="on">매장운영팀 4</span><span>영업지원팀 3</span></div></div>'
             + _field("추가할 참여자 검색", "이름, 아이디, 부서, 직급으로 검색", placeholder=True) +
-            '<div class="tg-row">' + _btn("선택한 4명 배정", pin=6) + '</div></div>'
+            '<div class="tg-radio"><span class="on">전체 24</span><span>ㄱ~ㅂ 9</span><span>ㅅ~ㅇ 8</span><span>ㅈ~ㅎ 7</span></div>'
+            + _btn("✓ 이 페이지 10명 모두 선택", "ghost") +
+            '<div class="tg-checks col"><span class="on">김하나 · user002 · 영업지원팀</span>'
+            '<span class="on">박민수 · user007 · 매장운영팀</span><span>이서연 · user011 · 고객서비스팀</span></div>'
+            '<div class="tg-sub">24명 중 1~10 · 1 / 3 페이지</div>'
+            '<div class="tg-row">' + _btn("선택한 6명 배정", pin=6) + '</div></div>'
         )),
         [
             ("프로젝트 검색·선택", "회사명, 사업자등록번호, 프로젝트명, 교육명으로 검색. 프로젝트를 고르면 오른쪽에 일정, 그 아래에 참여자 배정과 참여 현황·리포트가 열림"),
             ("검사 상태", "전체, 미시작, 진행 중, 교육 전 완료, 교육 후 완료 중 하나를 누르면 그 상태인 사람만 보임. 부서별로 묶어 완료 인원을 보여 주고, "
-             "진행 중이면 응답한 문항 수(예: 교육 전 12/24)가 표시됨. <b>배정된 참여자 검색</b>으로 이름, 아이디, 부서, 직급 검색 가능"),
+             "진행 중이면 응답한 문항 수(예: 교육 전 12/24)가 표시됨. 부서 안에서는 가나다순 10명씩 보이고, 10명이 넘으면 <b>전체</b>와 초성 구간으로 나뉨. "
+             "<b>배정된 참여자 검색</b>으로 이름, 아이디, 부서, 직급 검색 가능"),
             ("미완료자 명단 CSV", "교육 후 검사 시작일 전에는 교육 전 검사를, 그 뒤에는 교육 후 검사를 마치지 않은 사람의 명단. "
              "이름, 아이디, 부서, 직급, 상태만 담기며 사내 메신저로 독려할 때 씀"),
             ("참여자 배정 변경", "잘못 배정한 사람은 <b>프로젝트 배정 해제</b>. 해제해도 제출한 검사 결과는 보존되고, 다시 배정할 수 있음"),
-            ("부서 전체 선택", "아직 배정하지 않은 우리 회사 참여자를 부서 단위로 한 번에 선택. 부서에 없는 사람은 <b>추가할 참여자 검색</b>으로 찾아 "
-             "<b>개별 추가</b>. 계정이 없으면 참여자 계정 메뉴에서 먼저 발급"),
+            ("부서 전체 선택", "아직 배정하지 않은 우리 회사 참여자를 부서 단위로 한 번에 선택. 부서에 없는 사람은 아래 목록에서 한 명씩 체크하거나 "
+             "<b>이 페이지 10명 모두 선택</b>. 목록은 가나다순 10명씩이고 <b>추가할 참여자 검색</b>으로 좁힐 수 있으며, 페이지를 넘겨도 체크가 유지됨. "
+             "계정이 없으면 참여자 계정 메뉴에서 먼저 발급"),
             ("선택한 N명 배정", "누르면 배정되고, 참여자가 로그인하면 내 교육 화면에 표시됨"),
         ],
     ))
@@ -462,13 +489,14 @@ def _participant_steps() -> list[str]:
         "STEP 2 · 내 교육", "참여할 교육 고르기",
         "로그인하면 나에게 배정된 교육과, 교육 전 검사부터 나의 리포트까지 네 단계 중 지금 어디인지가 보입니다.",
         _frame("내 교육", (
-            _topbar(("내 교육",), "내 교육", "참여자", pins=False) +
-            '<div class="tg-row">' + _field("참여할 프로젝트", "2026 하반기 CS 역량 과정", pin=1) + '</div>'
-            '<div class="tg-card"><div class="tg-title">2026 하반기 CS 역량 과정</div>'
-            f'<div class="tg-sub">교육과정: {SAMPLE_PROJECT} · 교육일: 2026-11-12</div>'
-            '<div class="tg-row"><span class="tg-tag muted">교육 전 미완료</span><span class="tg-tag muted">교육 후 미완료</span></div>'
-            '<div class="tg-radio"><span class="on">1 교육 전 검사</span><span>2 교육 · 현업 적용</span><span>3 교육 후 검사</span><span>4 나의 리포트</span></div>'
-            '<div class="tg-split">' + _btn("교육 전 검사", pin=2, full=True) + _btn("교육 후 검사", "secondary", pin=3, full=True) + '</div></div>'
+            _sidebar(("내 교육",), "내 교육", "참여자", pins=False, body=(
+                '<div class="tg-row">' + _field("참여할 프로젝트", "2026 하반기 CS 역량 과정", pin=1) + '</div>'
+                '<div class="tg-card"><div class="tg-title">2026 하반기 CS 역량 과정</div>'
+                f'<div class="tg-sub">교육과정: {SAMPLE_PROJECT} · 교육일: 2026-11-12</div>'
+                '<div class="tg-row"><span class="tg-tag muted">교육 전 미완료</span><span class="tg-tag muted">교육 후 미완료</span></div>'
+                '<div class="tg-radio"><span class="on">1 교육 전 검사</span><span>2 교육 · 현업 적용</span><span>3 교육 후 검사</span><span>4 나의 리포트</span></div>'
+                '<div class="tg-split">' + _btn("교육 전 검사", pin=2, full=True) + _btn("교육 후 검사", "secondary", pin=3, full=True) + '</div></div>'
+            ))
         )),
         [
             ("참여할 프로젝트", "배정된 교육이 여러 개면 여기서 선택. 교육마다 응답은 따로 저장됨"),
