@@ -1,8 +1,12 @@
 # Paperlogy
 
-The KMA TAP wordmark uses Paperlogy ExtraBold (800). Its descriptor uses
-Paperlogy Medium (500). The original, unmodified WOFF2 files are bundled locally;
-the application does not request fonts from a third-party CDN.
+The KMA TAP wordmark uses Paperlogy Black (900); ExtraBold (800) and Medium (500)
+are bundled for other text. The 800 and 500 WOFF2 files are the original,
+unmodified files. `Paperlogy-9Black-latin.woff2` was cut from the official
+Paperlogy 1.000 release (`Paperlogy-9Black.ttf`) to Basic Latin (U+0020-007E)
+with fontTools on 2026-11-05, because the wordmark only spells "KMA TAP".
+The license declares no Reserved Font Name, so a subset may keep the name.
+The application does not request these fonts from a third-party CDN.
 
 - Designer's official site: https://freesentation.blog/paperlogyfont
 - Official source repository: https://github.com/Freesentation/paperlogy

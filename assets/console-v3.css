@@ -51,11 +51,11 @@
 .tap-brow > span:first-child {color: var(--c2-ink-2); font-weight: 600; overflow-wrap: anywhere;}
 .tap-track {height: 8px; border-radius: 999px; background: var(--c2-soft); overflow: hidden;}
 .tap-track i {display: block; height: 100%; border-radius: 999px; background: var(--c2-teal);}
-.tap-track i.is-pre {background: #7ac7bd;}
+.tap-track i.is-pre {background: #7a94c7;}
 .tap-brow em {font-style: normal; color: var(--c2-ink-3); font-variant-numeric: tabular-nums; white-space: nowrap; font-size: 13px;}
 .tap-legend {display: flex; gap: 16px; font-size: 12.5px; color: var(--c2-ink-3); margin-top: 2px;}
 .tap-legend i {display: inline-block; width: 12px; height: 12px; border-radius: 3px; margin-right: 6px; vertical-align: -1px; background: var(--c2-teal);}
-.tap-legend i.is-pre {background: #7ac7bd;}
+.tap-legend i.is-pre {background: #7a94c7;}
 
 /* Team heatmap: departments × competencies, shaded 1~5; scrolls sideways on narrow screens. */
 .tap-heat-wrap {overflow-x: auto; border: 1px solid var(--c2-line); border-radius: 12px;}
@@ -97,7 +97,7 @@
 .tap-course {display: flex; flex-direction: column; border: 1px solid var(--c2-line); border-radius: 12px; background: var(--c2-sheet); overflow: hidden; color: inherit; text-decoration: none !important; transition: border-color .15s, box-shadow .15s;}
 a.tap-course:hover {border-color: var(--c2-teal-line); box-shadow: var(--c2-pill-shadow);}
 /* KMA thumbnails are square with the title in the middle, so they are shown whole on a soft field instead of cropped. */
-.tap-course__thumb {position: relative; height: 118px; background: linear-gradient(135deg, #e9efee, #d8e5e2); overflow: hidden;}
+.tap-course__thumb {position: relative; height: 118px; background: linear-gradient(135deg, #e7eaf1, #d3dbea); overflow: hidden;}
 .tap-course__thumb img {width: 100%; height: 100%; object-fit: contain; display: block;}
 .tap-course__src {position: absolute; left: 8px; top: 8px; height: 22px; padding: 0 8px; border-radius: 999px; background: rgb(255 255 255 / .92); color: var(--c2-teal-strong); font-size: 11.5px; font-weight: 700; display: inline-flex; align-items: center;}
 .tap-course__body {padding: 10px 12px 12px; display: flex; flex-direction: column; gap: 6px; flex: 1;}

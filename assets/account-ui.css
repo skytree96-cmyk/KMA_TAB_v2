@@ -1,35 +1,35 @@
 /* KMA TAP account screens. Stable test IDs and explicit container keys only. */
 .stApp {
-  --tap-ink: #102f36;
-  --tap-muted: #536f75;
-  --tap-accent: #087b76;
-  --tap-accent-deep: #075f5b;
-  --tap-canvas: #f4f8f8;
+  --tap-ink: #161614;
+  --tap-muted: #6e6d66;
+  --tap-accent: #1769ff;
+  --tap-accent-deep: #0b4fcc;
+  --tap-canvas: #f2f5fa;
   --tap-glass: rgba(255,255,255,.72);
-  --tap-glass-low: rgba(243,250,249,.62);
-  --tap-line: rgba(106,145,148,.24);
+  --tap-glass-low: rgba(240,244,253,.62);
+  --tap-line: rgba(106,120,148,.24);
   --tap-edge: rgba(255,255,255,.86);
   --tap-input: rgba(255,255,255,.72);
-  --tap-soft: rgba(8,123,118,.07);
-  --tap-shadow: 0 14px 42px -26px rgba(21,71,75,.3);
+  --tap-soft: rgba(23,105,255,.07);
+  --tap-shadow: 0 14px 42px -26px rgba(22,22,20,.3);
   color: var(--tap-ink);
-  background: radial-gradient(ellipse at 4% 0%,rgba(156,216,215,.22),transparent 46%),
+  background: radial-gradient(ellipse at 4% 0%,rgba(156,176,216,.22),transparent 46%),
               radial-gradient(ellipse at 96% 35%,rgba(163,198,221,.18),transparent 48%),
               var(--tap-canvas);
 }
 @supports (color: light-dark(white,black)) {
   .stApp {
-    --tap-ink: light-dark(#102f36,#e5f3f2);
-    --tap-muted: light-dark(#536f75,#adbfca);
-    --tap-canvas: light-dark(#f4f8f8,#0d1b23);
-    --tap-glass: light-dark(rgba(255,255,255,.72),rgba(28,48,58,.84));
-    --tap-glass-low: light-dark(rgba(243,250,249,.62),rgba(18,37,47,.75));
-    --tap-line: light-dark(rgba(106,145,148,.24),rgba(166,207,210,.21));
-    --tap-edge: light-dark(rgba(255,255,255,.86),rgba(195,229,231,.18));
-    --tap-input: light-dark(rgba(255,255,255,.72),rgba(10,28,37,.8));
-    --tap-soft: light-dark(rgba(8,123,118,.07),rgba(97,208,197,.1));
-    --tap-accent: light-dark(#087b76,#8adcd2);
-    --tap-accent-deep: light-dark(#075f5b,#b3eee6);
+    --tap-ink: light-dark(#161614,#eef3ff);
+    --tap-muted: light-dark(#6e6d66,#adbfca);
+    --tap-canvas: light-dark(#f2f5fa,#161614);
+    --tap-glass: light-dark(rgba(255,255,255,.72),rgba(22,22,20,.84));
+    --tap-glass-low: light-dark(rgba(240,244,253,.62),rgba(18,37,47,.75));
+    --tap-line: light-dark(rgba(106,120,148,.24),rgba(166,181,210,.21));
+    --tap-edge: light-dark(rgba(255,255,255,.86),rgba(195,207,231,.18));
+    --tap-input: light-dark(rgba(255,255,255,.72),rgba(22,22,20,.8));
+    --tap-soft: light-dark(rgba(23,105,255,.07),rgba(97,135,208,.1));
+    --tap-accent: light-dark(#1769ff,#8aa6dc);
+    --tap-accent-deep: light-dark(#0b4fcc,#b3c7ee);
   }
 }
 .stApp, .stApp input, .stApp textarea, .stApp button,
@@ -59,7 +59,7 @@
 .stApp [data-testid="stSidebar"] {
   background:linear-gradient(160deg,var(--tap-glass),var(--tap-glass-low));
   border-right:1px solid var(--tap-edge);
-  box-shadow:8px 0 32px -24px rgba(18,73,79,.2);
+  box-shadow:8px 0 32px -24px rgba(22,22,20,.2);
   backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);
 }
 .stApp [data-testid="stSidebarContent"] {padding-top:1.4rem;}
@@ -94,7 +94,7 @@
 .stApp [data-testid="stMultiSelect"] [data-baseweb="select"] > div {
   border:1px solid var(--tap-line);
   border-radius:12px;background:var(--tap-input);color:var(--tap-ink);
-  box-shadow:inset 0 1px 1px rgba(9,64,72,.025);
+  box-shadow:inset 0 1px 1px rgba(22,22,20,.025);
 }
 .stApp input, .stApp textarea {color:var(--tap-ink);}
 .stApp input::placeholder, .stApp textarea::placeholder {color:var(--tap-muted);opacity:.8;}
@@ -111,14 +111,14 @@
   min-height:44px;border:1px solid var(--tap-line);border-radius:12px;
   padding:.62rem 1.05rem;color:var(--tap-ink);
   background:linear-gradient(150deg,var(--tap-glass),var(--tap-glass-low));
-  box-shadow:0 4px 12px -9px rgba(8,67,74,.3),inset 0 1px 0 var(--tap-edge);
+  box-shadow:0 4px 12px -9px rgba(22,22,20,.3),inset 0 1px 0 var(--tap-edge);
   transition:transform .16s ease,box-shadow .16s ease,border-color .16s ease;
 }
 .stApp [data-testid="stButton"] button[kind^="primary"],
 .stApp [data-testid="stFormSubmitButton"] button[kind^="primary"] {
-  color:#fff;background:linear-gradient(125deg,#09847e 0%,#076b67 65%,#075d5b 100%);
-  border:1px solid rgba(6,92,91,.4);
-  box-shadow:0 8px 18px -10px rgba(5,100,98,.7),inset 0 1px 0 rgba(255,255,255,.24);
+  color:#fff;background:linear-gradient(125deg,#1769ff 0%,#0b4fcc 65%,#0b4fcc 100%);
+  border:1px solid rgba(22,22,20,.4);
+  box-shadow:0 8px 18px -10px rgba(22,22,20,.7),inset 0 1px 0 rgba(255,255,255,.24);
 }
 .stApp button:disabled {opacity:.52;box-shadow:none !important;transform:none !important;}
 @media(hover:hover) {
@@ -127,7 +127,7 @@
   .stApp [data-testid="stDownloadButton"] button:not(:disabled):hover,
   .stApp [data-testid="stLinkButton"] a:hover {
     transform:translateY(-1px);border-color:var(--tap-accent);
-    box-shadow:0 9px 20px -12px rgba(5,90,90,.45),inset 0 1px 0 rgba(255,255,255,.25);
+    box-shadow:0 9px 20px -12px rgba(22,22,20,.45),inset 0 1px 0 rgba(255,255,255,.25);
   }
 }
 .stApp :is(button,a,input,textarea,[role="tab"]):focus-visible {
@@ -145,7 +145,7 @@
 }
 .stApp [data-testid="stTabs"] [role="tab"][aria-selected="true"] {
   color:var(--tap-accent-deep);background:var(--tap-glass);
-  box-shadow:0 3px 10px -5px rgba(16,73,78,.26);
+  box-shadow:0 3px 10px -5px rgba(22,22,20,.26);
 }
 .stApp [data-testid="stTabs"] [data-baseweb="tab-highlight"],
 .stApp [data-testid="stTabs"] [data-baseweb="tab-border"] {display:none;}
@@ -244,7 +244,7 @@
 .stApp [data-testid="stMultiSelect"] [role="group"] {
   min-height:46px;border:1px solid var(--tap-line);border-radius:12px;
   background:var(--tap-input);color:var(--tap-ink);
-  box-shadow:inset 0 1px 1px rgba(9,64,72,.025);
+  box-shadow:inset 0 1px 1px rgba(22,22,20,.025);
 }
 .stApp [data-testid="stTextInputRootElement"]:focus-within,
 .stApp [data-testid="stSelectbox"] [role="group"]:focus-within,

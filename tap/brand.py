@@ -16,7 +16,9 @@ BRAND_DESCRIPTION = "교육 전후\n변화 평가 플랫폼"
 def brand_css() -> str:
     """Return a style element; font loading makes no third-party requests."""
     faces = []
-    for weight, filename in ((500, "Paperlogy-5Medium.woff2"), (800, "Paperlogy-8ExtraBold.woff2")):
+    # The wordmark uses Black (900), cut to Basic Latin since it only spells "KMA TAP".
+    for weight, filename in ((500, "Paperlogy-5Medium.woff2"), (800, "Paperlogy-8ExtraBold.woff2"),
+                             (900, "Paperlogy-9Black-latin.woff2")):
         font = (FONT_DIR / filename).read_bytes()
         if font[:4] != b"wOF2":
             raise ValueError("Bundled Paperlogy font is invalid")
@@ -27,15 +29,15 @@ def brand_css() -> str:
         )
     return "<style>" + "".join(faces) + """
     .tap-ci {
-      --ci-kma:#192c48; --ci-tap:#087f83; --ci-dot:#20c7dc; --ci-caption:#51657f;
+      --ci-kma:#161614; --ci-tap:#1769ff; --ci-dot:#6fa0ff; --ci-caption:#6e6d66;
       display:flex; align-items:center; gap:26px; flex-wrap:wrap;
       width:fit-content; max-width:100%; margin:0 0 22px; padding:0;
       text-align:left; color:var(--ci-kma);
     }
     .tap-ci .tap-ci-wordmark {
       display:inline-flex; align-items:baseline; gap:0; flex-shrink:0;
-      font-family:'TAP Paperlogy',sans-serif !important; font-weight:800 !important;
-      font-size:clamp(40px,5.8vw,76px); line-height:1.08; letter-spacing:-.055em;
+      font-family:'TAP Paperlogy',sans-serif !important; font-weight:900 !important;
+      font-size:clamp(40px,5.8vw,76px); line-height:1.08; letter-spacing:-.01em;
       white-space:nowrap; font-synthesis:none; -webkit-font-smoothing:antialiased;
     }
     .tap-ci .tap-ci-kma,.tap-ci .tap-ci-tap {
@@ -54,9 +56,9 @@ def brand_css() -> str:
       font-size:14px !important; line-height:1.65 !important; letter-spacing:-.025em;
       color:var(--ci-caption); white-space:pre-line; margin:0; padding:1px 0 0;
     }
-    .tap-ci--navy {--ci-tap:#192c48;}
-    .tap-ci--teal {--ci-kma:#087f83;--ci-tap:#087f83;}
-    .tap-ci--reverse {--ci-kma:#ffffff;--ci-tap:#ffffff;--ci-caption:#d8e4ef;}
+    .tap-ci--navy {--ci-tap:#161614;}
+    .tap-ci--teal {--ci-kma:#1769ff;--ci-tap:#1769ff;--ci-dot:#0b4fcc;}
+    .tap-ci--reverse {--ci-kma:#ffffff;--ci-tap:#ffffff;--ci-caption:#d8e4ef;--ci-dot:#6fa0ff;}
     .tap-ci--compact {flex-direction:column;align-items:flex-start;gap:9px;margin:0 0 20px;}
     .tap-ci--compact .tap-ci-wordmark {font-size:32px;}
     .tap-ci--compact .tap-ci-description {font-size:10px !important;line-height:1.65 !important;}
