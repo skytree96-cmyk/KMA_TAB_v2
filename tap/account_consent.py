@@ -1,8 +1,9 @@
 """Privacy consent a participant gives once, before the first answer is stored.
 
-Three agreements, each shown and checked on its own (개인정보 보호법 제22조): collection and use, provision
-to the member company, and storage abroad (제28조의8, Google Cloud Tokyo). The privacy policy (KMA 개인정보
-처리방침 제1·3·4·6조의2) says the same; change both together and raise PRIVACY_CONSENT_VERSION.
+Two agreements, each shown and checked on its own (개인정보 보호법 제22조): collection and use, and provision
+to the member company. Storage in Google Cloud Tokyo is not asked here: it is a processor's storage disclosed in the
+privacy policy (제28조의8 제1항 제3호, KMA 개인정보 처리방침 제5조·제6조의2). The policy (제1·3·4·6조) says the same;
+change both together and raise PRIVACY_CONSENT_VERSION.
 """
 from __future__ import annotations
 
@@ -15,8 +16,6 @@ import streamlit as st
 from tap.account_store import PRIVACY_CONSENT_ITEMS, PRIVACY_CONSENT_VERSION
 
 PREFIX = "tap_consent_"
-# The party that stores the data abroad and its privacy contact (Google's DPO address on the UK ICO register).
-OVERSEAS_RECIPIENT = "Google LLC (Google Cloud) · 개인정보 보호 문의 dpo-google@google.com"
 KEPT = "검사 응답과 점수는 교육 후 검사 마감일부터 1년, 계정 정보는 회사의 삭제 요청이나 멤버십 계약 종료 때까지"
 
 CONSENT_SECTIONS: tuple[tuple[str, str, tuple[tuple[str, str], ...]], ...] = (
@@ -33,15 +32,8 @@ CONSENT_SECTIONS: tuple[tuple[str, str, tuple[tuple[str, str], ...]], ...] = (
                  "점수와 학습 희망은 5명 이상 모인 조직·부서 집계로만 제공하고, 개인 점수와 문항별 응답은 제공하지 않음"),
         ("보유 기간", "회사의 교육 운영에 필요한 기간(회사의 개인정보 처리방침에 따름)"),
     )),
-    ("overseas", "국외 보관(일본)", (
-        ("이전 국가", "일본(Google Cloud 도쿄 리전)"),
-        ("받는 곳", OVERSEAS_RECIPIENT),
-        ("항목", "위 수집 항목 전부와 접속 기록"),
-        ("시기와 방법", "검사를 이용할 때마다 암호화된 네트워크로 전송해 보관"),
-        ("목적과 보유 기간", "서버·데이터베이스·백업 운영. 보유 기간은 수집·이용과 같음"),
-    )),
 )
-REFUSAL = "동의하지 않을 수 있습니다. 다만 세 항목 모두 검사에 꼭 필요해서, 동의하지 않으면 TAP 검사를 할 수 없습니다."
+REFUSAL = "동의하지 않을 수 있습니다. 다만 두 항목 모두 검사에 꼭 필요해서, 동의하지 않으면 TAP 검사를 할 수 없습니다."
 assert tuple(code for code, _, _ in CONSENT_SECTIONS) == PRIVACY_CONSENT_ITEMS
 
 
@@ -56,7 +48,7 @@ def consent_html() -> str:
         cells = "".join(f"<dt>{escape(label)}</dt><dd>{escape(text)}</dd>" for label, text in rows)
         boxes.append(f'<section class="tap-consent__box"><h4><span>필수</span>{number}. {escape(title)}</h4><dl>{cells}</dl></section>')
     return ('<div class="tap-consent"><div class="tap-consent__head"><b>검사 전에 개인정보 처리에 동의해 주세요</b>'
-            '<p>처음 한 번만 묻습니다. 세 항목은 따로 동의를 받습니다.</p></div>'
+            '<p>처음 한 번만 묻습니다. 두 항목은 따로 동의를 받습니다.</p></div>'
             + "".join(boxes)
             + f'<p class="tap-consent__foot">{escape(REFUSAL)} 자세한 내용은 '
               f'<a href="{PRIVACY_POLICY_URL}" target="_blank" rel="noopener">KMA 개인정보 처리방침</a>에 있습니다.</p></div>')
