@@ -1,0 +1,2 @@
+# Only for the weekly catalog rebuild (GitHub Actions); the app itself does not need these.
+requests>=2.32,<3
