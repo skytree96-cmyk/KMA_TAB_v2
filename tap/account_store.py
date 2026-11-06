@@ -77,6 +77,8 @@ _EMAIL_RE = re.compile(r"[^@\s]+@[^@\s]+\.[^@\s]+\Z")
 _PHONE_RE = re.compile(r"\+?[0-9][0-9 ().-]*\Z")
 _TRANSFER_KEYS = frozenset({"application_opportunity", "supervisor_support", "resources_authority", "time_process_support"})
 _BARRIERS = frozenset({"적용 기회 부족", "상사·동료 지원 부족", "도구·정보·권한 부족", "시간·프로세스 제약", "특별한 방해요인 없음"})
+# Competencies a participant wants to learn more about, asked once at the end of the pre-training test.
+MAX_LEARNING_INTERESTS = 3
 
 
 def _password_input(password: str) -> bytes:
@@ -887,7 +889,7 @@ class AccountStore:
 
     @staticmethod
     def _payload(config, phase, payload, completed):
-        allowed = {"responses", "current_question", "started_at", "duration_seconds", "post_transfer_responses"}
+        allowed = {"responses", "current_question", "started_at", "duration_seconds", "post_transfer_responses", "learning_interests"}
         if not isinstance(payload, dict) or set(payload) - allowed:
             raise ValidationError("검사 저장 형식을 확인하세요.")
         payload = json.loads(_json(payload))
@@ -907,6 +909,12 @@ class AccountStore:
             raise ValidationError("현업 적용 응답을 확인하세요.")
         if phase == "pre" and transfer:
             raise ValidationError("교육 전 검사에는 현업 적용 응답을 저장할 수 없습니다.")
+        if "learning_interests" in payload:
+            interests = payload["learning_interests"]
+            factors = {str(code) for code in config.get("selected_factors") or []}
+            if (phase != "pre" or not isinstance(interests, list) or len(interests) > MAX_LEARNING_INTERESTS
+                    or len(set(interests)) != len(interests) or any(not isinstance(code, str) or code not in factors for code in interests)):
+                raise ValidationError(f"더 배우고 싶은 역량은 이 검사의 역량 중 {MAX_LEARNING_INTERESTS}개까지 고를 수 있습니다.")
         if phase == "post":
             if any(type(transfer[k]) is not int or not 1 <= transfer[k] <= 5 for k in _TRANSFER_KEYS & transfer.keys()) or (completed and not _TRANSFER_KEYS <= transfer.keys()):
                 raise ValidationError("현업 적용 환경 네 문항에 응답해 주세요.")
@@ -964,6 +972,30 @@ class AccountStore:
             for row in rows:
                 for phase in ("pre", "post"):
                     row[phase + "_payload"] = payloads.get((row["id"], phase))
+            return rows
+
+    def company_results(self, token: str, company_id: str | None = None) -> list[dict]:
+        """Every assignment of one company's projects with its submitted answers: input for the company demand report.
+
+        A manager reads only their own company; KMA names the company. Presentation must keep the N>=5 rule
+        and show counts per competency or department only, never a person.
+        """
+        with self._transaction() as conn:
+            actor = self._require(conn, token, {"kma", "company"})
+            if actor["role"] == "company":
+                company_id = actor["company_id"]
+            if not company_id or not self._one(conn, "SELECT id FROM tap_companies WHERE id=?", (str(company_id),)):
+                raise ValidationError("회사를 확인하세요.")
+            rows = self._assignments(conn, "p.company_id=?", (str(company_id),))
+            completed = self._all(conn, "SELECT s.assignment_id,s.phase,s.payload_json,s.completed_at FROM tap_assessments s "
+                                  "JOIN tap_assignments a ON a.id=s.assignment_id JOIN tap_projects p ON p.id=a.project_id "
+                                  "WHERE p.company_id=? AND s.completed=1", (str(company_id),))
+            done = {(row["assignment_id"], row["phase"]): row for row in completed}
+            for row in rows:
+                for phase in ("pre", "post"):
+                    record = done.get((row["id"], phase))
+                    row[phase + "_payload"] = json.loads(record["payload_json"]) if record else None
+                    row[phase + "_completed_at"] = record["completed_at"] if record else None
             return rows
 
     def record_report_access(self, token: str, project_id: str, event: str, assignment_id: str | None = None, *,

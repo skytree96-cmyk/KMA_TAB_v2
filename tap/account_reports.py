@@ -7,8 +7,8 @@ import pandas as pd
 import streamlit as st
 
 from tap.account_insights import (COURSE_INQUIRY_URL, TRANSFER_ATTENTION_MEAN, course_context_note, course_gap_counts,
-                                  hidden_team_note, organization_detail_rows, team_heatmap,
-                                  recommend_courses, summarize_transfer, transfer_notes)
+                                  environment_holds, hidden_team_note, hold_note, organization_detail_rows, team_heatmap,
+                                  recommend_courses, summarize_transfer, transfer_notes, weak_environment)
 from tap.account_ui_kit import (bar_rows, change_scale, change_summary, chip, fmt, foot, heatmap, notes, section,
                                 stat_tiles)
 from tap.aggregation import aggregate_paired_factor_results
@@ -70,14 +70,16 @@ def summarize_by_team(project: Mapping[str, Any], results: list[dict[str, Any]],
 
 
 def individual_report_pdf(project: Mapping[str, Any], questions: list[dict[str, Any]], pre_responses: Mapping[str, Any],
-                          post_responses: Mapping[str, Any], subject: str) -> bytes:
+                          post_responses: Mapping[str, Any], subject: str, *, interests: Any = None,
+                          transfer: Mapping[str, Any] | None = None) -> bytes:
     """Build one person's pre/post PDF from responses the caller is already authorized to read."""
     from tap.account_report_pdf import build_report_pdf
-    scores = score_pre_post_responses(questions, pre_responses, post_responses, (project.get("config") or {}).get("target_means"))
+    config = project.get("config") or {}
+    scores = score_pre_post_responses(questions, pre_responses, post_responses, config.get("target_means"))
     rows = [{**row, "change": row["self_reported_change"], "valid_n": row["paired_valid_items"]} for row in scores]
-    # Personal transfer answers stay out of the PDF.
+    # Personal transfer answers stay out of the PDF; they only decide which courses are held back.
     # Same picks as the participant screen: three competencies, each with a public course and an e-learning course.
-    courses = recommend_courses(project.get("config") or {}, scores, limit=6)
+    courses = personal_courses(config, scores, interests, transfer)
     return build_report_pdf(project, rows, kind="individual", subject=subject, participant_count=1, courses=courses)
 
 
@@ -96,8 +98,9 @@ def export_report_pdf(store: Any, token: str, project: Mapping[str, Any], assign
             raise ValidationError("교육 전후 검사를 모두 완료한 참여자를 선택해 주세요.")
         subject = " · ".join(str(part) for part in (result.get("user_name") or "참여자", result.get("login_id")) if part)
         _record_access(store, token, project, "download_individual_pdf", assignment_id)
-        return individual_report_pdf(project, questions, (result.get("pre_payload") or {}).get("responses", {}),
-                                     (result.get("post_payload") or {}).get("responses", {}), subject)
+        pre, post = result.get("pre_payload") or {}, result.get("post_payload") or {}
+        return individual_report_pdf(project, questions, pre.get("responses", {}), post.get("responses", {}), subject,
+                                     interests=pre.get("learning_interests"), transfer=post.get("post_transfer_responses"))
     summaries = {row["factor_code"]: row for row in summarize_project(project, results)}
     if not any(row["paired_n"] >= MIN_GROUP_N for row in summaries.values()):
         raise ValidationError("조직 리포트는 역량별 교육 전후 유효응답이 5명 이상일 때 다운로드할 수 있습니다.")
@@ -112,7 +115,7 @@ def export_report_pdf(store: Any, token: str, project: Mapping[str, Any], assign
     _record_access(store, token, project, "download_organization_pdf")
     # The PDF decides whether the department page is worth printing.
     return build_report_pdf(project, rows, kind="organization", subject="조직 전체", participant_count=count,
-                            transfer=summarize_transfer(results), courses=_organization_courses(config, summaries.values()),
+                            transfer=summarize_transfer(results), courses=_organization_courses(config, summaries.values(), results),
                             heatmap=team_heatmap(summarize_by_team(project, results)))
 
 
@@ -127,9 +130,34 @@ def _disclosed_scores(summaries: Any) -> list[dict[str, Any]]:
             for row in summaries if row["paired_n"] >= MIN_GROUP_N]
 
 
-def _organization_courses(config: Mapping[str, Any], summaries: Any) -> list[dict[str, Any]]:
+def personal_courses(config: Mapping[str, Any], scores: list[Mapping[str, Any]], interests: Any = None,
+                     transfer: Mapping[str, Any] | None = None) -> list[dict[str, Any]]:
+    """One person's picks: their own wishes first, nothing for competencies held for the environment."""
+    held = environment_holds(config, scores, weak_environment(transfer))
+    return recommend_courses(config, scores, limit=6, interests={str(code): 1 for code in interests or []},
+                             hold={item["factor_code"] for item in held})
+
+
+def interest_counts(results: list[Mapping[str, Any]]) -> dict[str, int]:
+    """How many participants chose each competency to learn more about, at the end of the pre-training test."""
+    counts: dict[str, int] = {}
+    for result in results:
+        if result.get("pre_completed"):
+            for code in (result.get("pre_payload") or {}).get("learning_interests") or []:
+                counts[str(code)] = counts.get(str(code), 0) + 1
+    return counts
+
+
+def organization_holds(config: Mapping[str, Any], summaries: Any, results: list[Mapping[str, Any]]) -> list[dict[str, Any]]:
+    return environment_holds(config, _disclosed_scores(summaries), weak_environment(summarize_transfer(results)))
+
+
+def _organization_courses(config: Mapping[str, Any], summaries: Any, results: list[Mapping[str, Any]] | None = None) -> list[dict[str, Any]]:
     # Three competencies × (public course, e-learning, in-house inquiry course).
-    return recommend_courses(config, _disclosed_scores(summaries), limit=9, audience="organization")
+    summaries = list(summaries)
+    held = organization_holds(config, summaries, results) if results is not None else []
+    return recommend_courses(config, _disclosed_scores(summaries), limit=9, audience="organization",
+                             interests=interest_counts(results or []), hold={item["factor_code"] for item in held})
 
 
 def _percent(value: int, total: int) -> float | None:
@@ -176,11 +204,16 @@ def _render_transfer(results: list[dict[str, Any]]) -> dict[str, Any]:
     return transfer
 
 
-def _render_courses(courses: list[dict[str, Any]], transfer: Mapping[str, Any], *, has_gap: bool = False) -> None:
-    from tap.account_course_ui import render_course_cards
+def _render_courses(courses: list[dict[str, Any]], transfer: Mapping[str, Any], *, has_gap: bool = False,
+                    holds: list[Mapping[str, Any]] = ()) -> None:
+    from tap.account_course_ui import render_course_cards, render_holds
     with section("courses", "school", "교육과정 검토 우선순위",
                  "교육 후 평균이 목표보다 0.2점 이상 낮은 역량과, 역량마다 연결된 KMA 과정(공개교육 · 이러닝 · 단체교육 문의)", tone="tint"):
-        if not courses and has_gap:
+        if holds:
+            render_holds(holds, "조직 개선과제", "교육보다 업무 환경을 먼저 점검할 역량입니다. 이 역량에는 과정을 권하지 않습니다.")
+        if not courses and holds:
+            pass
+        elif not courses and has_gap:
             st.info("목표보다 낮은 공개 역량은 있지만 지금 추천할 수 있는 KMA 과정이 없습니다. 아래 단체교육 문의를 이용해 주세요.")
         elif not courses:
             st.success("목표보다 0.2점 이상 낮은 공개 역량이 없어 검토할 후속 과정이 없습니다.")
@@ -311,7 +344,8 @@ def render_project_report(store: Any, token: str, project: Mapping[str, Any]) ->
     _render_team_heatmap(project, results)
     transfer = _render_transfer(results)
     _, below = course_gap_counts(project["config"], _disclosed_scores(summaries))
-    _render_courses(_organization_courses(project["config"], summaries), transfer, has_gap=bool(below))
+    _render_courses(_organization_courses(project["config"], summaries, results), transfer, has_gap=bool(below),
+                    holds=organization_holds(project["config"], summaries, results))
 
 
 def _detail_csv(project: Mapping[str, Any], results: list[dict[str, Any]], summaries: list[dict[str, Any]]) -> bytes:

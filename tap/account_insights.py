@@ -144,7 +144,8 @@ def course_gap_counts(config: Mapping[str, Any], factor_rows: Iterable[Mapping[s
 def recommend_courses(config: Mapping[str, Any], factor_rows: Iterable[Mapping[str, Any]], limit: int = 4, *,
                       audience: str = "individual", score_key: str = "post_score",
                       max_competencies: int = 3, today: date | None = None,
-                      session_starts: Mapping[str, list[str]] | None = None) -> list[dict[str, Any]]:
+                      session_starts: Mapping[str, list[str]] | None = None,
+                      interests: Mapping[str, int] | None = None, hold: Iterable[str] = ()) -> list[dict[str, Any]]:
     """Pick courses for competencies at least 0.2 below the project target.
 
     factor_rows need factor_code, factor_name_ko and the score under ``score_key`` (post_score after
@@ -159,15 +160,22 @@ def recommend_courses(config: Mapping[str, Any], factor_rows: Iterable[Mapping[s
     The same course — a second location, next year's run or another part of the same series — is never
     shown twice. Session dates come from ``session_starts`` (course code -> start dates) when given, else
     from the daily live answer of the KMA site when one is available, else from the catalog.
+
+    ``interests`` maps competency codes to how many people want to learn them (1 for one person's own
+    choice). One person's choices come first among the gaps; for an organization the count breaks ties
+    after the gap band and the organization's priorities. Either way the reason says so. Competencies in
+    ``hold`` get no course: their cause looks like the work environment (see environment_holds).
     """
     if TRAINING_GATE.get(str(config.get("training_cause") or "mixed_or_unknown"), 0.0) == 0.0:
         return []
     today = today or datetime.now(ZoneInfo("Asia/Seoul")).date()
     targets = config.get("target_means") or {}
     priorities = {str(code) for code in config.get("organization_priorities") or []}
+    wanted = {str(code): int(count) for code, count in (interests or {}).items() if count}
+    held = {str(code) for code in hold}
     needs = []
     for row in factor_rows:
-        if row.get(score_key) is None:
+        if row.get(score_key) is None or str(row["factor_code"]) in held:
             continue
         code, score = str(row["factor_code"]), float(row[score_key])
         target = float(targets.get(code, 3.5))
@@ -177,8 +185,13 @@ def recommend_courses(config: Mapping[str, Any], factor_rows: Iterable[Mapping[s
         pre = row.get("pre_score") if score_key == "post_score" else None
         needs.append({"factor_code": code, "factor_name_ko": row["factor_name_ko"], "score": score, "target": target,
                       "gap": gap, "change": None if pre is None else round(score - float(pre), 2),
-                      "phase": "post" if score_key == "post_score" else "pre"})
-    needs.sort(key=lambda need: (-round(need["gap"], 1), need["factor_code"] not in priorities, need["factor_code"]))
+                      "phase": "post" if score_key == "post_score" else "pre",
+                      "priority": code in priorities, "interest": wanted.get(code, 0), "audience": audience})
+    if audience == "individual":
+        # The participant's own wish comes first among competencies below target.
+        needs.sort(key=lambda need: (not need["interest"], -round(need["gap"], 1), not need["priority"], need["factor_code"]))
+    else:
+        needs.sort(key=lambda need: (-round(need["gap"], 1), not need["priority"], -need["interest"], need["factor_code"]))
     # Only the few competencies furthest from target: a report that lists courses for every competency
     # stops being a recommendation.
     needs = needs[:max_competencies]
@@ -292,6 +305,11 @@ def _course_reason(need: Mapping[str, Any]) -> dict[str, Any]:
     """The numbers behind a pick, and what the pre/post change suggests doing with it."""
     phase_label = "교육 후" if need.get("phase") == "post" else "교육 전"
     reason = f"{phase_label} {need['score']:.2f}점, 목표 {need['target']:.2f}점보다 {need['gap']:.2f}점 낮음"
+    # The other two conditions of a recommendation, when they hold: the organization's priority and the wish to learn.
+    if need.get("priority"):
+        reason += " · 조직 우선역량"
+    if need.get("interest"):
+        reason += " · 학습 희망" + (f" {need['interest']}명" if need.get("audience") == "organization" else "")
     change = need["change"]
     if change is None:
         return {"reason": reason, "advice": ""}
@@ -305,6 +323,65 @@ def _course_reason(need: Mapping[str, Any]) -> dict[str, Any]:
     else:
         advice = "교육 전과 큰 차이가 없습니다. 지난 교육 내용이 업무에 맞았는지, 적용할 여건이 있었는지 함께 점검하세요."
     return {"reason": reason, "advice": advice}
+
+
+# Conditions that, when low, point to the work environment rather than missing skills.
+ENVIRONMENT_FACTORS = (("resources_authority", "도구·정보·권한"), ("time_process_support", "시간·프로세스"))
+PERSONAL_WEAK_ANSWER = 2  # one person's answer of 2 or lower; a group mean is weak below TRANSFER_ATTENTION_MEAN
+
+
+def weak_environment(transfer: Mapping[str, Any] | None) -> list[str]:
+    """Labels of the environment conditions that are low, from one person's answers or a group summary.
+
+    One person: their own answers (``post_transfer_responses``). A group: summarize_transfer's result,
+    used only when disclosed.
+    """
+    if not transfer:
+        return []
+    if "factors" in transfer:
+        if not transfer.get("disclosed"):
+            return []
+        means = {row["code"]: row["mean"] for row in transfer["factors"]}
+        return [label for code, label in ENVIRONMENT_FACTORS
+                if means.get(code) is not None and means[code] < TRANSFER_ATTENTION_MEAN]
+    return [label for code, label in ENVIRONMENT_FACTORS
+            if type(transfer.get(code)) is int and transfer[code] <= PERSONAL_WEAK_ANSWER]
+
+
+def environment_holds(config: Mapping[str, Any], factor_rows: Iterable[Mapping[str, Any]], weak: list[str]) -> list[dict[str, Any]]:
+    """Competencies whose course is held back and turned into an organization improvement item.
+
+    After training, a competency still at least 0.2 below target that also moved less than 0.2, while the
+    tools, authority or time to apply it were rated low: more training is unlikely to help before the
+    environment changes. Needs both readings; before training nothing is held.
+    """
+    if not weak:
+        return []
+    targets = config.get("target_means") or {}
+    held = []
+    for row in factor_rows:
+        post, pre = row.get("post_score"), row.get("pre_score")
+        if post is None or pre is None:
+            continue
+        gap = round(float(targets.get(str(row["factor_code"]), 3.5)) - float(post), 2)
+        change = round(float(post) - float(pre), 2)
+        if gap >= MEANINGFUL_DIFFERENCE and change < MEANINGFUL_DIFFERENCE:
+            held.append({"factor_code": str(row["factor_code"]), "factor_name_ko": row["factor_name_ko"],
+                         "score": float(post), "gap": gap, "change": change, "conditions": list(weak)})
+    return held
+
+
+def hold_note(item: Mapping[str, Any]) -> str:
+    """One line for an organization improvement item."""
+    change = item["change"]
+    if change == 0:
+        moved = "교육 전과 같습니다"
+    elif change > 0:
+        moved = f"교육 전보다 {change:.2f}점 오르는 데 그쳤습니다"
+    else:
+        moved = f"교육 전보다 {abs(change):.2f}점 낮아졌습니다"
+    return (f"목표보다 {item['gap']:.2f}점 낮고 {moved}. {'·'.join(item['conditions'])} 응답이 낮아 "
+            "과정보다 업무 환경을 먼저 점검하세요.")
 
 
 def team_heatmap(team_summaries: Iterable[Mapping[str, Any]], min_n: int = MIN_GROUP_N) -> dict[str, Any]:
