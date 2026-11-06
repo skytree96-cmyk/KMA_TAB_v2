@@ -127,7 +127,7 @@ def _denied(exception_type, function, *args) -> None:
 def _exercise(scoped_url: str) -> None:
     from tap.account_store import (
         AccountStore, AuthenticationError, AuthorizationError, ConflictError, ValidationError,
-        hash_password,
+        PRIVACY_CONSENT_ITEMS, PRIVACY_CONSENT_VERSION, hash_password,
     )
     import psycopg
     from tap.data import questions_for_factors
@@ -171,6 +171,12 @@ def _exercise(scoped_url: str) -> None:
     participant, participant_token = user("0123456789-participant001", "participant", company_a, profile=profile)
     _check({key: store.principal(participant_token)[key] for key in profile} == profile)
     _, peer_token = user("0123456789-participant002", "participant", company_a)
+    # Consent screen: stored on the account, required before any answer, and only the participant can give it.
+    _check(store.principal(participant_token)["privacy_consent_version"] == "")
+    _denied(ValidationError, store.record_privacy_consent, participant_token, PRIVACY_CONSENT_VERSION, PRIVACY_CONSENT_ITEMS[:2])
+    for consenting in (participant_token, peer_token):
+        store.record_privacy_consent(consenting, PRIVACY_CONSENT_VERSION, PRIVACY_CONSENT_ITEMS, client="203.0.113.30")
+    _check(store.principal(participant_token)["privacy_consent_version"] == PRIVACY_CONSENT_VERSION)
     _, other_company_token = user("manager001", "company", company_b)
     _check(participant["id"] not in {row["id"] for row in store.list_users(other_company_token)})
     project = store.create_project(admin, "Isolated PostgreSQL Check", {
@@ -319,6 +325,8 @@ def _exercise(scoped_url: str) -> None:
     store = AccountStore(scoped_url, clock=lambda: now[0])
     _check(store.purge_expired_assessments() == 2)
     _check(store.purge_expired_assessments() == 0)
+    # Access records stay two years, so nothing written in 2026 is old enough yet.
+    _check(store.purge_expired_access_logs() == 0)
     admin = store.login("check-admin", changed)
     purged = store.project_results(admin, project["id"])
     _check(purged[0]["pre_payload"] is None and purged[0]["post_payload"] is None)

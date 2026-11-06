@@ -248,6 +248,37 @@ class AccountReportPDFTests(unittest.TestCase):
         # One comparable competency is not shown as both the one to spread and the one to check first.
         self.assertNotIn("우선 점검할 역량", text)
 
+    def test_held_competencies_print_above_the_courses_with_the_web_wording(self):
+        try:
+            from pypdf import PdfReader
+        except ImportError:
+            self.skipTest("pypdf is not installed")
+        from tap.account_insights import HOLD_COPY, hold_note
+        hold = {"factor_code": "CORE-CO", "factor_name_ko": "협업과 팀워크", "score": 2.6, "gap": 0.9, "change": 0.1,
+                "conditions": ["도구·정보·권한"]}
+        courses = [{"title": "문제해결 공개과정", "source": "public_edu_center", "factor_name_ko": "문제해결력", "advice": "",
+                    "reason": "교육 후 3.00점, 목표 3.50점보다 0.50점 낮음"}]
+
+        def text_of(pdf):
+            return "".join(page.extract_text() for page in PdfReader(BytesIO(pdf)).pages).replace("\n", "").replace(" ", "")
+
+        personal = text_of(build_report_pdf(PROJECT, [row()], kind="individual", subject="참여자", courses=courses, holds=[hold]))
+        title, caption = HOLD_COPY["individual"]
+        for words in (title, caption, hold_note(hold), "협업과팀워크"):
+            self.assertIn(words.replace(" ", ""), personal)
+        self.assertLess(personal.index(title.replace(" ", "")), personal.index("문제해결공개과정"))
+
+        # Everything below target is held: the panel stands alone and never claims there is nothing to review.
+        transfer = {"n": 3, "disclosed": False, "factors": [], "barriers": []}
+        org = text_of(build_report_pdf(PROJECT, [row()], kind="organization", subject="조직 전체", participant_count=5,
+                                       transfer=transfer, courses=[], holds=[hold]))
+        self.assertIn(HOLD_COPY["organization"][0].replace(" ", ""), org)
+        self.assertNotIn("검토할후속과정이없습니다", org)
+        self.assertIn("맞춤형교육문의", org)
+        # Without holds nothing changes.
+        plain = text_of(build_report_pdf(PROJECT, [row()], kind="individual", subject="참여자", courses=courses))
+        self.assertNotIn(title.replace(" ", ""), plain)
+
     def test_invalid_kind_rejected(self):
         with self.assertRaises(ValueError):
             build_report_pdf(PROJECT, [], kind="other", subject="test")

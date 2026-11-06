@@ -909,10 +909,26 @@ def _competency_card(index: int, row: Mapping[str, Any], width: float, *, is_org
     return _panel(detail, width, padding=padding)
 
 
-def _followup_story(transfer: Mapping[str, Any] | None, courses: list[Mapping[str, Any]] | None, width: float) -> list[Any]:
+def _hold_panel(holds: list[Mapping[str, Any]], is_org: bool, width: float) -> Table:
+    """Competencies held back for the work environment: warm panel, one name and one sentence each."""
+    from tap.account_insights import HOLD_COPY, hold_note
+    title, caption = HOLD_COPY["organization" if is_org else "individual"]
+    body: list[Any] = [_inline(Chip("과정 보류", colors.white, WARN, stroke=WARN), _p(title, size=12, bold=True), width - 28),
+                       Spacer(1, 4), _p(caption, size=8.6, color=MUTED)]
+    for item in holds:
+        body.extend([Spacer(1, 7), HRFlowable(width="100%", thickness=.5, color=WARN_SOFT, spaceBefore=0, spaceAfter=0), Spacer(1, 7),
+                     _p(str(item["factor_name_ko"]), size=10.2, bold=True), Spacer(1, 2), _p(hold_note(item), size=8.8)])
+    table = _panel(body, width, fill=WARN_PALE, padding=14)
+    table.setStyle(TableStyle([("BOX", (0, 0), (-1, -1), .6, WARN_SOFT)]))
+    return table
+
+
+def _followup_story(transfer: Mapping[str, Any] | None, courses: list[Mapping[str, Any]] | None, width: float,
+                    holds: list[Mapping[str, Any]] | tuple = ()) -> list[Any]:
     """Transfer climate (organization only) and follow-up courses, continuing after the competency details."""
     from tap.account_insights import COURSE_INQUIRY_URL, course_context_note, transfer_notes
     is_org = transfer is not None
+    hold_panel = _hold_panel(list(holds), is_org, width) if holds else None
     inner = width - 32  # panel padding
     inquiry = [_button_row(LinkButton("맞춤형 교육 문의", COURSE_INQUIRY_URL, width=108),
                            "회사 상황에 맞춘 과정은 KMA 교육 문의 페이지(www.kma.or.kr)로 문의 부탁드립니다.", inner)] if is_org else []
@@ -946,6 +962,9 @@ def _followup_story(transfer: Mapping[str, Any] | None, courses: list[Mapping[st
                      _p(f"교육 후 {'평균이' if is_org else '점수가'} 목표보다 0.2점 이상 낮은 역량을 차이가 큰 순서로 골랐습니다.\n"
                         f"역량마다 {sources} 과정을 제안합니다. 버튼을 누르면 KMA 과정 페이지가 열립니다.", size=8.4, color=MUTED),
                      *([Spacer(1, 6), _p(note, size=8.8, bold=True, color=TEAL)] if note else []), Spacer(1, 10)])
+        if hold_panel is not None:
+            story.extend([KeepTogether(lead + [hold_panel]), Spacer(1, 9)])
+            lead = []
         # Courses arrive source by source; the reader needs them under their competency, each competency in one box.
         groups: dict[str, list[Mapping[str, Any]]] = {}
         for course in courses:
@@ -959,6 +978,12 @@ def _followup_story(transfer: Mapping[str, Any] | None, courses: list[Mapping[st
             lead = []
         if inquiry:
             story.append(_panel(inquiry, width, padding=12))
+    elif courses is not None and hold_panel is not None:
+        # Every competency below target is held: the panel replaces the course list, and "nothing below target" would be wrong.
+        story.append(KeepTogether(lead + [hold_panel]))
+        if inquiry:
+            story.extend([Spacer(1, 9), _panel(inquiry, width, padding=12)])
+        lead = []
     elif courses is not None:
         story.append(KeepTogether(lead + [_panel([_p("교육과정 검토 우선순위" if is_org else "제안 과정", size=12, bold=True), Spacer(1, 7),
                                                   _p("목표보다 0.2점 이상 낮은 역량이 없어 검토할 후속 과정이 없습니다.", size=9),
@@ -970,8 +995,13 @@ def _followup_story(transfer: Mapping[str, Any] | None, courses: list[Mapping[st
 
 def build_report_pdf(project: Mapping[str, Any], rows: list[Mapping[str, Any]], *, kind: str,
                      subject: str, participant_count: int = 1, transfer: Mapping[str, Any] | None = None,
-                     courses: list[Mapping[str, Any]] | None = None, heatmap: Mapping[str, Any] | None = None) -> bytes:
-    """``heatmap`` is account_insights.team_heatmap's result; it adds the department grid to an organization report."""
+                     courses: list[Mapping[str, Any]] | None = None, heatmap: Mapping[str, Any] | None = None,
+                     holds: list[Mapping[str, Any]] | None = None) -> bytes:
+    """``heatmap`` is account_insights.team_heatmap's result; it adds the department grid to an organization report.
+
+    ``holds`` is account_insights.environment_holds's result: competencies sent to the work environment
+    instead of a course, listed above the courses as on the web report.
+    """
     prepared = prepare_rows(rows, kind)
     _fonts()
     summary = report_summary(prepared)
@@ -1082,7 +1112,7 @@ def build_report_pdf(project: Mapping[str, Any], rows: list[Mapping[str, Any]], 
     if is_org:
         story.extend(_heatmap_story(heatmap, prepared, width))
     if transfer is not None or courses is not None:
-        story.extend(_followup_story(transfer, courses, width))
+        story.extend(_followup_story(transfer, courses, width, holds=holds or ()))
     if not prepared:
         story.extend([Spacer(1, 4), *rules])
 

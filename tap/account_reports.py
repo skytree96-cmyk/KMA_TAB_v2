@@ -6,7 +6,7 @@ from typing import Any, Mapping
 import pandas as pd
 import streamlit as st
 
-from tap.account_insights import (COURSE_INQUIRY_URL, TRANSFER_ATTENTION_MEAN, course_context_note, course_gap_counts,
+from tap.account_insights import (COURSE_INQUIRY_URL, HOLD_COPY, TRANSFER_ATTENTION_MEAN, course_context_note, course_gap_counts,
                                   environment_holds, hidden_team_note, hold_note, organization_detail_rows, team_heatmap,
                                   recommend_courses, summarize_transfer, transfer_notes, weak_environment)
 from tap.account_ui_kit import (bar_rows, change_scale, change_summary, chip, fmt, foot, heatmap, notes, section,
@@ -77,10 +77,12 @@ def individual_report_pdf(project: Mapping[str, Any], questions: list[dict[str, 
     config = project.get("config") or {}
     scores = score_pre_post_responses(questions, pre_responses, post_responses, config.get("target_means"))
     rows = [{**row, "change": row["self_reported_change"], "valid_n": row["paired_valid_items"]} for row in scores]
-    # Personal transfer answers stay out of the PDF; they only decide which courses are held back.
+    # Personal transfer answers stay out of the PDF; they only decide which competencies are held back, and the
+    # PDF names those as the participant screen does.
     # Same picks as the participant screen: three competencies, each with a public course and an e-learning course.
     courses = personal_courses(config, scores, interests, transfer)
-    return build_report_pdf(project, rows, kind="individual", subject=subject, participant_count=1, courses=courses)
+    return build_report_pdf(project, rows, kind="individual", subject=subject, participant_count=1, courses=courses,
+                            holds=personal_holds(config, scores, transfer))
 
 
 def export_report_pdf(store: Any, token: str, project: Mapping[str, Any], assignment_id: str | None = None) -> bytes:
@@ -116,6 +118,7 @@ def export_report_pdf(store: Any, token: str, project: Mapping[str, Any], assign
     # The PDF decides whether the department page is worth printing.
     return build_report_pdf(project, rows, kind="organization", subject="조직 전체", participant_count=count,
                             transfer=summarize_transfer(results), courses=_organization_courses(config, summaries.values(), results),
+                            holds=organization_holds(config, summaries.values(), results),
                             heatmap=team_heatmap(summarize_by_team(project, results)))
 
 
@@ -133,9 +136,15 @@ def _disclosed_scores(summaries: Any) -> list[dict[str, Any]]:
 def personal_courses(config: Mapping[str, Any], scores: list[Mapping[str, Any]], interests: Any = None,
                      transfer: Mapping[str, Any] | None = None) -> list[dict[str, Any]]:
     """One person's picks: their own wishes first, nothing for competencies held for the environment."""
-    held = environment_holds(config, scores, weak_environment(transfer))
+    held = personal_holds(config, scores, transfer)
     return recommend_courses(config, scores, limit=6, interests={str(code): 1 for code in interests or []},
                              hold={item["factor_code"] for item in held})
+
+
+def personal_holds(config: Mapping[str, Any], scores: list[Mapping[str, Any]],
+                   transfer: Mapping[str, Any] | None = None) -> list[dict[str, Any]]:
+    """Competencies held back for one person because their own answers rated the work environment low."""
+    return environment_holds(config, scores, weak_environment(transfer))
 
 
 def interest_counts(results: list[Mapping[str, Any]]) -> dict[str, int]:
@@ -210,7 +219,7 @@ def _render_courses(courses: list[dict[str, Any]], transfer: Mapping[str, Any], 
     with section("courses", "school", "교육과정 검토 우선순위",
                  "교육 후 평균이 목표보다 0.2점 이상 낮은 역량과, 역량마다 연결된 KMA 과정(공개교육 · 이러닝 · 단체교육 문의)", tone="tint"):
         if holds:
-            render_holds(holds, "조직 개선과제", "교육보다 업무 환경을 먼저 점검할 역량입니다. 이 역량에는 과정을 권하지 않습니다.")
+            render_holds(holds, *HOLD_COPY["organization"])
         if not courses and holds:
             pass
         elif not courses and has_gap:

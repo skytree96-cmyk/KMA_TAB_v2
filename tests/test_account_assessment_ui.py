@@ -9,6 +9,7 @@ from streamlit.testing.v1 import AppTest
 
 from tap.account_assessment_ui import (PREFIX, TRANSFER_ITEMS, _AnswersSaved, _checked_record, _error_message,
                                       _project_questions, _reset_scope)
+from tap.account_store import PRIVACY_CONSENT_ITEMS, PRIVACY_CONSENT_VERSION
 from tap.data import questions_for_factors
 import tap.account_assessment_ui as assessment_ui
 
@@ -44,6 +45,14 @@ class MemoryStore:
         self.fail_next = False
         self.calls = []
         self.reads = []
+        # What the portal's principal carries; a participant who has not agreed yet sees the consent screen.
+        self.consent = {"privacy_consent_version": PRIVACY_CONSENT_VERSION}
+        self.consents = []
+
+    def record_privacy_consent(self, token, version, items, *, client=""):
+        self.consents.append((version, tuple(items)))
+        self.consent = {"privacy_consent_version": version}
+        return self.consent
 
     def list_assignments(self, token):
         self.reads.append(("assignments", token))
@@ -74,8 +83,9 @@ def participant_app(store, *, focus=True):
     app = AppTest.from_string(
         "import streamlit as st\n"
         "from tap.account_assessment_ui import render_participant\n"
-        "render_participant(st.session_state['store'], 'session-token', "
-        "{'id': 'u', 'display_name': '테스트 참여자', 'role': 'participant'})\n",
+        "store = st.session_state['store']\n"
+        "render_participant(store, 'session-token', "
+        "{'id': 'u', 'display_name': '테스트 참여자', 'role': 'participant', **store.consent})\n",
         default_timeout=30,
     )
     app.session_state["store"] = store
