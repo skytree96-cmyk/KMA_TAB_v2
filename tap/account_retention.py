@@ -26,10 +26,12 @@ def schedule_purge(store: Any, *, clock=time.time) -> bool:
 
 
 def _purge(store: Any) -> None:
-    try:
-        count = store.purge_expired_assessments()
-        if count:
-            LOGGER.info("Retention purge removed %d assessment records", count)
-    except Exception as exc:
-        # The next day's run retries; a failure must not reach the user's page.
-        LOGGER.warning("Retention purge failed: %s", type(exc).__name__)
+    # Each job runs on its own: a failed response purge must not keep old access records, or the other way round.
+    for job, label in (("purge_expired_assessments", "assessment records"), ("purge_expired_access_logs", "access records")):
+        try:
+            count = getattr(store, job)()
+            if count:
+                LOGGER.info("Retention purge removed %d %s", count, label)
+        except Exception as exc:
+            # The next day's run retries; a failure must not reach the user's page.
+            LOGGER.warning("Retention purge failed (%s): %s", label, type(exc).__name__)

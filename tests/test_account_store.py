@@ -10,7 +10,7 @@ import unittest
 
 from tap.account_store import (AccountStore, AuthenticationError, AuthorizationError,
                                ConflictError, RateLimitError, ValidationError,
-                               SESSION_IDLE_SECONDS, SESSION_SECONDS,
+                               PRIVACY_CONSENT_ITEMS, PRIVACY_CONSENT_VERSION, SESSION_IDLE_SECONDS, SESSION_SECONDS,
                                hash_password, verify_password)
 
 
@@ -36,12 +36,15 @@ class AccountStoreTests(unittest.TestCase):
         self.a = self.store.create_company(self.admin, "회사 A", "0123456789")
         self.b = self.store.create_company(self.admin, "회사 B", "1234567890")
 
-    def user(self, role="participant", company=None, suffix="001", profile=None):
+    def user(self, role="participant", company=None, suffix="001", profile=None, consent=True):
         company = company or self.a
         login_id = company["slug"] + "-" + suffix if role == "participant" else suffix
         record = self.store.create_user(self.admin, login_id, "검증 사용자", role, company["id"], INITIAL, profile=profile)
         initial = self.store.login(record["login_id"], INITIAL)
         token = self.store.change_password(initial, INITIAL, CHANGED)
+        if role == "participant" and consent:
+            # Every participant agrees on the consent screen before the first answer can be stored.
+            self.store.record_privacy_consent(token, PRIVACY_CONSENT_VERSION, PRIVACY_CONSENT_ITEMS)
         return record, token
 
     def project(self, company=None, **overrides):

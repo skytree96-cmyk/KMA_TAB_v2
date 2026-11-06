@@ -187,3 +187,17 @@ a.tap-course:hover .tap-course__btn {border-color: var(--c2-teal); color: var(--
 .tap-hold ul {margin: 8px 0 0; padding: 0; list-style: none; display: grid; gap: 6px;}
 .tap-hold li {display: grid; gap: 1px; font-size: 13px; color: var(--c2-ink-2);}
 .tap-hold li b {color: var(--c2-ink); font-weight: 700;}
+
+/* Privacy consent before the first test: three required agreements, each in its own box. */
+.tap-consent {display: grid; gap: 12px; margin: 4px 0 6px;}
+.tap-consent__head b {display: block; font-size: 18px; font-weight: 800; color: var(--c2-ink); letter-spacing: -.01em;}
+.tap-consent__head p {margin: 4px 0 0; font-size: 13px; color: var(--c2-ink-3);}
+.tap-consent__box {padding: 14px 16px; border: 1px solid var(--c2-line); border-radius: 12px; background: var(--c2-sheet);}
+.tap-consent__box h4 {display: flex; align-items: center; gap: 8px; margin: 0 0 8px; font-size: 14.5px; font-weight: 700; color: var(--c2-ink);}
+.tap-consent__box h4 span {padding: 1px 8px; border-radius: 999px; background: var(--c2-teal-tint); color: var(--c2-teal-strong); font-size: 11.5px; font-weight: 700;}
+.tap-consent__box dl {display: grid; grid-template-columns: 96px 1fr; gap: 5px 12px; margin: 0;}
+.tap-consent__box dt {font-size: 12.5px; font-weight: 700; color: var(--c2-ink-3);}
+.tap-consent__box dd {margin: 0; font-size: 13px; line-height: 1.55; color: var(--c2-ink-2);}
+.tap-consent__foot {margin: 0; font-size: 12.5px; line-height: 1.55; color: var(--c2-ink-3);}
+.tap-consent__foot a {color: var(--c2-teal-strong); font-weight: 700;}
+@media (max-width: 560px) {.tap-consent__box dl {grid-template-columns: 1fr; gap: 1px;} .tap-consent__box dd {margin-bottom: 6px;}}

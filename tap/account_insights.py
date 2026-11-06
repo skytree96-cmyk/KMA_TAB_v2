@@ -371,6 +371,14 @@ def environment_holds(config: Mapping[str, Any], factor_rows: Iterable[Mapping[s
     return held
 
 
+# Title and one-line caption over the held competencies; the web report and the PDF use the same words.
+HOLD_COPY = {
+    "organization": ("조직 개선과제", "교육보다 업무 환경을 먼저 점검할 역량입니다. 이 역량에는 과정을 권하지 않습니다."),
+    "individual": ("환경 점검이 먼저인 역량",
+                   "교육 후에도 변화가 작고 업무 환경 응답이 낮은 역량입니다. 과정 대신 교육담당자와 업무 여건을 먼저 상의해 주세요."),
+}
+
+
 def hold_note(item: Mapping[str, Any]) -> str:
     """One line for an organization improvement item."""
     change = item["change"]

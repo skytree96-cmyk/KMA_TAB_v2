@@ -281,7 +281,7 @@ def _render_results(questions: list[dict[str, Any]], config: Mapping[str, Any], 
 def _render_followup_courses(config: Mapping[str, Any], results: list[dict[str, Any]], *, phase: str = "post",
                              interests: Any = None, transfer: Mapping[str, Any] | None = None) -> None:
     from tap.account_course_ui import render_course_cards, render_holds
-    from tap.account_insights import course_gap_counts, environment_holds, recommend_courses, weak_environment
+    from tap.account_insights import HOLD_COPY, course_gap_counts, environment_holds, recommend_courses, weak_environment
 
     # Three competencies, each with one public course and one e-learning course; the participant's own wishes first.
     score_key = "post_score" if phase == "post" else "score_1_to_5"
@@ -294,8 +294,7 @@ def _render_followup_courses(config: Mapping[str, Any], results: list[dict[str, 
                  f"{phase_label} 점수가 목표보다 0.2점 이상 낮은 역량과 KMA 과정(공개교육 · 이러닝). 본인 응답에 근거한 제안이니 수강 여부는 교육담당자와 상의",
                  tone="tint"):
         if held:
-            render_holds(held, "환경 점검이 먼저인 역량",
-                         "교육 후에도 변화가 작고 업무 환경 응답이 낮은 역량입니다. 과정 대신 교육담당자와 업무 여건을 먼저 상의해 주세요.")
+            render_holds(held, *HOLD_COPY["individual"])
         if not courses and held:
             return
         if not courses:
@@ -576,6 +575,11 @@ def render_participant(store: Any, token: str, principal: Mapping[str, Any]) -> 
     today = datetime.now(timezone(timedelta(hours=9))).date()
     if not start <= today <= end:
         st.info("아직 검사 기간이 시작되지 않았습니다." if today < start else "검사 기간이 종료되었습니다. 교육담당자에게 문의해 주세요.")
+        return
+    from tap.account_consent import has_consent, render_consent
+    if not has_consent(principal):
+        # Nothing is stored before this agreement; the store refuses answers without it as well.
+        render_consent(store, token)
         return
     st.caption("최근 8주 동안 실제 업무에서 나타난 행동을 기준으로 응답해 주세요.")
     st.caption(PRIVACY_NOTICE)

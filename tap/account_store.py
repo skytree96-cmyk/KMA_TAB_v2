@@ -63,6 +63,13 @@ ACCESS_LOGGED_ROLES = frozenset({"kma", "company"})
 REPORT_ACCESS_EVENTS = frozenset({"view_individual_report", "download_individual_pdf", "download_organization_pdf"})
 # Answers (and the scores built from them) are kept one year after the post-training deadline.
 RESPONSE_RETENTION_DAYS = 365
+# Access records are kept two years (안전성 확보조치 기준 제8조: at least one, two for larger processors).
+ACCESS_LOG_RETENTION_DAYS = 730
+# A participant agrees to these three before the first answer is stored (개인정보 보호법 제22조: each one separately).
+# A new version (the privacy notice changed) asks again.
+PRIVACY_CONSENT_VERSION = "2026-11"
+PRIVACY_CONSENT_ITEMS = ("collect", "provide_company", "overseas")
+_CONSENT_FIELDS = ("privacy_consent_version", "privacy_consent_at")
 KST = timezone(timedelta(hours=9))
 _SCRYPT_N, _SCRYPT_R, _SCRYPT_P = 2**15, 8, 3
 _LOGIN_RE = re.compile(r"[a-z0-9][a-z0-9._-]{2,63}\Z")
@@ -255,7 +262,7 @@ class AccountStore:
             # Additive migration for databases created before optional profiles.
             # The existing initialization lock/transaction covers all columns.
             existing = {row["name"] for row in self._all(conn, "PRAGMA table_info(tap_users)")} if self._sqlite else set()
-            for field in _PROFILE_LIMITS:
+            for field in (*_PROFILE_LIMITS, *_CONSENT_FIELDS):
                 if self._sqlite:
                     if field not in existing:
                         self._execute(conn, f"ALTER TABLE tap_users ADD COLUMN {field} TEXT NOT NULL DEFAULT ''")
@@ -380,11 +387,23 @@ class AccountStore:
 
     @staticmethod
     def _public_user(user):
-        return {key: (bool(user[key]) if key in {"active", "must_change_password"} else user[key]) for key in ("id", "login_id", "display_name", "role", "company_id", "active", "must_change_password", "company_name", "company_slug", "department", "job_title", "email", "phone") if key in user}
+        return {key: (bool(user[key]) if key in {"active", "must_change_password"} else user[key]) for key in ("id", "login_id", "display_name", "role", "company_id", "active", "must_change_password", "company_name", "company_slug", "department", "job_title", "email", "phone", *_CONSENT_FIELDS) if key in user}
 
     def principal(self, token: str) -> dict:
         with self._transaction() as conn:
             return self._public_user(self._require(conn, token, allow_password_change=True))
+
+    def record_privacy_consent(self, token: str, version: str, items, *, client: str = "") -> dict:
+        """A participant's own agreement to the TAP privacy notice, kept on the account as the proof of consent."""
+        if version != PRIVACY_CONSENT_VERSION or sorted(set(items or ())) != sorted(PRIVACY_CONSENT_ITEMS):
+            raise ValidationError("세 가지 항목에 모두 동의해야 검사를 시작할 수 있습니다.")
+        with self._transaction() as conn:
+            user = self._require(conn, token, {"participant"})
+            agreed_at = datetime.fromtimestamp(self._clock(), KST).isoformat(timespec="seconds")
+            self._execute(conn, "UPDATE tap_users SET privacy_consent_version=?,privacy_consent_at=? WHERE id=?",
+                          (version, agreed_at, user["id"]))
+            self._audit(conn, user["id"], "privacy_consent", user["id"], {"version": version, "ip": _client(client)})
+            return {"privacy_consent_version": version, "privacy_consent_at": agreed_at}
 
     def logout(self, token: str) -> None:
         if not isinstance(token, str) or len(token) > 128:
@@ -934,6 +953,8 @@ class AccountStore:
             raise ValidationError("제출 상태를 확인하세요.")
         with self._transaction() as conn:
             actor = self._require(conn, token, {"participant"})
+            if actor["privacy_consent_version"] != PRIVACY_CONSENT_VERSION:
+                raise AuthorizationError("개인정보 수집·이용 동의 후 검사를 시작할 수 있습니다.")
             _, config = self._owned_assignment(conn, actor, assignment_id, write=True)
             payload = self._payload(config, phase, payload, completed)
             encoded = _json(payload)
@@ -1061,3 +1082,9 @@ class AccountStore:
                 self._audit(conn, None, "purge_assessments", project["id"], {"project_id": project["id"], "count": str(max(count, 0))})
                 purged += max(count, 0)
         return purged
+
+    def purge_expired_access_logs(self) -> int:
+        """Server-only daily job: delete audit records older than ACCESS_LOG_RETENTION_DAYS."""
+        cutoff = self._clock() - ACCESS_LOG_RETENTION_DAYS * 86_400
+        with self._transaction() as conn:
+            return max(self._execute(conn, "DELETE FROM tap_audit_events WHERE created_at<?", (cutoff,)).rowcount, 0)

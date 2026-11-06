@@ -24,6 +24,7 @@ EVENT_LABELS = {
     "download_individual_pdf": "개인 리포트 PDF 내려받기",
     "download_organization_pdf": "조직 리포트 PDF 내려받기",
     "purge_assessments": "보관 기간 만료 응답 파기",
+    "privacy_consent": "참여자 개인정보 동의",
     "create_user": "계정 발급",
     "reset_password": "비밀번호 재발급",
     "change_password": "비밀번호 변경",

@@ -135,6 +135,25 @@ class IndividualReportCourseTests(unittest.TestCase):
         self.assertEqual(len(courses), 6)
         self.assertEqual({row["factor_code"] for row in courses}, {"CORE-CL", "JOB-PS", "LEAD-PD"})
         self.assertEqual([row["source"] for row in courses].count("studio_elearning"), 3)
+        self.assertEqual(build.call_args.kwargs["holds"], [])
+
+    def test_individual_pdf_names_the_competencies_held_for_the_environment(self):
+        from unittest.mock import patch
+        from tap.account_reports import individual_report_pdf
+        factors = ["CORE-CL", "JOB-PS", "LEAD-PD", "CORE-CO"]
+        questions = questions_for_factors(factors)
+        config = {"selected_factors": factors, "target_means": {code: 3.5 for code in factors}, "target_level": "manager",
+                  "delivery_preference": "all", "question_snapshot": questions}
+        pre = {q["question_code"]: 2 for q in questions}
+        post = {q["question_code"]: 4 if q["factor_code"] == "CORE-CO" else 2 for q in questions}
+        transfer = {"resources_authority": 2, "time_process_support": 4}
+        with patch("tap.account_report_pdf.build_report_pdf", return_value=b"%PDF") as build:
+            individual_report_pdf({"name": "리더십", "config": config}, questions, pre, post, "참여자", transfer=transfer)
+        held = build.call_args.kwargs["holds"]
+        # The three competencies that stayed at 2 are held; CORE-CO rose to target and is neither held nor recommended.
+        self.assertEqual({item["factor_code"] for item in held}, {"CORE-CL", "JOB-PS", "LEAD-PD"})
+        self.assertEqual(build.call_args.kwargs["courses"], [])
+        self.assertEqual(held[0]["conditions"], ["도구·정보·권한"])
 
 
 class ReportDownloadTests(unittest.TestCase):

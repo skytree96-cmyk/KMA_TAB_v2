@@ -19,7 +19,7 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from tap.account_store import AccountStore, ConflictError, KST, SESSION_SECONDS, ValidationError
+from tap.account_store import AccountStore, ConflictError, KST, PRIVACY_CONSENT_VERSION, SESSION_SECONDS, ValidationError
 
 FIXTURE = "sundaeguk-report-test-v1"
 COMPANY = "주식회사 순대국"
@@ -135,7 +135,9 @@ def seed_company(store: AccountStore) -> dict:
                 if index < 5:
                     # This applies only to newly created fixture users and is
                     # invisible outside the uncommitted transaction.
-                    atomic._execute(conn, "UPDATE tap_users SET must_change_password=0 WHERE id=?", (person["id"],))
+                    # Fixture accounts answer without the screens, so the consent the screen records is set here too.
+                    atomic._execute(conn, "UPDATE tap_users SET must_change_password=0,privacy_consent_version=?,privacy_consent_at=? WHERE id=?",
+                                    (PRIVACY_CONSENT_VERSION, datetime.fromtimestamp(store._clock(), KST).isoformat(timespec="seconds"), person["id"]))
                     with _internal_session(atomic, conn, person["id"]) as participant_token:
                         for phase in ("pre", "post"):
                             atomic.save_assessment(participant_token, assignment["id"], phase,
