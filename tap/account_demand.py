@@ -175,4 +175,4 @@ def render_company_demand(store: Any, token: str, *, company_id: str | None, com
         st.download_button("교육 수요 CSV 다운로드", demand_csv(demand), file_name="kma-tap-demand.csv", mime="text/csv",
                            icon=":material/table_view:", key="tap_demand_csv_" + str(company_id or "own"))
         st.html(foot("수요: 가장 최근 검사 점수가 프로젝트 목표보다 0.2점 이상 낮은 사람. 학습 희망: 교육 전 검사 끝에서 그 역량을 고른 사람. "
-                     "자기보고 행동빈도 기준이며 개인 평가에 쓰지 않습니다."))
+                     "본인이 답한 행동빈도(1~5) 기준입니다."))
