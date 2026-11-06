@@ -68,7 +68,7 @@ ACCESS_LOG_RETENTION_DAYS = 730
 # A participant agrees to these three before the first answer is stored (개인정보 보호법 제22조: each one separately).
 # A new version (the privacy notice changed) asks again.
 PRIVACY_CONSENT_VERSION = "2026-11"
-PRIVACY_CONSENT_ITEMS = ("collect", "provide_company", "overseas")
+PRIVACY_CONSENT_ITEMS = ("collect", "provide_company")
 _CONSENT_FIELDS = ("privacy_consent_version", "privacy_consent_at")
 KST = timezone(timedelta(hours=9))
 _SCRYPT_N, _SCRYPT_R, _SCRYPT_P = 2**15, 8, 3
@@ -396,7 +396,7 @@ class AccountStore:
     def record_privacy_consent(self, token: str, version: str, items, *, client: str = "") -> dict:
         """A participant's own agreement to the TAP privacy notice, kept on the account as the proof of consent."""
         if version != PRIVACY_CONSENT_VERSION or sorted(set(items or ())) != sorted(PRIVACY_CONSENT_ITEMS):
-            raise ValidationError("세 가지 항목에 모두 동의해야 검사를 시작할 수 있습니다.")
+            raise ValidationError("두 가지 항목에 모두 동의해야 검사를 시작할 수 있습니다.")
         with self._transaction() as conn:
             user = self._require(conn, token, {"participant"})
             agreed_at = datetime.fromtimestamp(self._clock(), KST).isoformat(timespec="seconds")

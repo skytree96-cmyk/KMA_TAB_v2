@@ -173,7 +173,7 @@ def _exercise(scoped_url: str) -> None:
     _, peer_token = user("0123456789-participant002", "participant", company_a)
     # Consent screen: stored on the account, required before any answer, and only the participant can give it.
     _check(store.principal(participant_token)["privacy_consent_version"] == "")
-    _denied(ValidationError, store.record_privacy_consent, participant_token, PRIVACY_CONSENT_VERSION, PRIVACY_CONSENT_ITEMS[:2])
+    _denied(ValidationError, store.record_privacy_consent, participant_token, PRIVACY_CONSENT_VERSION, PRIVACY_CONSENT_ITEMS[:1])
     for consenting in (participant_token, peer_token):
         store.record_privacy_consent(consenting, PRIVACY_CONSENT_VERSION, PRIVACY_CONSENT_ITEMS, client="203.0.113.30")
     _check(store.principal(participant_token)["privacy_consent_version"] == PRIVACY_CONSENT_VERSION)

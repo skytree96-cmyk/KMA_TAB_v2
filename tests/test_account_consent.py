@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import unittest
 
-from tap.account_consent import CONSENT_SECTIONS, OVERSEAS_RECIPIENT, consent_html, has_consent
+from tap.account_consent import CONSENT_SECTIONS, consent_html, has_consent
 from tap.account_store import (ACCESS_LOG_RETENTION_DAYS, PRIVACY_CONSENT_ITEMS, PRIVACY_CONSENT_VERSION,
                                AuthorizationError, ValidationError, hash_password)
 from tests import test_account_assessment_ui as ui_tests
@@ -19,7 +19,7 @@ class ConsentStoreTests(unittest.TestCase):
     def setUpClass(cls):
         cls.seed_hash = hash_password(store_tests.INITIAL)
 
-    def test_no_answer_is_stored_before_all_three_agreements(self):
+    def test_no_answer_is_stored_before_both_agreements(self):
         record, token = self.user(consent=False)
         project = self.project()
         assignment = self.store.assign_participant(self.admin, project["id"], record["id"])
@@ -27,7 +27,7 @@ class ConsentStoreTests(unittest.TestCase):
         with self.assertRaises(AuthorizationError):
             self.store.save_assessment(token, assignment["id"], "pre", self.payload(project), False)
         self.assertIsNone(self.store.load_assessment(token, assignment["id"], "pre"))
-        for version, items in ((PRIVACY_CONSENT_VERSION, PRIVACY_CONSENT_ITEMS[:2]), ("2025-01", PRIVACY_CONSENT_ITEMS),
+        for version, items in ((PRIVACY_CONSENT_VERSION, PRIVACY_CONSENT_ITEMS[:1]), ("2025-01", PRIVACY_CONSENT_ITEMS),
                                (PRIVACY_CONSENT_VERSION, ())):
             with self.assertRaises(ValidationError):
                 self.store.record_privacy_consent(token, version, items)
@@ -68,14 +68,14 @@ class ConsentStoreTests(unittest.TestCase):
 
 
 class ConsentScreenTests(unittest.TestCase):
-    def test_notice_names_each_agreement_the_recipient_abroad_and_the_policy(self):
+    def test_notice_names_each_agreement_and_the_policy_but_not_the_storage_abroad(self):
         page = consent_html()
-        self.assertEqual(page.count('class="tap-consent__box"'), 3)
+        self.assertEqual(page.count('class="tap-consent__box"'), 2)
         for _, title, rows in CONSENT_SECTIONS:
             self.assertIn(title, page)
             self.assertTrue(any(label == "보유 기간" or "보유 기간" in label for label, _ in rows))
-        self.assertIn(OVERSEAS_RECIPIENT, page)
-        self.assertIn("일본(Google Cloud 도쿄 리전)", page)
+        for hidden in ("국외", "일본", "Google"):
+            self.assertNotIn(hidden, page)  # disclosed in the privacy policy, not asked on screen
         self.assertIn("https://membership.kma.or.kr/privacy.html", page)
         self.assertIn("동의하지 않으면 TAP 검사를 할 수 없습니다", page)
         self.assertFalse(has_consent({"privacy_consent_version": "2025-01"}))
@@ -89,12 +89,11 @@ class ConsentScreenTests(unittest.TestCase):
         agree = next(button for button in app.button if button.label == "동의하고 검사 시작")
         self.assertTrue(agree.disabled)
         boxes = list(app.checkbox)
-        self.assertEqual(len(boxes), 3)
-        for box in boxes[:2]:
-            box.check()
+        self.assertEqual(len(boxes), 2)
+        boxes[0].check()
         app.run()
         self.assertTrue(next(button for button in app.button if button.label == "동의하고 검사 시작").disabled)
-        app.checkbox[2].check()
+        app.checkbox[1].check()
         app.run()
         ui_tests.click(app, "동의하고 검사 시작")
         self.assertEqual(store.consents, [(PRIVACY_CONSENT_VERSION, PRIVACY_CONSENT_ITEMS)])
