@@ -25,6 +25,14 @@ import urllib.request
 from zoneinfo import ZoneInfo
 
 LOGGER = logging.getLogger(__name__)
+# Nothing configures the root logger in this app, so INFO lines would vanish. Refresh results go to stderr,
+# which Cloud Run keeps in its logs.
+if not LOGGER.handlers:
+    _handler = logging.StreamHandler()
+    _handler.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(name)s: %(message)s"))
+    LOGGER.addHandler(_handler)
+    LOGGER.setLevel(logging.INFO)
+    LOGGER.propagate = False
 ENV_FLAG = "TAP_LIVE_SCHEDULE"
 FORM_URL = "https://www.kma.or.kr/usrs/eduRegMgnt/eduRegMgntForm.do?p_ctgry_id={category}&mkey={menu}"
 LIST_URL = "https://www.kma.or.kr/usrs/eduRegMgnt/eduRegRowDataList.do"
@@ -89,9 +97,14 @@ def _list_request(category: str, menu: str, year: int) -> urllib.request.Request
 
 
 def fetch_session_starts(categories: Iterable[tuple[str, str]], years: Iterable[int], *,
-                         timeout: float = 20, workers: int = 6) -> dict[str, list[str]]:
-    """Ask the site for every category and year. Any failed call fails the whole fetch: a course that is
-    missing from a partial answer would wrongly read as "no sessions"."""
+                         timeout: float = 20, workers: int = 6,
+                         failed: set[tuple[str, str]] | None = None) -> dict[str, list[str]]:
+    """Ask the site for every category and year.
+
+    Without ``failed``, any failed call fails the whole fetch: a course missing from a partial answer would
+    wrongly read as "no sessions". With a set, the categories whose calls failed are added to it instead,
+    so the caller can keep the catalog dates for just those courses. Every call failing still raises.
+    """
     categories, years = list(categories), list(years)
     if not categories:
         raise ValueError("no categories to fetch")
@@ -100,21 +113,34 @@ def fetch_session_starts(categories: Iterable[tuple[str, str]], years: Iterable[
     # The list endpoint answers only inside a browsing session, so open one page first for the cookie.
     opener.open(FORM_URL.format(category=categories[0][0], menu=categories[0][1]), timeout=timeout).read()
 
-    def call(job: tuple[str, str, int]) -> list[Mapping[str, Any]]:
+    def call(job: tuple[str, str, int]) -> list[Mapping[str, Any]] | None:
         category, menu, year = job
-        with opener.open(_list_request(category, menu, year), timeout=timeout) as response:
-            payload = json.loads(response.read().decode("utf-8", "replace"))
-        rows = payload.get("dataList")
-        if not isinstance(rows, list):
-            raise ValueError("unexpected list answer")
-        return rows
+        try:
+            with opener.open(_list_request(category, menu, year), timeout=timeout) as response:
+                payload = json.loads(response.read().decode("utf-8", "replace"))
+            rows = payload.get("dataList")
+            if not isinstance(rows, list):
+                raise ValueError("unexpected list answer")
+            return rows
+        except Exception:
+            if failed is None:
+                raise
+            return None
 
     merged: dict[str, set[str]] = {}
     jobs = [(category, menu, year) for category, menu in categories for year in years]
+    lost: set[tuple[str, str]] = set()
     with ThreadPoolExecutor(max_workers=workers) as pool:
-        for rows in pool.map(call, jobs):
+        for job, rows in zip(jobs, pool.map(call, jobs)):
+            if rows is None:
+                lost.add((job[0], job[1]))
+                continue
             for code, starts in parse_sessions(rows).items():
                 merged.setdefault(code, set()).update(starts)
+    if failed is not None:
+        if len(lost) == len(categories):
+            raise ConnectionError("every list call failed")
+        failed.update(lost)
     return {code: sorted(starts) for code, starts in merged.items()}
 
 
@@ -123,13 +149,24 @@ def _refresh() -> None:
         from tap.data import load_courses
         courses = [course for course in load_courses() if str(course.get("source", "")) == "public_edu_center"]
         year = datetime.now(ZoneInfo("Asia/Seoul")).year
-        starts = fetch_session_starts(catalog_categories(courses), (year, year + 1))
+        failed: set[tuple[str, str]] = set()
+        starts = fetch_session_starts(catalog_categories(courses), (year, year + 1), failed=failed)
         known = {str(course.get("crscd", "")) for course in courses}
         if len(known & starts.keys()) < MIN_COVERAGE * max(1, len(known)):
             raise ValueError("live schedule covers too few catalog courses")
+        # Courses of a category the site did not answer keep their catalog dates instead of reading as "no sessions".
+        kept = 0
+        for course in courses:
+            pairs = catalog_categories([course])
+            if pairs and pairs[0] in failed:
+                catalog_starts = [s for s in str(course.get("upcoming_starts") or "").split("|") if len(s) == 8]
+                code = str(course.get("crscd", ""))
+                starts[code] = sorted(set(starts.get(code, [])) | set(catalog_starts))
+                kept += 1
         with _LOCK:
             _STATE.update(starts=starts, fetched_at=time.time())
-        LOGGER.info("Course schedule refreshed: %d courses", len(starts))
+        LOGGER.info("Course schedule refreshed: %d courses, %d categories unanswered (%d courses on catalog dates)",
+                    len(starts), len(failed), kept)
     except Exception as exc:  # network, site change, parsing: keep the catalog and try again later
         LOGGER.warning("Course schedule refresh failed: %s", type(exc).__name__)
     finally:
@@ -153,6 +190,11 @@ def live_session_starts() -> Mapping[str, list[str]] | None:
         if _STATE["starts"] is not None and now - _STATE["fetched_at"] < MAX_AGE_SECONDS:
             return _STATE["starts"]
         return None
+
+
+def warm_up() -> None:
+    """Called on every page view (the open page too), so a refresh starts before anyone opens a report."""
+    live_session_starts()
 
 
 def schedule_basis() -> str:

@@ -16,7 +16,11 @@ st.set_page_config(
 )
 
 if production_mode():
+    from tap.course_schedule import warm_up
     from tap.account_portal import render_portal, TOKEN_KEY
+
+    # Cheap after the first call: it only starts a background refresh when the dates are a day old.
+    warm_up()
     from tap.account_landing import render_account_landing
     from tap.account_guide import render_account_guide
 

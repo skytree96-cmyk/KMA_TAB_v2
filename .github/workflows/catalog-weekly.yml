@@ -1,0 +1,99 @@
+name: Course catalog weekly refresh
+
+# Every Monday 03:00 KST: crawl the KMA public education center and stud.io, rebuild data/courses.csv and
+# data/competency_course_map.csv, run the same checks as "TAP validation", then commit to main and deploy.
+# Nothing is committed when the crawl fails, the catalog shrinks sharply (catalog/run_weekly.py) or a check fails;
+# the app keeps the previous catalog and GitHub e-mails the failed run.
+on:
+  schedule:
+    - cron: "0 18 * * 0"
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Crawl and check only (no commit, no deploy)"
+        type: boolean
+        default: false
+
+concurrency:
+  group: catalog-weekly
+  cancel-in-progress: false
+
+permissions:
+  contents: write   # push the refreshed data to main
+  actions: write    # start "Deploy to Cloud Run" (a push made with this token starts no workflow by itself)
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      TAP_APP_MODE: demo
+      PYTHONIOENCODING: utf-8
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_PASSWORD: isolated-ci-test-password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install dependencies
+        run: python -m pip install -r requirements.txt -r catalog/requirements.txt
+      - name: Rebuild catalog
+        run: python -m catalog.run_weekly ${{ inputs.dry_run && '--dry-run' || '' }}
+      - name: Detect data changes
+        id: diff
+        run: |
+          if git diff --quiet -- data/; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "No catalog change this week." >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+            git diff --stat -- data/
+          fi
+      - name: Refresh release manifest
+        if: steps.diff.outputs.changed == 'true'
+        run: python scripts/validate_project.py --write-manifest
+      # The same checks as .github/workflows/ci.yml, on the refreshed data.
+      - name: Brand initial browser tab
+        if: steps.diff.outputs.changed == 'true'
+        run: python scripts/brand_streamlit_shell.py
+      - name: Validate question bank and source files
+        if: steps.diff.outputs.changed == 'true'
+        run: python scripts/validate_project.py
+      - name: Verify accounts against PostgreSQL
+        if: steps.diff.outputs.changed == 'true'
+        env:
+          TEST_DATABASE_URL: postgresql://postgres:isolated-ci-test-password@localhost:5432/postgres
+        run: python scripts/check_postgres_accounts.py
+      - name: Run unit tests
+        if: steps.diff.outputs.changed == 'true'
+        run: python -m unittest discover -s tests
+      - name: Smoke-test all Streamlit pages and role navigation
+        if: steps.diff.outputs.changed == 'true'
+        run: python scripts/smoke_pages.py
+      - name: Commit to main
+        if: steps.diff.outputs.changed == 'true' && !inputs.dry_run
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/courses.csv data/competency_course_map.csv MANIFEST_SHA256.txt
+          git commit -m "교육과정 카탈로그 주간 갱신 ($(TZ=Asia/Seoul date +%F))"
+          git push origin HEAD:main
+      - name: Deploy
+        if: steps.diff.outputs.changed == 'true' && !inputs.dry_run
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run deploy.yml --ref main

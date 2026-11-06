@@ -72,6 +72,28 @@ class LiveScheduleStateTests(unittest.TestCase):
             self.assertIn("KMA 사이트에서 조회", course_schedule.schedule_basis())
             fetch.assert_called_once()
 
+    def test_unanswered_category_keeps_its_catalog_dates_and_the_rest_goes_live(self):
+        public = [row for row in load_courses() if row["source"] == "public_edu_center"]
+        down = catalog_categories(public)[0]
+        in_down = [row for row in public if catalog_categories([row]) == [down]]
+        answer = {str(row["crscd"]): ["20991231"] for row in public if row not in in_down}
+
+        def fetch(categories, years, *, failed=None, **_):
+            failed.add(down)
+            return dict(answer)
+
+        with patch.dict(os.environ, {course_schedule.ENV_FLAG: "1"}), \
+                patch.object(course_schedule, "fetch_session_starts", side_effect=fetch):
+            live_session_starts()
+            self.wait()
+            live = live_session_starts()
+        self.assertIsNotNone(live)
+        sample = next(row for row in public if row not in in_down)
+        self.assertEqual(live[str(sample["crscd"])], ["20991231"])
+        for row in in_down:
+            catalog = sorted({s for s in str(row.get("upcoming_starts") or "").split("|") if len(s) == 8})
+            self.assertEqual(live[str(row["crscd"])], catalog)
+
     def test_failed_or_thin_answer_keeps_the_catalog_and_waits_before_retrying(self):
         for outcome in ({"side_effect": OSError("down")}, {"return_value": {"1": ["20991231"]}}):
             course_schedule.reset_for_tests()
