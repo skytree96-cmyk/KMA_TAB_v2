@@ -49,6 +49,9 @@ class Store:
     def project_results(self, token, project_id):
         st.session_state["reads"] = st.session_state.get("reads", []) + [("report", project_id)]
         return []
+    def company_results(self, token, company_id=None):
+        st.session_state["reads"] = st.session_state.get("reads", []) + [("demand", company_id)]
+        return []
 render_dashboard(Store(), "session-token", {"role":st.session_state.get("role", "kma"),
     "company_id":"co1", "company_name":"알파 교육"})
 '''
@@ -131,6 +134,14 @@ class AccountDashboardTests(unittest.TestCase):
         self.assertEqual(len(app.selectbox(key="account_dashboard_report").options), 1)
         self.assertIsNone(app.selectbox(key="account_dashboard_report").value)
         self.assertEqual(app.session_state["reads"], [("dashboard", "session-token")])
+        self.assertEqual(list(app.exception), [])
+
+    def test_company_demand_is_read_only_when_asked_for(self):
+        app = self.app("company")
+        self.assertNotIn(("demand", None), app.session_state["reads"])
+        app.toggle(key="account_dashboard_demand_open").set_value(True).run()
+        self.assertEqual(app.session_state["reads"][-1], ("demand", None))
+        self.assertTrue(any("교육 수요가 표시됩니다" in item.value for item in app.info))
         self.assertEqual(list(app.exception), [])
 
     def test_empty_store_renders_zero_counts_without_demo_or_report(self):
