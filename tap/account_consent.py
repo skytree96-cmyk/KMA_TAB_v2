@@ -1,9 +1,9 @@
 """Privacy consent a participant gives once, before the first answer is stored.
 
 Two agreements, each shown and checked on its own (개인정보 보호법 제22조): collection and use, and provision
-to the member company. Storage in Google Cloud Tokyo is not asked here: it is a processor's storage disclosed in the
-privacy policy (제28조의8 제1항 제3호, KMA 개인정보 처리방침 제5조·제6조의2). The policy (제1·3·4·6조) says the same;
-change both together and raise PRIVACY_CONSENT_VERSION.
+to the member company. The privacy policy (KMA 개인정보 처리방침 제1·3·4·6조) says the same; change both together
+and raise PRIVACY_CONSENT_VERSION. Storage in Google Cloud Tokyo is neither asked here nor written in the policy,
+by KMA's decision of 2026-11-06; whether 제28조의8 needs it is left to the privacy officer.
 """
 from __future__ import annotations
 
