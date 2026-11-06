@@ -86,6 +86,17 @@ def competency_group_html(number: int, rows: Sequence[Mapping[str, Any]]) -> str
             f'<div class="tap-need__body">{advice}<div class="tap-courses">{"".join(course_card_html(row) for row in rows)}</div></div></div>')
 
 
+def holds_html(items: Sequence[Mapping[str, Any]], title: str, caption: str) -> str:
+    from tap.account_insights import hold_note
+    rows = "".join(f'<li><b>{escape(str(item["factor_name_ko"]))}</b><span>{escape(hold_note(item))}</span></li>' for item in items)
+    return (f'<div class="tap-hold">{icon("construction")}<div><div class="tap-hold__title">{escape(title)}</div>'
+            f'<div class="tap-hold__cap">{escape(caption)}</div><ul>{rows}</ul></div></div>')
+
+
+def render_holds(items: Sequence[Mapping[str, Any]], title: str, caption: str) -> None:
+    st.html(holds_html(items, title, caption))
+
+
 def render_course_cards(courses: Sequence[Mapping[str, Any]], *, key_prefix: str = "") -> None:
     """Group picks by competency and draw each group as a numbered block of small cards."""
     groups: dict[str, list[Mapping[str, Any]]] = {}

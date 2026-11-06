@@ -324,3 +324,34 @@ def render_dashboard(store: Any, token: str, principal: Mapping[str, Any]) -> No
         else:
             st.info("현재 확인할 미완료 검사나 임박한 일정이 없습니다.")
     _render_projects(store, token, projects, str(role), today)
+    _render_demand(store, token, principal, summary)
+
+
+def _render_demand(store: Any, token: str, principal: Mapping[str, Any], summary: Mapping[str, Any]) -> None:
+    """Company training demand across all projects; KMA picks the company first."""
+    from tap.account_demand import render_company_demand
+
+    company_id, company_name = None, str(principal.get("company_name") or "소속 회사")
+    if principal.get("role") == "kma":
+        companies = {str(row["company_id"]): str(row.get("company_name") or "회사명 미등록")
+                     for row in summary.get("company_participation") or [] if row.get("company_id")}
+        if not companies:
+            return
+        key = PREFIX + "demand_company"
+        if st.session_state.get(key) not in {None, *companies}:
+            st.session_state[key] = None
+        company_id = st.selectbox("교육 수요를 볼 회사", [None, *sorted(companies, key=companies.get)], index=None, key=key,
+                                  format_func=lambda value: "회사를 고르세요" if value is None else companies[value],
+                                  placeholder="회사를 고르세요")
+        if company_id is None:
+            st.caption("회사를 고르면 그 회사의 교육 수요가 표시됩니다.")
+            return
+        company_name = companies[company_id]
+    # Reading every answer of the company is heavier than the dashboard aggregate, so it waits to be asked for.
+    elif not st.toggle("회사 교육 수요 보기", key=PREFIX + "demand_open",
+                       help="최근 12개월 모든 프로젝트를 합쳐 역량별 교육 수요와 연결 과정을 봅니다."):
+        return
+    try:
+        render_company_demand(store, token, company_id=company_id, company_name=company_name)
+    except Exception as exc:
+        _show_error(exc)

@@ -25,6 +25,7 @@ from tap.scoring import score_pre_post_responses, score_responses
 
 
 PREFIX = "_tap_participant_"
+LEARNING_INTEREST_LIMIT = 3  # account_store.MAX_LEARNING_INTERESTS
 PHASE_LABELS = {"pre": "교육 전 검사", "post": "교육 후 검사"}
 TRANSFER_ITEMS = (
     ("application_opportunity", "교육에서 배운 내용을 업무에 적용할 기회가 있었다."),
@@ -264,7 +265,7 @@ def _render_results(questions: list[dict[str, Any]], config: Mapping[str, Any], 
         transfer = post["payload"].get("post_transfer_responses", {})
         if transfer:
             _render_transfer_answers(transfer)
-        _render_followup_courses(config, results)
+        _render_followup_courses(config, results, interests=pre["payload"].get("learning_interests"), transfer=transfer)
     else:
         results = score_responses(questions, pre_responses, targets, assessment_phase="pre")
         with section("my_pre", "insights", "나의 교육 전 검사 결과", "최근 8주 행동빈도(1~5). 교육 후 검사까지 마치면 같은 문항의 변화가 나옴"):
@@ -274,20 +275,29 @@ def _render_results(questions: list[dict[str, Any]], config: Mapping[str, Any], 
                 for r in results
             ], hide_index=True, width="stretch")
             st.html(foot("0(수행 기회 없음)은 점수에 합산하지 않습니다. 유효응답이 부족한 역량은 산출하지 않습니다."))
-        _render_followup_courses(config, results, phase="pre")
+        _render_followup_courses(config, results, phase="pre", interests=pre["payload"].get("learning_interests"))
 
 
-def _render_followup_courses(config: Mapping[str, Any], results: list[dict[str, Any]], *, phase: str = "post") -> None:
-    from tap.account_course_ui import render_course_cards
-    from tap.account_insights import course_gap_counts, recommend_courses
+def _render_followup_courses(config: Mapping[str, Any], results: list[dict[str, Any]], *, phase: str = "post",
+                             interests: Any = None, transfer: Mapping[str, Any] | None = None) -> None:
+    from tap.account_course_ui import render_course_cards, render_holds
+    from tap.account_insights import course_gap_counts, environment_holds, recommend_courses, weak_environment
 
-    # Three competencies, each with one public course and one e-learning course.
+    # Three competencies, each with one public course and one e-learning course; the participant's own wishes first.
     score_key = "post_score" if phase == "post" else "score_1_to_5"
-    courses = recommend_courses(config, results, limit=6, score_key=score_key)
+    wanted = {str(code): 1 for code in interests or []}
+    held = environment_holds(config, results, weak_environment(transfer)) if phase == "post" else []
+    courses = recommend_courses(config, results, limit=6, score_key=score_key, interests=wanted,
+                                hold={item["factor_code"] for item in held})
     phase_label = "교육 후" if phase == "post" else "교육 전"
     with section("my_courses", "school", "보완 학습 제안" if phase == "post" else "보완할 역량과 KMA 추천 과정",
                  f"{phase_label} 점수가 목표보다 0.2점 이상 낮은 역량과 KMA 과정(공개교육 · 이러닝). 본인 응답에 근거한 제안이니 수강 여부는 교육담당자와 상의",
                  tone="tint"):
+        if held:
+            render_holds(held, "환경 점검이 먼저인 역량",
+                         "교육 후에도 변화가 작고 업무 환경 응답이 낮은 역량입니다. 과정 대신 교육담당자와 업무 여건을 먼저 상의해 주세요.")
+        if not courses and held:
+            return
         if not courses:
             # An empty list has three causes; only one of them means the scores are fine.
             scored, below = course_gap_counts(config, results, score_key)
@@ -334,7 +344,9 @@ def _render_report_download(assignment: Mapping[str, Any], config: Mapping[str, 
     subject = " · ".join(str(part) for part in (principal.get("display_name") or "참여자", principal.get("login_id")) if part)
     st.download_button(
         "내 리포트 PDF 다운로드", icon=":material/download:", type="primary",
-        data=lambda: individual_report_pdf(project, questions, pre["payload"]["responses"], post["payload"]["responses"], subject),
+        data=lambda: individual_report_pdf(project, questions, pre["payload"]["responses"], post["payload"]["responses"], subject,
+                                           interests=pre["payload"].get("learning_interests"),
+                                           transfer=post["payload"].get("post_transfer_responses")),
         file_name="KMA_TAP_나의_전후_리포트.pdf", mime="application/pdf", on_click="ignore",
         key=PREFIX + f"own_report_pdf_{assignment.get('id')}",
     )
@@ -350,12 +362,24 @@ def _render_review(store: Any, token: str, assignment_id: str, phase: str, quest
             for i, q in enumerate(questions)
         ], hide_index=True, width="stretch")
     st.button("역량문항 응답 수정", key=PREFIX + "review_back", on_click=_go_to_question, args=(phase, 0))
-    st.caption("최종 제출 후에는 응답을 변경할 수 없습니다.")
     if phase == "pre":
+        names = {}
+        for question in questions:
+            names.setdefault(str(question["factor_code"]), str(question["factor_name_ko"]))
+        saved = [code for code in payload.get("learning_interests") or [] if code in names]
+        st.subheader("더 배우고 싶은 역량")
+        st.caption(f"이번 검사의 역량 중 더 배우고 싶은 것을 {LEARNING_INTEREST_LIMIT}개까지 고르세요(선택). "
+                   "추천 과정을 고를 때 먼저 반영하고, 회사에는 역량별 인원만 집계해 전합니다.")
+        interests = st.multiselect("더 배우고 싶은 역량", list(names), default=saved, format_func=names.get,
+                                   max_selections=LEARNING_INTEREST_LIMIT, placeholder="고르지 않아도 제출할 수 있습니다",
+                                   key=PREFIX + "learning_interests", label_visibility="collapsed")
+        st.caption("최종 제출 후에는 응답을 변경할 수 없습니다.")
         if st.button("교육 전 검사 최종 제출", type="primary", key=PREFIX + "finish_pre", width="stretch"):
+            payload["learning_interests"] = list(interests)
             if _save(store, token, assignment_id, phase, payload, True, codes):
                 st.rerun()
         return
+    st.caption("최종 제출 후에는 응답을 변경할 수 없습니다.")
 
     st.subheader("현업전이 환경 확인")
     st.caption("교육 내용을 업무에 적용할 수 있었는지 묻습니다. 이 응답은 역량점수에 합산하지 않고, 점수 변화를 해석하거나 후속조치를 정할 때만 씁니다.")

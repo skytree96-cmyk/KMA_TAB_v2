@@ -177,3 +177,13 @@ a.tap-course:hover .tap-course__btn {border-color: var(--c2-teal); color: var(--
   .tap-srow__val {width: 100%;}
   .tap-srow__val strong {min-width: 0; text-align: left;}
 }
+
+
+/* Courses held back because the work environment, not skills, looks like the cause. */
+.tap-hold {display: flex; gap: 12px; align-items: flex-start; padding: 14px 16px; margin-bottom: 12px; border-radius: 12px; background: var(--c2-orange-tint);}
+.tap-hold > .tap-ms {font-size: 22px; color: var(--c2-orange);}
+.tap-hold__title {font-size: 14.5px; font-weight: 700; color: var(--c2-orange-ink);}
+.tap-hold__cap {font-size: 12.5px; color: var(--c2-ink-2); margin-top: 2px;}
+.tap-hold ul {margin: 8px 0 0; padding: 0; list-style: none; display: grid; gap: 6px;}
+.tap-hold li {display: grid; gap: 1px; font-size: 13px; color: var(--c2-ink-2);}
+.tap-hold li b {color: var(--c2-ink); font-weight: 700;}
