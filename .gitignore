@@ -27,9 +27,7 @@ reports/
 .vscode/
 coverage/
 node_modules/
-.wrangler/
 .tmp/
-cloudflare/dist/
 output/
 
 # GCP deploy settings

@@ -11,7 +11,7 @@ sys.path.insert(0,str(ROOT))
 
 def main():
     if os.environ.get("TAP_POSTGRES_PREFLIGHT") == "1":
-        subprocess.run([sys.executable,str(ROOT/"scripts"/"check_postgres_accounts.py"),"--render-preflight"],check=True)
+        subprocess.run([sys.executable,str(ROOT/"scripts"/"check_postgres_accounts.py"),"--startup-preflight"],check=True)
     from tap.account_store import AccountStore
     store=AccountStore(os.environ.get("DATABASE_URL",""))
     store.initialize()

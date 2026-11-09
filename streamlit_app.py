@@ -51,7 +51,7 @@ if production_mode():
     home = st.Page(account_home, title="KMA TAP", default=True)
     guide = st.Page(render_account_guide, title="이용 안내 · KMA TAP", url_path="guide")
     workspace = {route: workspace_page(route, url_path, title) for route, (url_path, title) in ROUTES.items()}
-    # Public service introduction (formerly the Cloudflare open page); always
+    # Public service introduction; always
     # shows the landing page, even for a signed-in session.
     open_page = st.Page(render_account_landing, title="서비스 소개 · KMA TAP", url_path="open")
     register_pages(home=home, guide=guide, open=open_page, **workspace)

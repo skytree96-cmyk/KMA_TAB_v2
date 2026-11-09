@@ -1003,7 +1003,7 @@
           </ul>
         </nav>
         <a class="button button-secondary header-guide-button" data-guide-download href="/tap-user-guide.pdf" download="TAP_사용설명서_v3.pdf">사용설명서</a>
-        <a class="button button-primary" data-app-link href="https://kmatap.streamlit.app/pre_assessment?tap_role=participant">검사 참여</a>
+        <a class="button button-primary" data-app-link href="/pre_assessment?tap_role=participant">검사 참여</a>
         <button class="menu-button" id="menuButton" type="button" aria-expanded="false" aria-controls="navList" aria-label="메뉴 열기">☰</button>
       </div>
     </div>
@@ -1019,7 +1019,7 @@
             <p>같은 참여자가 같은 문항으로 교육 전후에 응답하고, 두 결과를 비교합니다. 업무행동 변화와 현업 적용환경을 함께 보고, 부족한 역량에는 KMA 교육과정을 추천합니다.</p>
             <div class="hero-actions">
               <a class="button button-primary" href="#report">샘플 리포트 보기 <span aria-hidden="true">↓</span></a>
-              <a class="button button-secondary" data-app-link href="https://kmatap.streamlit.app/pre_assessment?tap_role=participant">프로젝트 코드로 검사 참여</a>
+              <a class="button button-secondary" data-app-link href="/pre_assessment?tap_role=participant">프로젝트 코드로 검사 참여</a>
             </div>
           </div>
 
@@ -1141,7 +1141,7 @@
             <li>부족 역량별 추천 교육과정</li>
             <li>A4 인쇄용 리포트와 상세 CSV</li>
           </ul>
-          <a class="button button-ghost report-action" data-app-link href="https://kmatap.streamlit.app/organization_report?tap_role=company">리포트 기능 화면 열기</a>
+          <a class="button button-ghost report-action" data-app-link href="/organization_report?tap_role=company">리포트 기능 화면 열기</a>
         </div>
       </div>
     </section>
@@ -1174,22 +1174,22 @@
             <span class="role-kicker">HRD · L&amp;D</span><h3>교육담당자</h3>
             <p>프로젝트를 운영하고 조직의 교육 전후 변화를 확인합니다.</p>
             <ul class="role-list"><li>교육·검사 일정과 측정역량 설정</li><li>교육 전후 검사 완료 현황</li><li>조직 변화와 추천 교육과정</li></ul>
-            <a class="button button-secondary" data-app-link href="https://kmatap.streamlit.app/project_setup?tap_role=company">프로젝트 시작</a>
+            <a class="button button-secondary" data-app-link href="/project_setup?tap_role=company">프로젝트 시작</a>
           </article>
           <article class="role-card">
             <span class="role-kicker">LEARNER</span><h3>참여자</h3>
             <p>교육 전후 검사를 마치고 본인의 관찰 변화를 확인합니다.</p>
             <ul class="role-list"><li>프로젝트 코드로 검사 참여</li><li>교육 전후 행동빈도 응답</li><li>개인 변화와 추천 과정 확인</li></ul>
             <div class="role-actions">
-              <a class="button button-secondary" data-app-link href="https://kmatap.streamlit.app/pre_assessment?tap_role=participant">교육 전 검사</a>
-              <a class="button button-secondary" data-app-link href="https://kmatap.streamlit.app/post_assessment?tap_role=participant">교육 후 검사</a>
+              <a class="button button-secondary" data-app-link href="/pre_assessment?tap_role=participant">교육 전 검사</a>
+              <a class="button button-secondary" data-app-link href="/post_assessment?tap_role=participant">교육 후 검사</a>
             </div>
           </article>
           <article class="role-card">
             <span class="role-kicker">KMA OPERATOR</span><h3>KMA 관리자</h3>
             <p>평가도구와 문항, 교육과정 매핑의 품질을 관리합니다.</p>
             <ul class="role-list"><li>기획검증 프로젝트 현황</li><li>문항은행 및 검수 근거</li><li>역량·교육과정 매핑 확인</li></ul>
-            <a class="button button-secondary" data-app-link href="https://kmatap.streamlit.app/kma_dashboard?tap_role=kma">관리 화면</a>
+            <a class="button button-secondary" data-app-link href="/kma_dashboard?tap_role=kma">관리 화면</a>
           </article>
         </div>
       </div>
@@ -1228,7 +1228,7 @@
     <section class="final-cta">
       <div class="container final-inner">
         <div><h2>교육 전후 변화를<br>직접 확인해 보세요.</h2><p>합성 샘플 리포트를 먼저 보거나 교육 전 검사로 바로 이동하세요.</p></div>
-        <div class="final-actions"><a class="button button-primary" href="#report">샘플 리포트</a><a class="button button-ghost" data-app-link href="https://kmatap.streamlit.app/pre_assessment?tap_role=participant">검사 참여</a></div>
+        <div class="final-actions"><a class="button button-primary" href="#report">샘플 리포트</a><a class="button button-ghost" data-app-link href="/pre_assessment?tap_role=participant">검사 참여</a></div>
       </div>
     </section>
   </main>
@@ -1285,7 +1285,7 @@
       const streamlitMain = landingRoot.closest?.('[data-testid="stMain"]')
         || landingDocument.querySelector('[data-testid="stMain"]');
 
-      // Native scrolling handles the standalone Cloudflare document and every
+      // Native scrolling handles the standalone document and every
       // scrollable ancestor. Streamlit itself scrolls stMain, not window.
       target.scrollIntoView({ behavior, block: 'start', inline: 'nearest' });
       if (streamlitMain?.contains(target)) {

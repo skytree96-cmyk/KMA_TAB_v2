@@ -12,7 +12,7 @@ from tap.open_page import PUBLIC_PAGE_CSS
 
 
 # Production copy lives in its own file (v3: tabs for reports, heatmap and assessment). The legacy demo page
-# (tap.open_page.OPEN_PAGE_PATH) stays as it is for demo mode and Cloudflare.
+# (tap.open_page.OPEN_PAGE_PATH) stays as it is for demo mode.
 LANDING_PATH = Path(__file__).resolve().parents[1] / "docs" / "TAP_오픈페이지_v3.html"
 
 LANDING_SHELL_CSS = """

@@ -13,7 +13,7 @@ COPY requirements.txt .
 RUN python -m pip install -r requirements.txt
 
 COPY . .
-# Same tab branding step as the Render build command.
+# Brand the Streamlit HTML shell (tab title and icon) before the app starts.
 RUN python scripts/brand_streamlit_shell.py \
     && useradd --create-home --uid 10001 tap \
     && chown -R tap /app

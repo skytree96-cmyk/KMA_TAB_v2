@@ -275,7 +275,7 @@ def _project_widget_key(prefix: str, project_key: str) -> str:
 
 
 def _render_radar_component(artifact: dict[str, object]) -> None:
-    """Render SVG radar HTML without Streamlit Cloud's ``st.html`` sanitizer."""
+    """Render SVG radar HTML without Streamlit's ``st.html`` sanitizer."""
 
     st.iframe(
         str(artifact.get("html") or ""),

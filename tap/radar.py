@@ -260,7 +260,7 @@ def build_pre_post_radar_html(
 ) -> str:
     """Build a self-contained, Streamlit-safe pre/post radar HTML fragment.
 
-    Render with ``st.iframe(..., height="content")``. Streamlit Cloud's
+    Render with ``st.iframe(..., height="content")``. Streamlit's
     ``st.html`` sanitizer can remove inline SVG even when the accessible table
     remains, so a sandboxed iframe is required for the actual radar shape.
     No JavaScript or third-party chart library is required.

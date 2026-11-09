@@ -748,7 +748,7 @@ def setup_page(page_title: str, page_icon: str = "T") -> str:
 
 
 def _safe_page_link(path: str, label: str, *, key: str) -> None:
-    """Keep the app usable when Streamlit Cloud has a stale page registry."""
+    """Keep the app usable when Streamlit has a stale page registry."""
     try:
         st.page_link(path, label=label, use_container_width=True)
     except StreamlitPageNotFoundError:

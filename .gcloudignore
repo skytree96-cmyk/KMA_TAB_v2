@@ -7,7 +7,6 @@
 .tmp/
 tmp/
 output/
-cloudflare/
 tests/
 deploy/gcp/config.env
 **/__pycache__/
