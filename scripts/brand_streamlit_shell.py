@@ -1,4 +1,4 @@
-"""Brand the initial HTML shell in the disposable Render/CI installation.
+"""Brand the initial HTML shell in the disposable Docker/CI installation.
 
 Streamlit 1.61.1 sends this shell before Python page configuration is available.
 The dependency is pinned in requirements.txt; unexpected shell markup fails the

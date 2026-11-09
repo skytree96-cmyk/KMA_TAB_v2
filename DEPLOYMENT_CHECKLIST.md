@@ -1,67 +1,31 @@
 # TAP 배포 체크리스트
 
-## Cloudflare 공개 오픈페이지
+운영은 Cloud Run `kmatap`(프로젝트 `kma-tab`, 리전 `asia-northeast1`) 하나입니다. 주소는 https://tap.kma.or.kr 입니다.
 
-- [ ] cd cloudflare && pnpm install && pnpm run build 통과
-- [ ] pnpm exec wrangler deploy 성공
-- [ ] https://kma-tap-open.skytree96.workers.dev 응답 200 확인
-- [ ] /tap-user-guide.pdf 응답 200 및 PDF 열림 확인
-- [ ] 교육담당자·교육 전 검사·교육 후 검사·KMA 관리 CTA가 Streamlit 기능 앱으로 이동하는지 확인
-- [ ] GitHub 저장소 링크가 공개페이지에 노출되지 않는지 확인
-- [ ] 전체 앱은 아직 Streamlit이며 Cloudflare 전체 이전은 Worker API·D1·웹 프런트엔드 재구축 대상임을 확인
+## 릴리스마다
 
-## 공개 검토용 DEMO
+- [ ] 작업 브랜치에서 `python scripts/validate_project.py --write-manifest` 후 `python scripts/validate_project.py` 통과
+- [ ] `TAP_APP_MODE=demo python -m unittest discover -s tests` 통과
+- [ ] PR을 올리고 GitHub Actions `TAP validation` 통과 확인
+- [ ] 담당자 확인 후 main에 머지. 머지하면 `Deploy to Cloud Run`이 자동으로 배포합니다.
+- [ ] 배포 후 최신 리비전이 트래픽 100%를 받는지 확인. `preview` 태그 배포 뒤에는 트래픽이 이전 리비전에 고정돼 있을 수 있습니다.
 
-### GitHub 합성 테스트 저장소(선택)
+  ```bash
+  gcloud run services describe kmatap --project kma-tab --region asia-northeast1 --format="value(status.traffic)"
+  ```
 
-- [ ] `demo-data` 브랜치 존재 확인
-- [ ] Fine-grained token의 대상 저장소를 `KMA_TAB_v2`로 한정
-- [ ] 토큰 권한을 `Contents: Read and write`로만 제한
-- [ ] Streamlit Secrets의 `[github_demo_store]` 설정 및 토큰 비공개 확인
-- [ ] `participant_access_code`와 신규기업용 `company_access_code`를 서로 다르게 Secrets에 설정
-- [ ] 신규 기업마다 별도 기업 관리자 확인코드를 정하고 참여자 코드와 다름을 확인
-- [ ] 사업자등록번호·KMA 기업코드·관리자코드 원문이 프로젝트/제출 JSON에 없는지 확인
-- [ ] 서로 다른 두 기업에서 같은 프로젝트명을 사용해도 대시보드·리포트가 섞이지 않는지 확인
-- [ ] 기획검증 종료 후 `enabled=false` 전환 또는 토큰 폐기
-- [ ] 프로젝트 게시·다른 브라우저 프로젝트 코드 불러오기 확인
-- [ ] 교육 전/후 완료 후 누적 대시보드와 조직 리포트 반영 확인
-- [ ] 실명·사번·이메일·실제 응답 미사용 확인
+- [ ] https://tap.kma.or.kr 첫 화면과 `/_stcore/health`가 200으로 응답
+- [ ] 새 리비전에 오류 로그가 없는지 확인
+- [ ] 화면을 바꾼 릴리스는 KMA 관리자·교육담당자·참여자 세 역할로 확인
+- [ ] 문제가 있으면 Cloud Run 콘솔에서 이전 리비전에 트래픽 100%를 돌려 롤백
 
-- [ ] 이 폴더만 새 GitHub 저장소 루트에 업로드
-- [ ] `.env`, `.streamlit/secrets.toml`, 개인식별정보 파일이 없는지 확인
-- [ ] `python scripts/validate_project.py` 통과
-- [ ] `python -m unittest discover -s tests -v` 통과
-- [ ] GitHub 저장소 연결 후 엔트리 파일을 `streamlit_app.py`로 지정
-- [ ] Python 3.12 선택
-- [ ] 배포 후 처음 사용 안내·홈·프로젝트 설정·교육 전 검사·교육 후 검사·개인리포트·조직리포트·문항은행 순회
-- [ ] 사이드바 접기·파일 업로드 아이콘이 `keyboard_double...`, `upload` 글자로 노출되지 않는지 확인
-- [ ] 밝은 화면과 운영체제 다크모드에서 본문·버튼·입력창 대비 확인
-- [ ] 교육 전후 리포트 예시 워터마크, 전·후 유효응답 N<5 보호, 인쇄용 HTML 다운로드 확인
-- [ ] 교육 전후 리포트에서 누적 실시 프로젝트 선택·완료 인원 카드·최대 8축 레이더 그래프 확인
-- [ ] GitHub 합성 프로젝트 N<5에서 리포트 미리보기 코드·명시적 토글을 거쳐서만 화면 전용 레이더가 보이고, 다운로드·인쇄에는 포함되지 않는지 확인
-- [ ] 하단 CSV 보조 기능이 명시적으로 선택했을 때만 프로젝트 결과보다 우선하는지 확인
-- [ ] KMA 대시보드의 실데이터/목업 표에 중복 열이 없고 PyArrow 오류 없이 표시되는지 확인
-- [ ] 교육 전·후에 같은 교육 참여자 ID와 같은 문항 버전이 유지되는지 확인
-- [ ] 사후검사 시작일이 교육일 8주 이후인지, 검사기간 밖 제출 차단이 운영 환경에서 켜져 있는지 확인
-- [ ] 공개 데모에 실제 개인정보·기밀자료를 업로드하지 않는다는 안내 확인
+## 교육과정 카탈로그
 
-## 실제 회원사 운영
+- 매주 월요일 03:00(KST) `Course catalog weekly refresh`가 과정을 다시 모아 main에 직접 커밋하고 배포까지 합니다. 바뀐 과정이 없으면 커밋·배포를 건너뜁니다.
+- 실패하면 GitHub가 메일을 보냅니다. 결과는 Actions 실행 화면 요약에서 봅니다.
 
-- [ ] 교육 전 검사 완료 후 기준파일(JSON)을 내려받고, 새 브라우저 세션의 교육 후 검사에서 동일 프로젝트·참여자 ID로 복원되는지 확인
-- [ ] 참여자 사이드바에서 `교육 전 검사`와 `교육 후 검사`가 각각 열리고, 메뉴 선택과 실제 검사 단계가 항상 일치하는지 확인
-- [ ] 기준파일에는 가명 ID와 문항별 응답이 포함되므로 참여자 본인만 접근 가능한 저장 위치와 폐기기한을 안내
-- [ ] 실제 다인 운영은 브라우저 세션이나 기준파일에 의존하지 않고 PostgreSQL 등 서버 저장소에 프로젝트·참여자·검사버전·완료일을 영속화
+## 데이터·보안
 
-- [ ] 외부 PostgreSQL 연결 및 스키마 적용
-- [ ] KMA 관리자·교육담당자·참여자 역할별 인증/인가 구현
-- [ ] 프로젝트/문항/채점/과정매핑 버전 고정
-- [ ] 조직 업로드에 project_id·assessment_version·target_level·assessment_date를 저장하고 혼합 집계 차단
-- [ ] 개인정보 처리방침·동의·철회·보유기간 반영
-- [ ] 개인결과 HR 공유는 별도 동의가 있을 때만 허용
-- [ ] N<5 및 보완 억제 검증
-- [ ] 과정코드·개설상태·URL을 실제 KMA 카탈로그와 대조
-- [ ] 인지면접 표본과 파일럿 목표표본을 연구설계서에서 사용목적·집단구성·분석모형 근거와 함께 확정
-- [ ] 신뢰도·요인구조·DIF 분석 후 문항/해석 기준 확정
-- [ ] 비밀검사·의존성 감사·조직 간 접근 방지 테스트를 CI에 추가
-
-공식 배포 안내: https://docs.streamlit.io/deploy/streamlit-community-cloud/deploy-your-app
+- [ ] `.env`, `.streamlit/secrets.toml`, `deploy/gcp/config.env`, 개인정보가 든 파일이 커밋에 없는지 확인
+- [ ] 비밀값(DB 주소, 관리자 해시)은 Secret Manager에만 둡니다.
+- [ ] 개인정보 처리 항목·보관 기간·회사 제공 범위를 바꾸면 동의 화면 문구(`tap/account_consent.py`)와 동의 버전, 개인정보 처리방침, 이용 안내를 함께 고칩니다.

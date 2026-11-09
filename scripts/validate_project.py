@@ -51,7 +51,6 @@ MANIFEST_EXCLUDED_TOP_LEVEL = {
 # Local-only files: a git worktree keeps ".git" as a file, and config.env is gitignored.
 MANIFEST_EXCLUDED_FILES = {".git", "deploy/gcp/config.env"}
 MANIFEST_EXCLUDED_DIRECTORY_NAMES = {
-    ".wrangler",
     "__pycache__",
     "node_modules",
 }
@@ -72,10 +71,6 @@ def deployable_paths() -> set[str]:
                 name
                 for name in child_directories
                 if name not in MANIFEST_EXCLUDED_DIRECTORY_NAMES
-                and not (
-                    directory_path == ROOT / "cloudflare"
-                    and name == "dist"
-                )
             ]
         for filename in filenames:
             path = directory_path / filename
@@ -209,11 +204,6 @@ def main() -> int:
         ROOT / "docs" / "TAP_오픈페이지_와이어프레임_v1.html",
         ROOT / "docs" / "TAP_사용설명서_v3.pdf",
         ROOT / "docs" / "TAP_빠른사용가이드_v3.pptx",
-        ROOT / "cloudflare" / "build.mjs",
-        ROOT / "cloudflare" / "package.json",
-        ROOT / "cloudflare" / "pnpm-lock.yaml",
-        ROOT / "cloudflare" / "pnpm-workspace.yaml",
-        ROOT / "cloudflare" / "wrangler.jsonc",
     ]
     for path in required_pages:
         if not path.exists():
@@ -285,32 +275,6 @@ def main() -> int:
             if marker not in source:
                 errors.append(
                     f"open-page contract missing in {path.relative_to(ROOT)}: {marker}"
-                )
-    cloudflare_contract = {
-        ROOT / "cloudflare" / "build.mjs": (
-            "https://kmatap.streamlit.app",
-            "tap-user-guide.pdf",
-            "guidePdfBase64Token",
-            "Content-Disposition: attachment",
-            "GitHub repository link",
-        ),
-        ROOT / "cloudflare" / "wrangler.jsonc": (
-            '"name": "kma-tap-open"',
-            '"directory": "./dist"',
-        ),
-        ROOT / "cloudflare" / "package.json": (
-            '"build": "node build.mjs"',
-            '"wrangler"',
-        ),
-    }
-    for path, markers in cloudflare_contract.items():
-        if not path.is_file():
-            continue
-        source = path.read_text(encoding="utf-8")
-        for marker in markers:
-            if marker not in source:
-                errors.append(
-                    f"Cloudflare open-page contract missing in {path.relative_to(ROOT)}: {marker}"
                 )
     open_page_html = ROOT / "docs" / "TAP_오픈페이지_와이어프레임_v1.html"
     if open_page_html.is_file():

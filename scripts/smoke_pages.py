@@ -69,8 +69,8 @@ def main() -> int:
     ):
         if f'href="{route}"' not in source:
             raise AssertionError(f"same-host open-page link is missing: {route}")
-    if 'href="https://kmatap.streamlit.app/' in source:
-        raise AssertionError("rendered app links must not redirect to the old host")
+    if 'data-app-link href="http' in source:
+        raise AssertionError("app links must stay on the current host")
     if source.count(' data-guide-download href="/tap-user-guide.pdf"') != 3:
         raise AssertionError("top/mobile/footer guide download links must all exist")
     if source.count('href="/tap-user-guide.pdf"') != 3:

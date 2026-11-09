@@ -38,11 +38,11 @@ class PostgresPreflightTests(unittest.TestCase):
             with self.subTest(schema=schema), self.assertRaises(ValueError):
                 preflight._schema_url("postgresql://tester@localhost/check", schema)
 
-    def test_render_database_requires_explicit_double_opt_in(self):
+    def test_startup_database_requires_explicit_double_opt_in(self):
         output = io.StringIO()
         with patch.dict(os.environ, {"DATABASE_URL": "SECRET_DSN_SENTINEL"}, clear=True), redirect_stdout(output):
             self.assertEqual(preflight.main([]), 1)
-            self.assertEqual(preflight.main(["--render-preflight"]), 1)
+            self.assertEqual(preflight.main(["--startup-preflight"]), 1)
         self.assertIn("stage=configuration", output.getvalue())
         self.assertNotIn("SECRET_DSN_SENTINEL", output.getvalue())
 

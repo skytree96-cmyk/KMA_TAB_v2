@@ -665,21 +665,14 @@ class DashboardTests(unittest.TestCase):
             r'data-app-link href="([^"]+)"', _rendered_open_page_html()
         )
         self.assertGreaterEqual(len(original_links), 8)
-        self.assertEqual(len(original_links), len(rendered_links))
-        for original, rendered in zip(original_links, rendered_links):
-            self.assertTrue(original.startswith("https://kmatap.streamlit.app/"))
-            self.assertTrue(rendered.startswith("/") and not rendered.startswith("//"))
-            expected = urlsplit(original)
-            for origin in (
-                "https://kma-tap-staging.onrender.com",
-                "http://localhost:8501",
-                "https://tap.example.org",
-            ):
-                destination = urlsplit(urljoin(origin + "/", rendered))
+        self.assertEqual(original_links, rendered_links)
+        for link in original_links:
+            self.assertTrue(link.startswith("/") and not link.startswith("//"))
+            for origin in ("http://localhost:8501", "https://tap.example.org"):
+                destination = urlsplit(urljoin(origin + "/", link))
                 self.assertEqual(urlsplit(origin).netloc, destination.netloc)
-                self.assertEqual(expected.path, destination.path)
-                self.assertEqual(expected.query, destination.query)
-                self.assertEqual(expected.fragment, destination.fragment)
+                self.assertEqual(urlsplit(link).path, destination.path)
+                self.assertEqual(urlsplit(link).query, destination.query)
         self.assertEqual(static_source, OPEN_PAGE_PATH.read_bytes())
 
     def test_public_deep_link_sets_the_destination_role(self) -> None:

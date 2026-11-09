@@ -27,7 +27,7 @@ GitHub의 Fine-grained personal access token을 다음과 같이 생성합니다
 
 ## 2. Streamlit Secrets 등록
 
-Streamlit Community Cloud의 앱 설정에서 **Secrets**에 다음 내용을 등록합니다. 토큰은 코드나 GitHub 파일에 커밋하지 않습니다.
+앱의 Streamlit Secrets(로컬은 `.streamlit/secrets.toml`)에 다음 내용을 등록합니다. 토큰은 코드나 GitHub 파일에 커밋하지 않습니다.
 
 ```toml
 [github_demo_store]

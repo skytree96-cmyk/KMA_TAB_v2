@@ -1,6 +1,6 @@
-# KMA TAP — Google Cloud 이전 가이드
+# KMA TAP — Google Cloud 운영 가이드
 
-Render(`kmatap.onrender.com`) → **Cloud Run(도쿄) + Cloud SQL PostgreSQL 18** + `tap.kma.or.kr` 형태의 서브도메인.
+운영: **Cloud Run(도쿄) + Cloud SQL PostgreSQL 18**, 주소 `https://tap.kma.or.kr`.
 
 | 구성 | 값 |
 | --- | --- |
@@ -25,20 +25,6 @@ Cloud Shell(브라우저)에서 실행해도 됩니다. 이 경우 저장소를 
 ```bash
 bash deploy/gcp/01_setup.sh
 ```
-
-## 2. Render DB 이전 (전환 직전에 실행)
-
-1. Render 대시보드 → `kmatap-db` → Networking → 접근 허용 IP에 `0.0.0.0/0` 임시 추가
-2. Render 대시보드 → `kmatap-db` → Connect → **External Database URL** 복사
-3. 실행 후 URL 붙여넣기(화면에 표시되지 않음, Secret Manager에만 저장)
-
-```bash
-bash deploy/gcp/02_migrate_render.sh
-```
-
-4. 끝나면 Render의 `0.0.0.0/0` 규칙 삭제, `gcloud secrets delete render-database-url`
-
-덤프 이후 Render에 들어온 데이터는 복사되지 않으므로, 이전 당일에는 Render 사용을 멈추도록 안내하세요.
 
 ## 3. 앱 배포 (릴리스마다 반복)
 
@@ -79,11 +65,6 @@ bash deploy/gcp/04_domain.sh
 > TAP 서비스 운영을 위해 아래 DNS 레코드 등록을 요청드립니다.
 > 1) `kma.or.kr` TXT `google-site-verification=…` (Google 도메인 소유 인증용, 기존 레코드 유지)
 > 2) `tap.kma.or.kr` CNAME `ghs.googlehosted.com.` (Google Cloud Run 연결)
-
-## 5. 전환 후 정리
-
-- 새 도메인에서 정상 동작 확인 후 Render 웹서비스 Suspend, 1~2주 뒤 Render DB 삭제
-- 오픈페이지·사용설명서 등 `kmatap.onrender.com` 링크를 `https://tap.kma.or.kr`로 교체 (2026-10-01 완료)
 
 ## 문제 해결
 

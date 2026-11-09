@@ -18,7 +18,6 @@ RUN_SA="tap-run@$PROJECT_ID.iam.gserviceaccount.com"
 BUILD_SA="tap-build@$PROJECT_ID.iam.gserviceaccount.com"
 DB_URL_SECRET="tap-database-url"
 ADMIN_HASH_SECRET="tap-bootstrap-admin-hash"
-RENDER_URL_SECRET="render-database-url"
 MIGRATION_BUCKET="gs://$PROJECT_ID-kmatap-migration"
 
 gcloud config set project "$PROJECT_ID" >/dev/null

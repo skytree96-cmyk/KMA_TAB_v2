@@ -1,111 +1,60 @@
-# TAP 교육 전후 역량평가 MVP
+# KMA TAP
 
-KMA 회원사의 교육 전 출발점과 교육 후 현업 행동 변화를 같은 기준으로 비교하고, 다음 교육·조직개선을 연결하기 위한 Streamlit 공개 검토용 MVP입니다.
+KMA 회원사 임직원의 교육 전후 업무행동 변화를 같은 문항으로 재고, 개인·조직 리포트와 KMA 교육과정 추천으로 이어 주는 서비스입니다.
 
-이번 버전은 인터랙티브 목업의 Teal·Mint 디자인 시스템을 적용하고 역할별 화면을 분리했습니다. 서비스 루트(`/`)는 기능·측정원칙·합성 샘플 리포트·역할별 진입을 안내하는 공개 오픈페이지이며, 기존 교육담당자 대시보드는 `/manager_dashboard`로 분리했습니다.
+## 운영
 
-기획·테스트 단계에서는 선택적으로 GitHub의 별도 `demo-data` 브랜치에 **합성 데이터만** 누적할 수 있습니다. 회사명·사업자등록번호로 참여를 요청하면 사업자등록번호에서 만든 비가역 `company_id`로 기업별 프로젝트·완료 스냅샷을 분리하고, KMA 관리자가 화면에서 승인합니다. 사업자등록번호와 참여자 ID 원문은 저장하지 않습니다. 연결 방법은 `docs/GITHUB_DEMO_STORE_SETUP.md`를 따릅니다. 실제 운영 전에는 PostgreSQL 기반 자체 서버 저장소와 사용자별 인증/RBAC로 교체해야 합니다.
+- 주소: https://tap.kma.or.kr
+- Google Cloud Run `kmatap` (프로젝트 `kma-tab`, 리전 `asia-northeast1`) + Cloud SQL PostgreSQL 18 `kmatap-db`
+- 앱은 Streamlit 프레임워크로 동작하며, 컨테이너는 `scripts/start_accounts.py`로 시작합니다(`Dockerfile`).
+- 인프라·도메인·자동 배포 설정: [`deploy/gcp/README.md`](deploy/gcp/README.md)
+- 계정·데이터·환경변수: [`docs/ACCOUNT_DEPLOYMENT.md`](docs/ACCOUNT_DEPLOYMENT.md)
+- 배포 점검 순서: [`DEPLOYMENT_CHECKLIST.md`](DEPLOYMENT_CHECKLIST.md)
 
-화면의 Material 아이콘 글꼴 충돌과 다크모드 대비를 수정했으며, 교육 전후 조직 리포트는 A4 페이퍼형 4쪽 구조와 인쇄용 HTML 다운로드를 제공합니다. 사이드바의 영문 자동 페이지명은 숨기고 사용자 화면을 한글로 통일했습니다.
+| 역할 | 하는 일 |
+|---|---|
+| KMA 관리자 | 회원사·교육담당자 계정, 회사별 운영 현황, 접속 기록 |
+| 교육담당자 | 참여자 계정·부서·직급, 프로젝트와 배정, 진행 현황, 조직 리포트 |
+| 참여자 | 첫 검사 전 개인정보 동의, 교육 전·후 검사, 본인 리포트 |
 
-| 데모 역할 | 기본 화면 | 제공 범위 |
-|---|---|---|
-| 교육담당자 | 관리자 대시보드 | 현재 브라우저의 실제 프로젝트·참여자 전후 상태, 사전·사후 조직 변화·교육 추천 |
-| 참여자 | 교육 전 검사 · 교육 후 검사 | 본인 검사·변화 리포트·결과 공유 의사 표시(자동 전송 아님) |
-| KMA 관리자 | KMA 대시보드 | 참여 기업 신청 목록·승인/거절·회사별 완료현황·문항 버전·과정 매핑 |
+## 배포 흐름
 
-사이드바의 역할 전환은 공개 검토용 데모 기능입니다. 실제 운영에서는 인증·조직 소속·서버단 권한검사를 연결해야 합니다.
+1. 작업 브랜치에서 고치고 PR을 올립니다. GitHub Actions `TAP validation`(`.github/workflows/ci.yml`)이 검증·PostgreSQL 점검·테스트를 돌립니다.
+2. main에 머지하면 `Deploy to Cloud Run`(`.github/workflows/deploy.yml`)이 검증 통과 후 자동으로 배포합니다. **머지가 곧 운영 배포입니다.**
+3. 배포 후 새 리비전이 트래픽 100%를 받는지 확인합니다.
+4. 교육과정 카탈로그는 `.github/workflows/catalog-weekly.yml`이 매주 월요일 03:00(KST)에 갱신해 main에 커밋하고 배포합니다([`catalog/`](catalog/README.md)).
 
-GitHub 기획검증 저장소를 연결하면 관리자 대시보드는 `demo-data` 브랜치에 누적된 합성 프로젝트와 검사 완료 결과를 집계합니다. KMA 대시보드는 회사명·승인상태·신청/검토시각·회사별 프로젝트와 교육 전/후 완료현황을 참여 기업 목록으로 보여줍니다. 사업자등록번호 원문과 관리자 개인 정보는 저장하거나 표시하지 않으므로 현재 목록의 관리자 범위는 개인계정이 아닌 회사 단위입니다. 미연결 또는 조회 실패 시에는 현재 브라우저 세션의 프로젝트 0~1개와 참여자 0~1명만 표시합니다.
-
-GitHub 기획검증 저장소를 연결하면 교육담당자가 게시한 프로젝트 코드를 다른 브라우저에서 불러와 교육 전 검사를 시작할 수 있고, 교육 전·후 각 검사 완료 시점의 가명 스냅샷이 기업별로 누적됩니다. 신규 기업은 회사명·사업자등록번호로 참여를 요청하고 KMA 승인 후 프로젝트를 만들 수 있으며, 참여자는 별도 `기획검증 접속코드`를 사용합니다. 미연결 또는 참여자 코드 불일치 때에는 동일 브라우저 세션과 기준파일(JSON) 방식으로 계속 진행할 수 있습니다.
-
-## 공개 주소
-
-- Cloudflare 오픈페이지: https://kma-tap-open.skytree96.workers.dev
-- Streamlit 기능 앱: https://kmatap.streamlit.app
-
-Cloudflare 무료 Workers에서는 Streamlit 서버를 그대로 실행할 수 없어 현재는 오픈페이지와 PDF 사용설명서만 Cloudflare에서 제공하고, 검사·대시보드·리포트는 Streamlit로 연결합니다. 전체 이전안은 docs/CLOUDFLARE_MIGRATION_PLAN.md에 정리했습니다.
-
-## 핵심 정리
-
-| 구분 | 원본 | 이번 배포본 |
-|---|---:|---:|
-| 전체 역량 | 36 | 운영 31, 비활성 5 |
-| 전체 문항 | 144 | 운영 124, 비활성 20 |
-| 파일럿 후보 | - | 4개 후보역량·16문항, 점수 산출 비활성 |
-| 역문항 | 5 | 0 |
-| 점수 | 임의 규준 T점수·백분위 | 행동빈도 평균 1~5 + 표시용 0~100 |
-| 직급 | 5개 독립 점수 | 대상자·문항 적용 기준 |
-| 조직 집계 | 표본 보호 없음 | 전·후 유효응답 N<5 비공개 |
-
-## 화면·선택 UI
-
-- 목업과 같은 `#102A2D / #087B76 / #DFF4F1 / #F4F8F7` 팔레트, 20px 카드, 다크틸 히어로를 사용합니다.
-- 프로젝트의 기본역량은 체크된 고정 카드로 표시합니다.
-- 전문·미래역량은 체크박스로 최대 3개, 직무역량은 최대 1개, 합계 최대 4개를 선택합니다.
-- 조직 우선역량과 학습 희망역량도 목록형 선택 대신 체크박스를 사용합니다.
-- 현재 원본의 `target_levels`를 유지하므로 기본값인 관리자·리더는 8개·32문항, 실무자는 적용 가능한 6개·24문항입니다. CORE8을 전 직급 공통으로 고정하려면 전문가 감수 후 해당 메타데이터를 먼저 변경해야 합니다.
-
-## 빠른 사용법
-
-1. 사이드바 `처음 사용 안내`에서 자신의 역할을 확인합니다.
-2. 교육담당자는 회사명과 사업자등록번호를 입력해 참여를 요청합니다. KMA 관리자가 `KMA 대시보드`에서 승인하면 같은 정보로 회사 범위를 확인하고, `교육평가 프로젝트`에서 교육명·교육일·사전/사후 검사기간·공통 측정역량을 설정합니다.
-3. 참여자는 왼쪽 `교육 전 검사`를 선택하고, GitHub 기획검증 저장소가 연결된 경우 교육담당자가 전달한 프로젝트 코드와 `기획검증 접속코드`를 입력해 다른 브라우저에서도 검사를 시작합니다. 미연결 때에는 프로젝트를 만든 동일 브라우저 세션에서 시작합니다. 교육 후 현업 적용 8~10주 뒤에는 왼쪽 `교육 후 검사`를 선택해 같은 문항·척도로 응답합니다. 두 시점에는 같은 교육 참여자 ID를 사용합니다. ID가 없어도 문항은 표시되지만 응답 저장·다음 문항 이동·검사 완료는 할 수 없습니다.
-   브라우저 세션이 종료되거나 앱이 재배포될 수 있으므로 다음 순서로 교육 후 검사를 이어갑니다.
-   1. 사전검사 완료 후 개인 리포트에서 `1. 교육 전 검사 기준파일 저장` 선택
-   2. 내려받은 `tap_pre_baseline_프로젝트ID_완료일.json`을 현업 적용 8~10주 동안 본인만 접근 가능한 위치에 보관
-   3. 왼쪽 **교육 후 검사**를 열고 `교육 전 검사 기준파일(JSON)` 선택
-   4. 교육 참여자 ID와 사전응답 자동 복원 확인 후 사후검사 완료 및 비교 리포트 확인
-
-   기준파일은 일반 `결과 JSON`과 다른 연결용 파일이며 서버 원본이나 전체 백업이 아닙니다. 이름·사번 대신 가명 교육 참여자 ID를 사용하고, 문항별 응답이 포함되므로 본인만 안전하게 보관하세요.
-4. 개인은 사전·사후 검사를 모두 완료한 뒤 본인의 변화를 확인하고 조직 집계용 열이 포함된 `결과 CSV`를 내려받습니다. 공유 동의 체크박스는 의사 표시일 뿐 파일을 자동 전송하지 않으므로, 조직 집계가 필요하면 정해진 안전한 방법으로 교육담당자에게 전달합니다.
-5. 교육담당자는 `교육 전후 리포트`에서 GitHub에 누적된 실시 프로젝트를 먼저 선택합니다. 프로젝트명·코드·교육 전/후 완료 인원과 사전·사후 비교 결과를 확인하며, 공개 가능한 역량은 최대 8축 레이더 그래프로 비교합니다. 선택 역량이 8개를 넘으면 표시할 3~8개를 고릅니다.
-6. GitHub 누적자료 대신 별도 파일 비교가 필요하면 하단 `CSV 파일로 직접 비교하기`를 펼칩니다. 참여자별 결과 CSV의 헤더를 유지한 채 행 단위로 합쳐 업로드하고 `업로드 CSV로 리포트 보기`를 명시적으로 선택합니다.
-7. 동일 참여자 ID·프로젝트·문항 버전의 교육 전·후 유효 결과가 역량별로 N≥5일 때만 평균과 변화량이 공개됩니다. GitHub 합성 기획검증 프로젝트의 N<5 결과는 리포트 미리보기 코드와 명시적 화면 미리보기 확인을 거친 경우에만 표시되며 다운로드·인쇄되지 않습니다. 사후검사의 적용기회·상사지원·도구·권한·장애요인과 함께 해석합니다.
-8. 교육 전후 리포트의 `인쇄용 리포트 HTML`을 내려받아 브라우저의 `인쇄 → PDF 저장`을 사용합니다.
-
-화면 안의 상세 안내와 PDF 사용설명서는 `pages/0_user_guide.py`, `docs/TAP_사용설명서_v3.pdf`에서 제공합니다.
-
-운영용 교육 전후 리포트 CSV는 참여자별·역량별 장형 구조이며 `participant_id`, `factor_code`, `score_1_to_5`, `project_id`, `assessment_version`, `target_level`, `assessment_date`, `session_type`, `valid_items`, `na_items`, `missing_items`와 네 전이요인 열을 사용합니다. `session_type`은 `pre` 또는 `post`이며, 두 시점에는 같은 교육 참여자 ID(`participant_id`)와 같은 문항 버전을 유지해야 합니다. 각 참여자의 개인 리포트에서 받은 결과 CSV는 열 이름을 바꾸지 않고 헤더 하나 아래에 행으로 합칩니다. 화면의 `사전·사후 CSV 양식`을 사용하면 올바른 형식으로 시작할 수 있습니다. 조직 리포트는 역량별 전·후 유효응답 N≥5만 공개하며, 이는 개인정보 보호 최소기준일 뿐 통계적 안정성이나 교육의 인과효과를 보장하지 않습니다. 공개 데모에는 실제 개인정보나 기밀 응답을 업로드하지 마세요.
-
-원본 144문항은 모두 `data/question_bank.csv`에 보존돼 있습니다. 직급 20문항은 `active=false`, `original_decision=삭제`로 표시됩니다. 영업 4문항과 마케팅 1문항은 정적 SQL과 실행 API 문구가 달라 두 원문을 함께 기록했습니다.
-
-## 실행
+## 로컬 검증
 
 ```bash
 python -m venv .venv
-source .venv/bin/activate  # Windows: .venv\Scripts\activate
+.venv\Scripts\activate   # macOS/Linux: source .venv/bin/activate
 pip install -r requirements.txt
+python scripts/validate_project.py --write-manifest   # 파일을 바꾼 뒤 MANIFEST_SHA256.txt 갱신
 python scripts/validate_project.py
-python -m unittest discover -s tests -v
-python scripts/smoke_pages.py
-streamlit run streamlit_app.py
+TAP_APP_MODE=demo python -m unittest discover -s tests
+TAP_APP_MODE=demo python scripts/smoke_pages.py
 ```
 
-## GitHub → Streamlit Community Cloud
+PostgreSQL 점검은 `TEST_DATABASE_URL`을 지정하고 `python scripts/check_postgres_accounts.py`를 실행합니다. 운영 모드 앱은 PostgreSQL(`DATABASE_URL`)이 있어야 뜹니다.
 
-1. 이 폴더의 내용만 GitHub 저장소 루트에 업로드합니다.
-2. Streamlit Community Cloud에서 저장소를 연결합니다.
-3. 엔트리 파일은 `streamlit_app.py`, Python은 3.12로 설정합니다.
-4. 공개 검토용은 별도 secret 없이 실행됩니다.
-5. 실제 운영 secret은 GitHub가 아닌 Streamlit Secrets 화면에 입력합니다.
+`TAP_APP_MODE=demo`는 초기 공개 MVP 화면(`pages/`, GitHub `demo-data` 합성 데이터 저장소)을 띄우는 모드입니다. 운영에는 쓰지 않고, 기존 검사·리포트 회귀 테스트에서만 씁니다.
 
-GitHub Actions는 push와 pull request마다 데이터 무결성, 단위 테스트, Python 문법 검사를 실행합니다.
+## 구조
 
-Streamlit은 배포용 의존성을 `requirements.txt` 등으로 선언하도록 안내하며, 비밀값은 별도 Secrets 관리에 넣도록 안내합니다.
-
-- https://docs.streamlit.io/deploy/streamlit-community-cloud/deploy-your-app/app-dependencies
-- https://docs.streamlit.io/deploy/streamlit-community-cloud/deploy-your-app/secrets-management
-
-## Cloudflare 공개 오픈페이지
-
-    cd cloudflare
-    pnpm install
-    pnpm run build
-    pnpm exec wrangler deploy
-
-cloudflare/build.mjs는 공개 HTML을 cloudflare/dist/index.html로 만들고 PDF 사용설명서를 함께 복사합니다. 기능 CTA는 현재 Streamlit 앱의 각 역할 화면으로 연결하며 GitHub 저장소 외부 링크는 노출하지 않습니다.
+```text
+streamlit_app.py   # 진입점 (운영: 계정 앱, 데모 모드: 초기 MVP)
+tap/               # 앱 로직: account_*(운영 계정 앱), 채점·추천·리포트·PDF
+pages/             # 초기 MVP 화면 (데모 모드 전용, 운영 이미지에서 제외)
+data/              # 문항 144개·역량 36개, 과정과 역량 매핑
+catalog/           # KMA 과정 수집·매핑, 주간 갱신
+assets/            # 화면 CSS, 글꼴
+docs/              # 사용설명서, 오픈페이지, 설계 문서
+database/          # PostgreSQL 스키마
+deploy/gcp/        # Cloud Run·Cloud SQL 설정 스크립트
+scripts/           # 시작·검증·점검 스크립트
+tests/             # 단위·화면 테스트
+```
 
 ## 문항·채점
 
@@ -131,34 +80,6 @@ cloudflare/build.mjs는 공개 HTML을 cloudflare/dist/index.html로 만들고 P
 - 비교집단이 없는 사전·사후 차이는 `교육 전후 관찰된 자기보고 행동빈도 변화`로만 해석하며 교육의 인과효과로 표현하지 않습니다.
 - 행동빈도 구간은 파일럿 전 `임시 기술구간`이며 표준설정 결과가 아닙니다.
 
-## 교육 추천 100점
-
-| 항목 | 배점 |
-|---|---:|
-| 목표수준과 현재수준의 격차 | 40 |
-| 역량–과정 내용 매핑 적합도 | 30 |
-| 조직 우선순위 | 15 |
-| 본인 학습희망 | 10 |
-| 대상수준·교육방식 적합 | 5 |
-
-프로젝트 생성 단계에서는 격차 원인을 미리 선택하지 않습니다. 교육 전·후 변화와 교육 후 현업전이 응답(적용 기회, 상사 지원, 도구·권한, 시간·프로세스)을 함께 확인해 원인을 해석합니다. 원인을 아직 모르는 상태는 점수를 임의로 낮추지 않는 중립값(게이트 1.0)이며, 별도 검토로 권한·도구·프로세스 등 시스템 요인이 명시적으로 확인된 경우에만 교육 추천을 0으로 차단할 수 있습니다. 과정명과 URL은 원본 코드의 예시를 정리한 것이므로 실제 운영 전 KMA 과정코드·개설상태와 대조해야 합니다.
-
-이 점수는 `교육과정 검토 우선순위`를 돕는 휴리스틱입니다. 목표 3.5에서는 격차 항목의 실제 최대가 25점입니다. 가중치와 시스템 요인 판정 기준은 전문가 합의와 민감도 분석 후 확정해야 합니다.
-
-## 구조
-
-```text
-streamlit_app.py          # 공개 오픈페이지 엔트리
-pages/                    # 관리자 대시보드·설정·교육 전/후 검사·개인/조직 리포트·문항은행·KMA 대시보드
-tap/                      # 오픈페이지·데이터·채점·추천·집계·선택·대시보드 로직
-data/                     # 144문항, 36역량, 과정·매핑, 명시적 데모 데이터
-docs/                     # 교육평가 검토보고서와 빠른 사용 가이드
-database/                 # 실제 운영용 PostgreSQL 참조 스키마
-cloudflare/                # Workers Static Assets 공개페이지 빌드·배포
-tests/                    # 순수 로직과 데이터 무결성 테스트
-scripts/validate_project.py
-```
-
 ## 타당화 상태
 
 현재 문항 판정은 역량 정의·행동구체성·단일성·수행기회·편향·척도 적합성에 대한 1차 내용검토입니다. 통계적 타당화 완료를 의미하지 않습니다.
@@ -177,7 +98,3 @@ scripts/validate_project.py
 - Standards for Educational and Psychological Testing: https://www.testingstandards.net/uploads/7/6/6/4/76643089/standards_2014edition.pdf
 - CDC Cognitive Interviewing: https://www.cdc.gov/nchs/ccqder/question-evaluation/cognitive-interviewing.html
 - CDC Training Needs Analysis: https://www.cdc.gov/training-development/php/about/assess-training-needs-conducting-needs-analysis.html
-
-## 운영 한계
-
-이 ZIP은 별도 운영 DB·로그인 없이 즉시 공개 검토 배포가 가능합니다. 선택형 GitHub 기획검증 저장소는 합성 프로젝트와 완료검사 스냅샷만 누적하며, 진행 중 문항 응답·실제 개인정보·기밀자료를 저장하는 운영 DB가 아닙니다. 연결하지 않으면 모든 진행 상태는 현재 브라우저 세션에만 유지됩니다. 완료한 교육 전 결과는 개인 리포트의 기준파일(JSON)로 내려받아 교육 후 검사에서 복원할 수 있지만, 파일에는 가명 ID와 문항별 응답이 있으므로 본인만 안전하게 보관해야 합니다. 개인결과 공유 동의 체크박스는 자동 전송 기능이 아니며, 실제 다인 조직 운영과 자동 취합·장기보존에는 `database/production_schema.sql` 기반 서버 저장을 연결하고 `SECURITY.md`, `DEPLOYMENT_CHECKLIST.md`를 따라야 합니다.

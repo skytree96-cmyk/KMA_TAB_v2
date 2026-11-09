@@ -1,7 +1,7 @@
 """Exercise account persistence in a disposable, isolated PostgreSQL schema.
 
-Normal use: set TEST_DATABASE_URL and run this file. Render's one-time startup
-check additionally requires BOTH --render-preflight and TAP_POSTGRES_PREFLIGHT=1
+Normal use: set TEST_DATABASE_URL and run this file. The one-time startup
+check additionally requires BOTH --startup-preflight and TAP_POSTGRES_PREFLIGHT=1
 before DATABASE_URL can be selected. Credentials and raw DB errors never print.
 """
 from __future__ import annotations
@@ -336,12 +336,12 @@ def _exercise(scoped_url: str) -> None:
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Check accounts in a disposable PostgreSQL schema.")
-    parser.add_argument("--render-preflight", action="store_true", help="Use DATABASE_URL only with TAP_POSTGRES_PREFLIGHT=1.")
+    parser.add_argument("--startup-preflight", action="store_true", help="Use DATABASE_URL only with TAP_POSTGRES_PREFLIGHT=1.")
     args = parser.parse_args(argv)
     try:
-        if args.render_preflight:
+        if args.startup_preflight:
             if os.environ.get("TAP_POSTGRES_PREFLIGHT") != "1":
-                raise PermissionError("Render preflight was not enabled")
+                raise PermissionError("Startup preflight was not enabled")
             dsn = os.environ.get("DATABASE_URL", "")
         else:
             dsn = os.environ.get("TEST_DATABASE_URL", "")
