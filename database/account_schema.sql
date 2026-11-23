@@ -59,3 +59,21 @@ CREATE TABLE IF NOT EXISTS tap_question_overrides (
  revision INTEGER NOT NULL CHECK (revision >= 1), updated_at DOUBLE PRECISION NOT NULL,
  updated_by TEXT NOT NULL REFERENCES tap_users(id)
 );
+
+-- Claude API ledger. Each call reserves its worst-case cost first and is settled
+-- with the actual cost, so the monthly allocation holds even under concurrency.
+CREATE TABLE IF NOT EXISTS tap_ai_usage (
+ id TEXT PRIMARY KEY, month TEXT NOT NULL, feature TEXT NOT NULL, project_id TEXT,
+ status TEXT NOT NULL CHECK (status IN ('reserved','settled')),
+ amount_micros BIGINT NOT NULL CHECK (amount_micros >= 0),
+ input_tokens INTEGER NOT NULL DEFAULT 0, output_tokens INTEGER NOT NULL DEFAULT 0,
+ outcome TEXT NOT NULL DEFAULT '', created_at DOUBLE PRECISION NOT NULL, settled_at DOUBLE PRECISION
+);
+CREATE INDEX IF NOT EXISTS tap_ai_usage_month_idx ON tap_ai_usage(month, feature);
+CREATE TABLE IF NOT EXISTS tap_ai_results (
+ feature TEXT NOT NULL, cache_key TEXT NOT NULL, result_text TEXT NOT NULL,
+ created_at DOUBLE PRECISION NOT NULL, PRIMARY KEY (feature, cache_key)
+);
+CREATE TABLE IF NOT EXISTS tap_ai_state (
+ state_key TEXT PRIMARY KEY, state_value TEXT NOT NULL, updated_at DOUBLE PRECISION NOT NULL
+);

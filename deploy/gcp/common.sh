@@ -18,6 +18,8 @@ RUN_SA="tap-run@$PROJECT_ID.iam.gserviceaccount.com"
 BUILD_SA="tap-build@$PROJECT_ID.iam.gserviceaccount.com"
 DB_URL_SECRET="tap-database-url"
 ADMIN_HASH_SECRET="tap-bootstrap-admin-hash"
+# Optional Claude API key. Without it (or with TAP_AI_ENABLED unset) the app shows rule-based text only.
+AI_KEY_SECRET="tap-anthropic-api-key"
 MIGRATION_BUCKET="gs://$PROJECT_ID-kmatap-migration"
 
 gcloud config set project "$PROJECT_ID" >/dev/null

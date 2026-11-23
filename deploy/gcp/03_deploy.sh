@@ -28,6 +28,15 @@ if secret_exists "$ADMIN_HASH_SECRET"; then
   fi
   secrets="$secrets,BOOTSTRAP_ADMIN_PASSWORD_HASH=$ADMIN_HASH_SECRET:latest"
 fi
+# Claude API is optional: the app falls back to rule-based text when the key,
+# the credit or the monthly allocation is missing (tap/ai_client.py).
+if secret_exists "$AI_KEY_SECRET"; then
+  if [[ "${SKIP_SECRET_BINDING:-0}" != "1" ]]; then
+    gcloud secrets add-iam-policy-binding "$AI_KEY_SECRET" \
+      --member="serviceAccount:$RUN_SA" --role=roles/secretmanager.secretAccessor --quiet >/dev/null
+  fi
+  secrets="$secrets,ANTHROPIC_API_KEY=$AI_KEY_SECRET:latest"
+fi
 
 echo "== Deploying $SERVICE"
 # Streamlit keeps per-browser state in memory over a websocket, so session
@@ -39,7 +48,7 @@ gcloud run deploy "$SERVICE" --image="$image" --region="$REGION" \
   --service-account="$RUN_SA" \
   --add-cloudsql-instances="$SQL_CONNECTION" \
   --set-secrets="$secrets" \
-  --set-env-vars="TAP_APP_MODE=production,GITHUB_DEMO_STORE_ENABLED=false,TAP_POSTGRES_PREFLIGHT=0,BOOTSTRAP_ADMIN_LOGIN=kma.admin,TAP_LIVE_SCHEDULE=1" \
+  --set-env-vars="TAP_APP_MODE=production,GITHUB_DEMO_STORE_ENABLED=false,TAP_POSTGRES_PREFLIGHT=0,BOOTSTRAP_ADMIN_LOGIN=kma.admin,TAP_LIVE_SCHEDULE=1,TAP_AI_ENABLED=${TAP_AI_ENABLED:-0}" \
   --port=8080 --cpu=1 --memory=1Gi --concurrency=30 \
   --min-instances="${MIN_INSTANCES:-1}" --max-instances="${MAX_INSTANCES:-3}" \
   --session-affinity --timeout=3600 --cpu-boost \
