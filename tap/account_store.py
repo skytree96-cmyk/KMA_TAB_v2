@@ -1088,3 +1088,82 @@ class AccountStore:
         cutoff = self._clock() - ACCESS_LOG_RETENTION_DAYS * 86_400
         with self._transaction() as conn:
             return max(self._execute(conn, "DELETE FROM tap_audit_events WHERE created_at<?", (cutoff,)).rowcount, 0)
+
+    # --- Claude API ledger (server-only; see tap/ai_client.py) -----------------
+
+    def now(self) -> float:
+        return self._clock()
+
+    def ai_reserve(self, feature: str, amount_micros: int, feature_limit_micros: int, monthly_limit_micros: int,
+                   project_id: str | None = None) -> str | None:
+        """Reserve the worst-case cost of one call, or None when it would pass either limit."""
+        from tap.ai_budget import month_key
+
+        month = month_key(self._clock())
+        with self._transaction() as conn:
+            if not self._sqlite:
+                self._execute(conn, "SELECT pg_advisory_xact_lock(847201903)")
+            used = self._one(conn, "SELECT COALESCE(SUM(amount_micros),0) AS total,"
+                                   " COALESCE(SUM(CASE WHEN feature=? THEN amount_micros ELSE 0 END),0) AS feature_total"
+                                   " FROM tap_ai_usage WHERE month=?", (feature, month))
+            if (int(used["feature_total"]) + amount_micros > feature_limit_micros
+                    or int(used["total"]) + amount_micros > monthly_limit_micros):
+                return None
+            reservation = str(uuid.uuid4())
+            self._execute(conn, "INSERT INTO tap_ai_usage(id,month,feature,project_id,status,amount_micros,created_at)"
+                                " VALUES (?,?,?,?,'reserved',?,?)",
+                          (reservation, month, feature, project_id, amount_micros, self._clock()))
+            return reservation
+
+    def ai_settle(self, reservation: str, amount_micros: int, *, input_tokens: int = 0, output_tokens: int = 0,
+                  outcome: str = "") -> None:
+        with self._transaction() as conn:
+            self._execute(conn, "UPDATE tap_ai_usage SET status='settled',amount_micros=?,input_tokens=?,output_tokens=?,"
+                                "outcome=?,settled_at=? WHERE id=? AND status='reserved'",
+                          (max(0, int(amount_micros)), int(input_tokens), int(output_tokens), outcome[:40],
+                           self._clock(), reservation))
+
+    def ai_month_usage(self, month: str | None = None) -> dict[str, int]:
+        """Micro-dollars by feature for a month (default: current, KST), reservations included."""
+        from tap.ai_budget import month_key
+
+        with self._transaction() as conn:
+            rows = self._all(conn, "SELECT feature,SUM(amount_micros) AS total FROM tap_ai_usage WHERE month=? GROUP BY feature",
+                             (month or month_key(self._clock()),))
+        return {row["feature"]: int(row["total"]) for row in rows}
+
+    def ai_usage_summary(self, token: str) -> list[dict]:
+        """KMA view of this month's spend against each allocation."""
+        from tap.ai_budget import FEATURES, to_micros
+
+        with self._transaction() as conn:
+            self._require(conn, token, {"kma"})
+        used = self.ai_month_usage()
+        return [{"feature": key, "label": feature.label, "used_micros": used.get(key, 0),
+                 "limit_micros": to_micros(feature.monthly_usd)} for key, feature in FEATURES.items()]
+
+    def ai_cached(self, feature: str, cache_key: str) -> str | None:
+        with self._transaction() as conn:
+            row = self._one(conn, "SELECT result_text FROM tap_ai_results WHERE feature=? AND cache_key=?", (feature, cache_key))
+        return row["result_text"] if row else None
+
+    def ai_store_result(self, feature: str, cache_key: str, text: str) -> None:
+        with self._transaction() as conn:
+            self._execute(conn, "INSERT INTO tap_ai_results(feature,cache_key,result_text,created_at) VALUES (?,?,?,?)"
+                                " ON CONFLICT(feature,cache_key) DO UPDATE SET result_text=excluded.result_text,"
+                                " created_at=excluded.created_at", (feature, cache_key, text, self._clock()))
+
+    def ai_paused_until(self) -> float:
+        with self._transaction() as conn:
+            row = self._one(conn, "SELECT state_value FROM tap_ai_state WHERE state_key='paused_until'")
+        try:
+            return float(row["state_value"]) if row else 0.0
+        except ValueError:
+            return 0.0
+
+    def ai_pause(self, until: float, reason: str) -> None:
+        with self._transaction() as conn:
+            for key, value in (("paused_until", str(until)), ("paused_reason", reason[:40])):
+                self._execute(conn, "INSERT INTO tap_ai_state(state_key,state_value,updated_at) VALUES (?,?,?)"
+                                    " ON CONFLICT(state_key) DO UPDATE SET state_value=excluded.state_value,"
+                                    " updated_at=excluded.updated_at", (key, value, self._clock()))
