@@ -198,13 +198,20 @@ class PdfTests(unittest.TestCase):
 
     def test_commentary_page_in_organization_pdf(self):
         from io import BytesIO
-        from pypdf import PdfReader
+
+        with_pdf, without_pdf = self.build(commentary={"result": GOOD, "created_at": "2026-11-23 14:20"}), self.build()
+        self.assertTrue(with_pdf.startswith(b"%PDF-"))
+        self.assertGreater(len(with_pdf), len(without_pdf))
+        try:
+            from pypdf import PdfReader
+        except ImportError:
+            self.skipTest("pypdf is not installed")  # CI has no pypdf, as in test_account_report_pdf
 
         def text(pdf):
             return "".join(page.extract_text() for page in PdfReader(BytesIO(pdf)).pages).replace(" ", "")
 
-        with_commentary = text(self.build(commentary={"result": GOOD, "created_at": "2026-11-23 14:20"}))
-        without = text(self.build())
+        with_commentary = text(with_pdf)
+        without = text(without_pdf)
         self.assertIn("한눈에보는해설", with_commentary)
         self.assertIn("다음에할일", with_commentary)
         self.assertIn("자동작성한해설", with_commentary)
