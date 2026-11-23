@@ -1,0 +1,250 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>리포트 해설 시안</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable.min.css">
+<style>
+:root{
+  --blue:#1769ff; --blue-strong:#0b4fcc; --blue-tint:#eef3ff; --blue-line:#c9d9ff;
+  --ink:#161614; --ink-2:#514f48; --ink-3:#6e6d66; --ink-4:#8e98a3;
+  --line:#e5e7eb; --line-2:#eef1f3; --soft:#f1f3f5; --canvas:#f7f8f9; --sheet:#fff;
+  --orange:#c2410c; --orange-tint:#fff1e8; --green:#15803d; --green-tint:#ecfdf3;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--canvas);color:var(--ink);font-family:'Pretendard Variable',Pretendard,'Malgun Gothic',system-ui,sans-serif;font-size:15px;line-height:1.6;word-break:keep-all}
+.ms{display:inline-flex;width:1em;height:1em;font-size:20px;flex:none;vertical-align:-.15em}.ms svg{width:100%;height:100%;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.wrap{max-width:1180px;margin:0 auto;padding:28px 16px 64px}
+.intro{display:flex;gap:16px;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;margin-bottom:20px}
+.intro h1{margin:0 0 4px;font-size:24px;letter-spacing:-.02em}
+.intro p{margin:0;color:var(--ink-3)}
+.tag{display:inline-flex;align-items:center;gap:4px;padding:3px 10px;border-radius:999px;background:var(--blue-tint);color:var(--blue-strong);font-size:12.5px;font-weight:600}
+.tabs{display:flex;gap:6px;flex-wrap:wrap;margin:6px 0 18px}
+.tabs button{border:1px solid var(--line);background:var(--sheet);color:var(--ink-2);padding:8px 14px;border-radius:10px;font:inherit;font-size:14px;cursor:pointer}
+.tabs button[aria-selected=true]{background:var(--ink);color:#fff;border-color:var(--ink)}
+.grid{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:20px;align-items:start}
+@media (max-width:960px){.grid{grid-template-columns:1fr}}
+.page{background:var(--sheet);border:1px solid var(--line);border-radius:16px;padding:24px}
+.sec-head{display:flex;gap:12px;align-items:center;margin-bottom:16px}
+.sec-ic{flex:none;width:38px;height:38px;border-radius:12px;display:grid;place-items:center;background:var(--blue-tint);color:var(--blue)}
+.sec-head h2{margin:0;font-size:18px}
+.sec-head small{display:block;color:var(--ink-3);font-size:13px}
+.chips{margin-left:auto;display:flex;gap:6px;flex-wrap:wrap}
+.chip{padding:3px 10px;border-radius:999px;background:var(--soft);color:var(--ink-2);font-size:12.5px;white-space:nowrap}
+.chip.ok{background:var(--green-tint);color:var(--green)}
+
+/* commentary block */
+.cm{border:1px solid var(--blue-line);border-radius:14px;overflow:hidden;margin-bottom:22px}
+.cm-top{background:linear-gradient(135deg,#1769ff 0%,#0b4fcc 100%);color:#fff;padding:18px 20px}
+.cm-label{display:flex;align-items:center;gap:6px;font-size:12.5px;font-weight:600;opacity:.9;margin-bottom:6px}
+.cm-head{margin:0;font-size:21px;font-weight:700;letter-spacing:-.02em;line-height:1.45}
+.cm-body{padding:18px 20px;background:#fbfcff}
+.finds{display:grid;grid-template-columns:1fr;gap:12px}
+@media (min-width:1100px){.finds{grid-template-columns:repeat(3,minmax(0,1fr))}}
+.find{background:#fff;border:1px solid var(--line);border-radius:12px;padding:14px 14px 12px}
+.find-top{display:flex;align-items:center;gap:8px;margin-bottom:8px}
+.find-ic{width:28px;height:28px;border-radius:8px;display:grid;place-items:center;background:var(--blue-tint);color:var(--blue)}
+.find-ic .ms{font-size:18px}
+.find h3{margin:0;font-size:15px}
+.find p{margin:0 0 4px;color:var(--ink-2);font-size:14px;line-height:1.55}
+.acts{margin-top:14px;background:#fff;border:1px solid var(--line);border-radius:12px;padding:14px 16px}
+.acts h4{margin:0 0 8px;font-size:14px;display:flex;align-items:center;gap:6px}
+.acts ol{margin:0;padding:0;list-style:none;display:grid;gap:8px}
+.acts li{display:flex;gap:10px;align-items:flex-start;font-size:14px;color:var(--ink-2)}
+.acts li b{flex:none;width:22px;height:22px;border-radius:50%;background:var(--blue);color:#fff;display:grid;place-items:center;font-size:12px;margin-top:1px}
+.cm-foot{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;padding:10px 20px;border-top:1px solid var(--line-2);font-size:12.5px;color:var(--ink-4);background:#fff}
+.cm-foot a{color:var(--ink-3)}
+
+/* empty / off states */
+.cm-make{display:flex;gap:16px;align-items:center;justify-content:space-between;flex-wrap:wrap;border:1px dashed var(--blue-line);background:var(--blue-tint);border-radius:14px;padding:18px 20px;margin-bottom:22px}
+.cm-make strong{display:block;font-size:16px}
+.cm-make span{color:var(--ink-3);font-size:13.5px}
+.btn{display:inline-flex;align-items:center;gap:6px;border:0;border-radius:10px;background:var(--blue);color:#fff;padding:10px 16px;font:inherit;font-weight:600;font-size:14px;cursor:pointer}
+.btn.ghost{background:#fff;color:var(--ink-2);border:1px solid var(--line)}
+.spin{display:none;align-items:center;gap:8px;color:var(--blue-strong);font-size:14px}
+.spin i{width:16px;height:16px;border-radius:50%;border:2px solid var(--blue-line);border-top-color:var(--blue);animation:r 1s linear infinite}
+@keyframes r{to{transform:rotate(360deg)}}
+
+/* existing chart (context) */
+.sub{font-size:14px;font-weight:700;margin:0 0 10px;display:flex;justify-content:space-between;align-items:baseline}
+.sub span{font-weight:400;color:var(--ink-4);font-size:12.5px}
+.rows{display:grid;gap:9px}
+.row{display:grid;grid-template-columns:120px minmax(0,1fr) 112px;gap:12px;align-items:center;font-size:13.5px}
+@media (max-width:620px){.row{grid-template-columns:88px minmax(0,1fr) 84px;gap:8px}}
+.track{position:relative;height:22px;background:var(--soft);border-radius:6px}
+.bar-pre{position:absolute;top:3px;width:4px;height:16px;margin-left:-2px;border-radius:2px;background:#4b5563;z-index:2}
+.bar-post{position:absolute;top:4px;height:14px;border-radius:5px;background:var(--blue)}
+.target{position:absolute;top:-3px;bottom:-3px;width:2px;background:var(--orange)}
+.val{text-align:right;color:var(--ink-2);font-variant-numeric:tabular-nums}
+.val em{font-style:normal;font-weight:700}
+.up{color:var(--blue-strong)} .flat{color:var(--ink-4)}
+.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:12.5px;color:var(--ink-3);margin-top:10px}
+.legend i{display:inline-block;width:14px;height:8px;border-radius:3px;vertical-align:middle;margin-right:4px}
+.notes{margin-top:16px;display:grid;gap:8px}
+.note{display:flex;gap:8px;align-items:flex-start;font-size:13.5px;padding:10px 12px;border-radius:10px;background:var(--soft);color:var(--ink-2)}
+.note.warn{background:var(--orange-tint);color:var(--orange)}
+
+/* side panel */
+.side{display:grid;gap:14px;position:sticky;top:16px}
+.card{background:var(--sheet);border:1px solid var(--line);border-radius:14px;padding:16px}
+.card h3{margin:0 0 10px;font-size:15px;display:flex;align-items:center;gap:6px}
+.card ul{margin:0;padding-left:18px;color:var(--ink-2);font-size:13.5px;display:grid;gap:6px}
+.kv{display:grid;grid-template-columns:auto 1fr;gap:6px 12px;font-size:13.5px}
+.kv dt{color:var(--ink-3)} .kv dd{margin:0;text-align:right;font-variant-numeric:tabular-nums}
+.meter{height:8px;background:var(--soft);border-radius:4px;overflow:hidden;margin:6px 0 4px}
+.meter i{display:block;height:100%;background:var(--blue)}
+.muted{color:var(--ink-4);font-size:12.5px}
+[hidden]{display:none!important}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="intro">
+    <div>
+      <span class="tag"><span class="ms" style="font-size:16px"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h8l4 4v14H6z"/><path d="M14 3v4h4"/></svg></span>시안 · 2026-11-23</span>
+      <h1>조직 리포트 해설</h1>
+      <p>담당자 조직 리포트 맨 위에 붙는 해설 블록입니다. 아래 해설은 합성 데이터로 실제 Claude(Sonnet 5.5)가 쓴 결과를 그대로 넣었습니다.</p>
+    </div>
+  </div>
+
+  <div class="tabs" role="tablist">
+    <button role="tab" aria-selected="true" data-view="done">① 해설이 있을 때</button>
+    <button role="tab" aria-selected="false" data-view="make">② 아직 만들지 않았을 때</button>
+    <button role="tab" aria-selected="false" data-view="off">③ 꺼짐 · 크레딧 소진 · 월 한도</button>
+  </div>
+
+  <div class="grid">
+    <main class="page">
+      <div class="sec-head">
+        <div class="sec-ic"><span class="ms"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 20V11"/><path d="M12 20V5"/><path d="M19 20v-6"/></svg></span></div>
+        <div>
+          <h2>조직 교육 전후 리포트</h2>
+          <small>교육 전후 완료 42명 · 측정 역량 6개 · 역량별 유효응답 5명 이상만 공개</small>
+        </div>
+        <div class="chips">
+          <span class="chip">2026 하반기 중간관리자 리더십 과정</span>
+          <span class="chip ok">공개 역량 6 / 6</span>
+        </div>
+      </div>
+
+      <!-- ① 해설 -->
+      <section class="cm" data-state="done">
+        <div class="cm-top">
+          <div class="cm-label"><span class="ms" style="font-size:16px"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z"/><path d="M19 16l.7 2 2 .7-2 .7-.7 2-.7-2-2-.7 2-.7z"/></svg></span>한눈에 보는 해설</div>
+          <p class="cm-head">전략적 사고 보완 과정과 현업 적용 여건을 함께 챙길 때입니다</p>
+        </div>
+        <div class="cm-body">
+          <div class="finds">
+            <article class="find">
+              <div class="find-top"><div class="find-ic"><span class="ms"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 17l6-6 4 4 8-8"/><path d="M15 7h6v6"/></svg></span></div><h3>변화는 컸지만 남은 격차</h3></div>
+              <p>성과 관리는 0.46점 올랐지만 목표 3.80점에는 아직 못 미칩니다.</p>
+              <p>전략적 사고는 0.23점 올랐고 목표와 0.59점 차이가 남아 있습니다.</p>
+              <p>변화 수용과 주도는 유지 수준이며 목표와 0.62점 거리가 있습니다.</p>
+            </article>
+            <article class="find">
+              <div class="find-top"><div class="find-ic"><span class="ms"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="6" height="5" rx="1"/><rect x="15" y="10" width="6" height="5" rx="1"/><rect x="15" y="17" width="6" height="5" rx="1"/><path d="M6 8v11h9M6 12.5h9"/></svg></span></div><h3>부서 사이 변화 차이</h3></div>
+              <p>성과 관리 변화는 생산본부가 0.58점, 경영지원이 0.37점입니다.</p>
+              <p>전략적 사고 변화는 영업본부가 0.35점, 생산본부가 0.12점입니다.</p>
+              <p>부서마다 변화가 큰 역량이 달라 보완 방식도 나누어 볼 필요가 있습니다.</p>
+            </article>
+            <article class="find">
+              <div class="find-top"><div class="find-ic"><span class="ms"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="7" width="18" height="13" rx="2"/><path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M3 13h18"/></svg></span></div><h3>적용을 막을 수 있는 여건</h3></div>
+              <p>적용 여건 중 상사·리더 지원은 2.70점, 시간·프로세스는 2.60점으로 낮습니다.</p>
+              <p>장애요인으로 시간·프로세스 제약을 고른 응답이 45%입니다.</p>
+              <p>현업에서 쓸 여건이 받쳐 주지 않으면 적용이 더딜 수 있습니다.</p>
+            </article>
+          </div>
+          <div class="acts">
+            <h4><span class="ms" style="font-size:18px;color:var(--blue)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7l2 2 4-4"/><path d="M4 16l2 2 4-4"/><path d="M13 8h7M13 17h7"/></svg></span>다음에 할 일</h4>
+            <ol>
+              <li><b>1</b><span>전략적 사고 보완을 위해 [공개교육] 전략적 사고와 기획력과 [이러닝] 전략적 사고 기초 중 대상자에게 맞는 과정을 정하세요.</span></li>
+              <li><b>2</b><span>변화 수용과 주도는 [공개교육] 변화관리 리더십과 [단체교육 문의] 변화를 이끄는 조직문화 워크숍을 함께 검토하세요.</span></li>
+              <li><b>3</b><span>참여자의 상사와 만나 업무 시간 확보와 적용 지원 방안을 정하세요.</span></li>
+            </ol>
+          </div>
+        </div>
+        <div class="cm-foot">
+          <span>※ 집계 수치로 자동 작성한 해설입니다. 숫자는 아래 차트가 기준입니다.</span>
+          <span>2026-11-23 14:20 작성 · <a href="#" onclick="return false">다시 만들기 (이번 달 9회 남음)</a></span>
+        </div>
+      </section>
+
+      <!-- ② 만들기 전 -->
+      <section class="cm-make" data-state="make" hidden>
+        <div>
+          <strong>한눈에 보는 해설</strong>
+          <span>역량 변화, 부서 차이, 현업 적용 여건을 묶어 읽은 해설을 만듭니다. 20~40초 걸리고, 한 번 만들면 이 리포트를 여는 사람 모두에게 그대로 보입니다.</span>
+        </div>
+        <div>
+          <button class="btn" id="makeBtn"><span class="ms" style="font-size:18px"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z"/><path d="M19 16l.7 2 2 .7-2 .7-.7 2-.7-2-2-.7 2-.7z"/></svg></span>해설 만들기</button>
+          <span class="spin" id="spin"><i></i>해설을 쓰는 중입니다</span>
+        </div>
+      </section>
+
+      <!-- 기존 리포트 (변경 없음) -->
+      <div class="sub">역량별 교육 전후 <span>짙은 눈금 교육 전 · 파랑 교육 후 · 주황 선 목표</span></div>
+      <div class="rows" id="rows"></div>
+      <div class="legend"><span><i style="background:#4b5563;width:4px;height:12px"></i>교육 전</span><span><i style="background:var(--blue)"></i>교육 후</span><span><i style="background:var(--orange);width:3px;height:12px"></i>목표 3.80</span></div>
+
+      <div class="notes">
+        <div class="note warn"><span class="ms" style="font-size:18px"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4l9 16H3z"/><path d="M12 10v4M12 17v.5"/></svg></span><span>평균이 3.0점 미만이라 먼저 보완할 현업 적용 조건은 시간·프로세스(2.60점), 상사·리더 지원(2.70점)입니다.</span></div>
+        <div class="note"><span class="ms" style="font-size:18px"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.5v.5"/></svg></span><span>가장 많이 꼽힌 적용 장애요인은 '시간·프로세스 제약'(45%)입니다.</span></div>
+      </div>
+      <p class="muted" style="margin:14px 0 0">↑ 여기부터는 지금 운영 중인 리포트와 같습니다(규칙 기반 문구). 해설이 없을 때도 이 부분은 그대로 나옵니다.</p>
+    </main>
+
+    <aside class="side">
+      <div class="card">
+        <h3><span class="ms" style="color:var(--blue)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6h11M9 12h11M9 18h11"/><path d="M4 6h.5M4 12h.5M4 18h.5"/></svg></span>운영 방식</h3>
+        <ul>
+          <li>담당자가 <b>해설 만들기</b>를 눌렀을 때만 만듭니다. 리포트를 연다고 저절로 돈이 나가지 않습니다.</li>
+          <li>만든 해설은 저장합니다. 다시 열거나 PDF를 받을 때는 새로 만들지 않습니다.</li>
+          <li>응답이 새로 들어와 숫자가 바뀌면 <b>다시 만들기</b>가 켜집니다. 프로젝트당 월 10회까지입니다.</li>
+          <li>Claude에는 5명 이상 묶음의 집계 수치만 보냅니다. 이름, 개인 점수, 서술형 응답은 보내지 않습니다.</li>
+          <li>해설 숫자가 입력과 다르면 저장하지 않고 버립니다.</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3><span class="ms" style="color:var(--blue)"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="6" width="18" height="12" rx="2"/><circle cx="12" cy="12" r="2.5"/></svg></span>이 해설 1건의 비용</h3>
+        <dl class="kv">
+          <dt>입력</dt><dd>13,171토큰</dd>
+          <dt>출력</dt><dd>1,831토큰</dd>
+          <dt>실제 비용</dt><dd><b>$0.045</b></dd>
+          <dt>1건 상한</dt><dd>$0.080</dd>
+        </dl>
+        <div class="meter"><i style="width:0.1%"></i></div>
+        <div class="muted">이번 달 해설 배정 $40 중 사용 $0.00 (500건까지)</div>
+      </div>
+      <div class="card">
+        <h3><span class="ms" style="color:var(--blue)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v8"/><path d="M6.5 6.5a8 8 0 1 0 11 0"/></svg></span>꺼질 때</h3>
+        <ul>
+          <li>키 없음, 크레딧 소진, 결제 실패, 월 배정 소진, API 장애 때는 해설 블록이 보이지 않고 ③처럼 지금 리포트만 나옵니다.</li>
+          <li>이미 만든 해설은 크레딧이 없어도 계속 보입니다.</li>
+        </ul>
+      </div>
+    </aside>
+  </div>
+</div>
+<script>
+const data=[["성과 관리",3.12,3.58],["소통과 영향력",3.40,3.71],["전략적 사고",2.98,3.21],["문제해결력",3.55,3.62],["고객 지향",3.90,3.95],["변화 수용과 주도",3.20,3.18]];
+const x=v=>((v-1)/4*100).toFixed(1)+"%";
+document.getElementById("rows").innerHTML=data.map(([n,a,b])=>{
+  const d=(b-a), cls=Math.abs(d)>=0.2?"up":"flat", sign=d>=0?"+":"−";
+  return `<div class="row"><span>${n}</span><div class="track"><span class="bar-pre" style="left:${x(a)}"></span><span class="bar-post" style="width:${x(b)};opacity:.9"></span><span class="target" style="left:${x(3.8)}"></span></div><span class="val">${a.toFixed(2)} → <em>${b.toFixed(2)}</em> <span class="${cls}">${sign}${Math.abs(d).toFixed(2)}</span></span></div>`;
+}).join("");
+const tabs=[...document.querySelectorAll("[role=tab]")];
+function show(view){
+  tabs.forEach(t=>t.setAttribute("aria-selected",String(t.dataset.view===view)));
+  document.querySelector('[data-state="done"]').hidden=view!=="done";
+  document.querySelector('[data-state="make"]').hidden=view!=="make";
+  document.getElementById("makeBtn").style.display="";document.getElementById("spin").style.display="none";
+}
+tabs.forEach(t=>t.addEventListener("click",()=>show(t.dataset.view)));
+document.getElementById("makeBtn").addEventListener("click",()=>{
+  document.getElementById("makeBtn").style.display="none";document.getElementById("spin").style.display="inline-flex";
+  setTimeout(()=>show("done"),1800);
+});
+</script>
+</body>
+</html>
