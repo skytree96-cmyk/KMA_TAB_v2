@@ -43,6 +43,16 @@ def ai_enabled() -> bool:
     return os.environ.get("TAP_AI_ENABLED", "").strip() == "1" and bool(os.environ.get("ANTHROPIC_API_KEY", "").strip())
 
 
+def ai_ready(ledger: Any) -> bool:
+    """Whether a call could start now: switched on, SDK installed and not paused. Budget is checked separately."""
+    try:
+        import importlib.util
+
+        return ai_enabled() and importlib.util.find_spec("anthropic") is not None and ledger.ai_paused_until() <= ledger.now()
+    except Exception:
+        return False
+
+
 def _default_client():
     try:
         import anthropic
@@ -72,7 +82,8 @@ def _error_kind(exc: Exception) -> str:
 
 
 def generate(ledger: Any, feature_key: str, *, system: str, prompt: str, project_id: str | None = None,
-             cache_key: str | None = None, client_factory: Callable[[], Any] | None = None) -> AIResult | None:
+             cache_key: str | None = None, client_factory: Callable[[], Any] | None = None,
+             output_schema: dict | None = None) -> AIResult | None:
     feature = FEATURES.get(feature_key)
     # Batch features are priced at the batch discount; a live call here would cost double.
     if feature is None or feature.monthly_usd <= 0 or feature.batch:
@@ -107,7 +118,8 @@ def generate(ledger: Any, feature_key: str, *, system: str, prompt: str, project
             max_tokens=feature.max_output_tokens,
             system=system,
             messages=[{"role": "user", "content": prompt}],
-            output_config={"effort": feature.effort},
+            output_config={"effort": feature.effort,
+                           **({"format": {"type": "json_schema", "schema": output_schema}} if output_schema else {})},
         )
     except Exception as exc:
         kind = _error_kind(exc)
