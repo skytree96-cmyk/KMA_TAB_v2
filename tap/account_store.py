@@ -1153,6 +1153,23 @@ class AccountStore:
                                 " ON CONFLICT(feature,cache_key) DO UPDATE SET result_text=excluded.result_text,"
                                 " created_at=excluded.created_at", (feature, cache_key, text, self._clock()))
 
+    def ai_latest_result(self, feature: str, prefix: str) -> dict | None:
+        """Most recent stored result whose key starts with prefix (e.g. "<project_id>:")."""
+        with self._transaction() as conn:
+            escaped = prefix.replace("!", "!!").replace("%", "!%").replace("_", "!_")
+            row = self._one(conn, "SELECT cache_key,result_text,created_at FROM tap_ai_results WHERE feature=?"
+                                  " AND cache_key LIKE ? ESCAPE '!' ORDER BY created_at DESC LIMIT 1", (feature, escaped + "%"))
+        return {"cache_key": row["cache_key"], "text": row["result_text"], "created_at": row["created_at"]} if row else None
+
+    def ai_project_month_count(self, feature: str, project_id: str) -> int:
+        """Calls started for one project this month (KST), failures included."""
+        from tap.ai_budget import month_key
+
+        with self._transaction() as conn:
+            row = self._one(conn, "SELECT COUNT(*) AS n FROM tap_ai_usage WHERE month=? AND feature=? AND project_id=?",
+                            (month_key(self._clock()), feature, project_id))
+        return int(row["n"]) if row else 0
+
     def ai_paused_until(self) -> float:
         with self._transaction() as conn:
             row = self._one(conn, "SELECT state_value FROM tap_ai_state WHERE state_key='paused_until'")

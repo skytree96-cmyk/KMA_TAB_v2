@@ -13,6 +13,8 @@ from tap.account_ui_kit import (bar_rows, change_scale, change_summary, chip, fm
                                 stat_tiles)
 from tap.aggregation import aggregate_paired_factor_results
 from tap.config import MIN_GROUP_N
+from tap.report_commentary import build_payload
+from tap.report_commentary_ui import render_commentary
 from tap.data import questions_for_factors
 from tap.scoring import score_pre_post_responses
 
@@ -330,6 +332,8 @@ def render_project_report(store: Any, token: str, project: Mapping[str, Any]) ->
         elif not disclosed:
             st.info(f"각 역량의 교육 전후 유효응답이 {MIN_GROUP_N}명 이상일 때 평균과 변화량을 공개합니다.")
         else:
+            courses = _organization_courses(project["config"], summaries, results)
+            render_commentary(store, project, _commentary_payload(project, summaries, paired, results, courses))
             # The web page is the report; the PDF is the same content to keep or send.
             pdf_column, csv_column = st.columns(2, gap="small")
             with pdf_column:
@@ -353,8 +357,16 @@ def render_project_report(store: Any, token: str, project: Mapping[str, Any]) ->
     _render_team_heatmap(project, results)
     transfer = _render_transfer(results)
     _, below = course_gap_counts(project["config"], _disclosed_scores(summaries))
-    _render_courses(_organization_courses(project["config"], summaries, results), transfer, has_gap=bool(below),
+    _render_courses(courses, transfer, has_gap=bool(below),
                     holds=organization_holds(project["config"], summaries, results))
+
+
+def _commentary_payload(project: Mapping[str, Any], summaries: list[dict[str, Any]], paired: int,
+                        results: list[dict[str, Any]], courses: list[dict[str, Any]]) -> dict[str, Any] | None:
+    """The disclosed aggregates the commentary may use; the same N>=5 rules as the screen."""
+    teams = summarize_by_team(project, results, "department")
+    grid = team_heatmap(teams) if len([team for team in teams if team["paired_n"]]) >= 2 else None
+    return build_payload(project, summaries, paired, grid, summarize_transfer(results), courses)
 
 
 def _detail_csv(project: Mapping[str, Any], results: list[dict[str, Any]], summaries: list[dict[str, Any]]) -> bytes:
