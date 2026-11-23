@@ -993,14 +993,59 @@ def _followup_story(transfer: Mapping[str, Any] | None, courses: list[Mapping[st
     return [*story, *lead]
 
 
+COMMENTARY_NOTICE = "※ 집계 수치로 자동 작성한 해설입니다. 숫자는 이 리포트의 차트와 표가 기준입니다."
+
+
+def _commentary_story(commentary: Mapping[str, Any], width: float) -> list[Any]:
+    """The web report's "한눈에 보는 해설" as one page block: headline band, three findings, next steps."""
+    result = commentary["result"]
+    band = Table([[[_p("한눈에 보는 해설", size=8.5, bold=True, color=colors.white), Spacer(1, 4),
+                    _p(result["headline"], size=15, bold=True, color=colors.white, leading=21)]]],
+                 colWidths=[width], cornerRadii=[12, 12, 12, 12])
+    band.setStyle(TableStyle([("BACKGROUND", (0, 0), (-1, -1), TEAL), ("LEFTPADDING", (0, 0), (-1, -1), 18),
+                              ("RIGHTPADDING", (0, 0), (-1, -1), 18), ("TOPPADDING", (0, 0), (-1, -1), 15),
+                              ("BOTTOMPADDING", (0, 0), (-1, -1), 16)]))
+    findings = list(result["findings"])
+    gap = 10
+    column = (width - gap * (len(findings) - 1)) / len(findings)
+    inner = column - 28
+    cells = [[_inline(NumberBadge(index), _p(item["title"], size=10.2, bold=True), inner), Spacer(1, 7),
+              *_sentences(str(item["body"]), size=8.8, gap=3)] for index, item in enumerate(findings, 1)]
+    tallest = max(_height(_panel(items, column, padding=14), column) for items in cells)
+    panels = [_panel(items + [Spacer(1, tallest - _height(_panel(items, column, padding=14), column))], column, padding=14)
+              for items in cells]
+    row: list[Any] = []
+    widths: list[float] = []
+    for index, panel in enumerate(panels):
+        if index:
+            row.append("")
+            widths.append(gap)
+        row.append(panel)
+        widths.append(column)
+    grid = Table([row], colWidths=widths)
+    grid.setStyle(TableStyle([("VALIGN", (0, 0), (-1, -1), "TOP"), *_FLAT]))
+    steps: list[Any] = [_p("다음에 할 일", size=11, bold=True), Spacer(1, 8)]
+    for index, text in enumerate(result["actions"], 1):
+        if index > 1:
+            steps.append(Spacer(1, 6))
+        steps.append(_inline(NumberBadge(index), _p(text, size=9.2), width - 32))
+    created = str(commentary.get("created_at") or "")
+    notice = _p(COMMENTARY_NOTICE + (f"  작성 {created}" if created else ""), size=7.5, color=MUTED)
+    return [KeepTogether([band, Spacer(1, 10), grid, Spacer(1, 10), _panel(steps, width), Spacer(1, 6), notice])]
+
+
 def build_report_pdf(project: Mapping[str, Any], rows: list[Mapping[str, Any]], *, kind: str,
                      subject: str, participant_count: int = 1, transfer: Mapping[str, Any] | None = None,
                      courses: list[Mapping[str, Any]] | None = None, heatmap: Mapping[str, Any] | None = None,
-                     holds: list[Mapping[str, Any]] | None = None) -> bytes:
+                     holds: list[Mapping[str, Any]] | None = None,
+                     commentary: Mapping[str, Any] | None = None) -> bytes:
     """``heatmap`` is account_insights.team_heatmap's result; it adds the department grid to an organization report.
 
     ``holds`` is account_insights.environment_holds's result: competencies sent to the work environment
     instead of a course, listed above the courses as on the web report.
+
+    ``commentary`` is a stored report commentary ({"result", "created_at"}) made for these same numbers;
+    it gets its own page after the profile, and the competency cards follow on that page.
     """
     prepared = prepare_rows(rows, kind)
     _fonts()
@@ -1097,8 +1142,11 @@ def build_report_pdf(project: Mapping[str, Any], rows: list[Mapping[str, Any]], 
             if sum(_height(flowable, width) for flowable in first_page) > page_h - 39 - 42 - 14:
                 del story[tiles_at:tiles_at + 2]
     story.append(_change_legend(width))
+    if commentary:
+        story.extend([PageBreak(), *_commentary_story(commentary, width)])
     if prepared:
-        story.extend([PageBreak(), _p("역량별 결과와 보완 가이드", size=20, bold=True), Spacer(1, 6),
+        # After the commentary the cards continue on the same page instead of leaving its lower half empty.
+        story.extend([Spacer(1, 22) if commentary else PageBreak(), _p("역량별 결과와 보완 가이드", size=20, bold=True), Spacer(1, 6),
             _p("역량별 교육 전후 변화와 교육 후 행동 빈도 구간에 따른 안내입니다.", size=9, color=MUTED), Spacer(1, 15)])
         targets = config.get("target_means") or {}
         for index, row in enumerate(prepared, 1):

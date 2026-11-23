@@ -11,7 +11,7 @@ from unittest import mock
 
 from tap.account_store import AccountStore
 from tap.report_commentary import (FEATURE, PROJECT_MONTHLY_LIMIT, build_payload, cache_key, commentary_state,
-                                   make_commentary, valid_commentary)
+                                   make_commentary, stored_commentary, valid_commentary)
 from tap.report_commentary_ui import commentary_html
 
 ON = {"TAP_AI_ENABLED": "1", "ANTHROPIC_API_KEY": "test-key"}
@@ -168,10 +168,48 @@ class FlowTests(unittest.TestCase):
             self.assertTrue(commentary_state(self.store, "proj-2", payload())["can_make"])
         self.assertEqual(self.calls, [])
 
+    def test_pdf_uses_only_the_commentary_for_these_numbers(self):
+        self.assertIsNone(stored_commentary(self.store, "proj-1", payload()))
+        with mock.patch.dict(os.environ, ON):
+            self.make()
+        self.assertEqual(stored_commentary(self.store, "proj-1", payload())["result"], GOOD)
+        changed = build_payload(PROJECT, [{**SUMMARIES[0], "post_mean": 3.6}, SUMMARIES[1]], 43, GRID, TRANSFER, COURSES)
+        self.assertIsNone(stored_commentary(self.store, "proj-1", changed))
+        self.assertIsNone(stored_commentary(self.store, "proj-1", None))
+        broken = mock.Mock()
+        broken.ai_cached.side_effect = RuntimeError("db down")
+        self.assertIsNone(stored_commentary(broken, "proj-1", payload()))
+
     def test_like_prefix_is_escaped(self):
         self.store.ai_store_result(FEATURE, "p_1:abc", json.dumps({"result": GOOD, "created_at": "x"}))
         self.assertIsNone(self.store.ai_latest_result(FEATURE, "pX1:"))
         self.assertIsNotNone(self.store.ai_latest_result(FEATURE, "p_1:"))
+
+
+class PdfTests(unittest.TestCase):
+    def build(self, **extra):
+        from tap.account_report_pdf import build_report_pdf
+
+        rows = [{"factor_code": row["factor_code"], "factor_name_ko": row["factor_name_ko"], "module_group": "",
+                 "pre_score": row["pre_mean"], "post_score": row["post_mean"],
+                 "change": round(row["post_mean"] - row["pre_mean"], 2), "valid_n": row["paired_n"]} for row in SUMMARIES[:2]]
+        return build_report_pdf(PROJECT, rows, kind="organization", subject="조직 전체", participant_count=42,
+                                transfer=TRANSFER, courses=[], **extra)
+
+    def test_commentary_page_in_organization_pdf(self):
+        from io import BytesIO
+        from pypdf import PdfReader
+
+        def text(pdf):
+            return "".join(page.extract_text() for page in PdfReader(BytesIO(pdf)).pages).replace(" ", "")
+
+        with_commentary = text(self.build(commentary={"result": GOOD, "created_at": "2026-11-23 14:20"}))
+        without = text(self.build())
+        self.assertIn("한눈에보는해설", with_commentary)
+        self.assertIn("다음에할일", with_commentary)
+        self.assertIn("자동작성한해설", with_commentary)
+        self.assertNotIn("한눈에보는해설", without)
+        self.assertIn("역량별결과와보완가이드", with_commentary)
 
 
 if __name__ == "__main__":

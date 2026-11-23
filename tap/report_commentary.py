@@ -168,6 +168,17 @@ def _decode(text: str | None) -> dict[str, Any] | None:
     return stored if isinstance(stored, dict) and "result" in stored else None
 
 
+def stored_commentary(store: Any, project_id: str, payload: Mapping[str, Any] | None) -> dict[str, Any] | None:
+    """The commentary made for exactly these numbers, for the PDF. Never calls the API; any failure is None."""
+    if not payload:
+        return None
+    try:
+        stored = _decode(store.ai_cached(FEATURE, cache_key(project_id, payload)))
+    except Exception:
+        return None
+    return stored if stored and valid_commentary(stored["result"], payload) else None
+
+
 def commentary_state(store: Any, project_id: str, payload: Mapping[str, Any]) -> dict[str, Any]:
     """What the report shows: the commentary for these numbers, an older one, and whether one can be made."""
     try:

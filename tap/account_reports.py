@@ -13,7 +13,7 @@ from tap.account_ui_kit import (bar_rows, change_scale, change_summary, chip, fm
                                 stat_tiles)
 from tap.aggregation import aggregate_paired_factor_results
 from tap.config import MIN_GROUP_N
-from tap.report_commentary import build_payload
+from tap.report_commentary import build_payload, stored_commentary
 from tap.report_commentary_ui import render_commentary
 from tap.data import questions_for_factors
 from tap.scoring import score_pre_post_responses
@@ -116,12 +116,15 @@ def export_report_pdf(store: Any, token: str, project: Mapping[str, Any], assign
                      "pre_score":row.get("pre_mean"),"post_score":row.get("post_mean"),"change":row.get("observed_change"),
                      "valid_n":row.get("paired_n",0)})
     count = len({row["user_id"] for row in results if row.get("pre_completed") and row.get("post_completed")})
+    courses = _organization_courses(config, summaries.values(), results)
     _record_access(store, token, project, "download_organization_pdf")
     # The PDF decides whether the department page is worth printing.
     return build_report_pdf(project, rows, kind="organization", subject="조직 전체", participant_count=count,
-                            transfer=summarize_transfer(results), courses=_organization_courses(config, summaries.values(), results),
+                            transfer=summarize_transfer(results), courses=courses,
                             holds=organization_holds(config, summaries.values(), results),
-                            heatmap=team_heatmap(summarize_by_team(project, results)))
+                            heatmap=team_heatmap(summarize_by_team(project, results)),
+                            commentary=stored_commentary(store, str(project["id"]),
+                                                         _commentary_payload(project, list(summaries.values()), count, results, courses)))
 
 
 def _record_access(store: Any, token: str, project: Mapping[str, Any], event: str, assignment_id: str | None = None) -> None:
